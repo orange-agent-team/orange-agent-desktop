@@ -6,7 +6,7 @@
 
 `apps/desktop` 是Flutter应用E06；`crates/desktop-bridge` 是Rust桥接E05。Flutter通过FRB 2.13.0的配对生成物调用经过审阅的DTO和命令，Native Assets hook编译/打包Rust库。当前没有额外业务工程、Node BFF或Cargokit拷贝。
 
-E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`628cd5f3acb340c7349bfc8822f3f167e3020718`的源码发行包；`config/runtime.lock.json`绑定整个archive和release manifest摘要，`vendor/runtime-628cd5f`保存独立构建需要的源码。供应方只从Git commit导出，不从工作树复制未提交内容；接收方校验全部文件与来源清单。vendor中的副本不改变核心工程所有权，也不按新增项目统计。
+E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`ee0e19b3a311cabcd4b58de8201460d19d729873`的源码发行包；`config/runtime.lock.json`绑定archive和release manifest摘要，`vendor/runtime-ee0e19b`保存独立源码。供应方只从Git commit导出；接收方校验文件清单及Cargo实际依赖路径。vendor副本不改变核心工程所有权，也不按新增项目或自研代码量重复统计。
 
 桌面虚拟Cargo workspace只有E05，明确排除vendor中的共享workspace，防止其继承桌面错误的依赖定义。依赖锁从已验证Runtime锁出发，增加固定FRB依赖；真实客户端锁记录在桌面根Cargo.lock。E04源码随固定包提供，当前E05并未启动任何模型引擎。
 
@@ -19,7 +19,11 @@ E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护
 | `validateAmount(handle,value)` | 用共享E01验证非负i64规范十进制字符串，原样无损返回 | 纯校验，不创建预算、不冻结余额、不收款 |
 | `closeHost(handle)` | 关闭当前本地存储句柄；再次打开生成新句柄 | 不表示GPU已释放，也不表示任何未来Job已取消 |
 
-可见DTO只有`HostView`和`BridgeError`。错误带稳定code和随机correlation ID，不透出底层路径或SQL错误。Host/HostRegistry及其Default实现移出FRB输入命名空间；生成脚本自动核对允许的类和函数集合，避免内部对象意外导出。
+可见DTO为`HostView`、`BridgeError`、`WorkspaceView`、`RunSummary`、`RunPage`。错误带稳定code和随机correlation ID，不透出底层路径或SQL错误。Host/HostRegistry及Default实现位于FRB输入命名空间之外；生成脚本核对允许的类和函数集合，避免内部对象意外导出。
+
+新增命令：`authorizeWorkspace`、`listWorkspaces`、`restoreWorkspaceAccess`、`revokeWorkspace`及`listRuns`。owner由Rust本机profile固定，不接受Dart伪造云owner。工作区DTO将持久`permissionActive`与当前Host的`sessionAccess`分开；旧Host句柄、旧授权请求和已撤销记录不能恢复访问。Run查询只传状态/计数，不传prompt或工具正文。
+
+macOS使用真实NSOpenPanel取得只读目录选择，安全作用域URL由Swift持有，Dart只持随机选择引用；Rust负责持久授权、目录身份和私有根校验。当前不保存OS安全书签，重启后通过重新选择恢复访问，不凭路径自动重建系统权限。`restoreWorkspaceAccess`仅供已完成OS权限核验的可信适配器调用，UI当前采用重新选择流程。Windows/Linux选择器尚未认证，明确拒绝未支持的平台入口。
 
 Rust持有Journal与独占锁。句柄不可猜测且绑定当前进程应用上下文，关闭后不能使用旧句柄操作新Host。FRB默认异步投递到Rust线程；不是通过Dart字段缓存来决定权限或金额有效性。
 
@@ -33,7 +37,7 @@ FRB生成Rust/Dart配对内容摘要，构建前检查`config/generated-bridge.l
 
 ## 后续接口演进
 
-接续E05-W02～W04：工作区授权记录与撤销、Run启动/推进/批准/取消、持久事件游标、慢消费者背压、成果句柄和退出排空。不得在Dart里复制E03执行状态机，不得让模型批准工具。
+接续E05-W02～W04：Run启动/推进/批准/取消、持久事件游标、慢消费者背压、成果句柄和退出排空；完整OS书签/多平台权限恢复另行认证。不得在Dart复制E03状态机，不得让模型批准工具。
 
 模型与GPU引擎由独立受管进程执行；桌面UI进程不加载GPU模型。接E08 Broker时必须区分本地存储关闭、Run取消、引擎退出和设备清理证据。云账户将接单独的原生授权流程，不能复用Admin cookie或把Web开发token复制到桌面。
 

@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// The trusted UI supplies an OS application-data directory, never model input.
 Future<HostView> initializeHost({required String applicationDataDirectory}) =>
@@ -30,6 +30,56 @@ Future<String> validateAmount({
 /// Closing a local handle does not assert any GPU or Job resource release.
 Future<void> closeHost({required String handle}) =>
     RustLib.instance.api.crateApiHostCloseHost(handle: handle);
+
+/// Called only after the trusted platform UI obtains explicit directory consent.
+Future<WorkspaceView> authorizeWorkspace({
+  required String handle,
+  required String requestId,
+  required String selectedDirectory,
+}) => RustLib.instance.api.crateApiHostAuthorizeWorkspace(
+  handle: handle,
+  requestId: requestId,
+  selectedDirectory: selectedDirectory,
+);
+
+Future<List<WorkspaceView>> listWorkspaces({
+  required String handle,
+  required bool includeRevoked,
+}) => RustLib.instance.api.crateApiHostListWorkspaces(
+  handle: handle,
+  includeRevoked: includeRevoked,
+);
+
+/// Restore only after the platform has revalidated its OS permission/bookmark.
+Future<WorkspaceView> restoreWorkspaceAccess({
+  required String handle,
+  required String workspaceId,
+}) => RustLib.instance.api.crateApiHostRestoreWorkspaceAccess(
+  handle: handle,
+  workspaceId: workspaceId,
+);
+
+Future<WorkspaceView> revokeWorkspace({
+  required String handle,
+  required String workspaceId,
+  required String expectedVersion,
+}) => RustLib.instance.api.crateApiHostRevokeWorkspace(
+  handle: handle,
+  workspaceId: workspaceId,
+  expectedVersion: expectedVersion,
+);
+
+Future<RunPage> listRuns({
+  required String handle,
+  String? workspaceId,
+  String? before,
+  required int limit,
+}) => RustLib.instance.api.crateApiHostListRuns(
+  handle: handle,
+  workspaceId: workspaceId,
+  before: before,
+  limit: limit,
+);
 
 class BridgeError implements FrbException {
   final String code;
@@ -82,4 +132,96 @@ class HostView {
           runtimeVersion == other.runtimeVersion &&
           runtimeSourceCommit == other.runtimeSourceCommit &&
           availableReadTools == other.availableReadTools;
+}
+
+class RunPage {
+  final List<RunSummary> runs;
+  final String? nextCursor;
+
+  const RunPage({required this.runs, this.nextCursor});
+
+  @override
+  int get hashCode => runs.hashCode ^ nextCursor.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RunPage &&
+          runtimeType == other.runtimeType &&
+          runs == other.runs &&
+          nextCursor == other.nextCursor;
+}
+
+class RunSummary {
+  final String runId;
+  final String? workspaceId;
+  final String phase;
+  final int steps;
+  final int invocations;
+  final bool active;
+
+  const RunSummary({
+    required this.runId,
+    this.workspaceId,
+    required this.phase,
+    required this.steps,
+    required this.invocations,
+    required this.active,
+  });
+
+  @override
+  int get hashCode =>
+      runId.hashCode ^
+      workspaceId.hashCode ^
+      phase.hashCode ^
+      steps.hashCode ^
+      invocations.hashCode ^
+      active.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RunSummary &&
+          runtimeType == other.runtimeType &&
+          runId == other.runId &&
+          workspaceId == other.workspaceId &&
+          phase == other.phase &&
+          steps == other.steps &&
+          invocations == other.invocations &&
+          active == other.active;
+}
+
+class WorkspaceView {
+  final String workspaceId;
+  final String displayPath;
+  final String permissionVersion;
+  final bool permissionActive;
+  final bool sessionAccess;
+
+  const WorkspaceView({
+    required this.workspaceId,
+    required this.displayPath,
+    required this.permissionVersion,
+    required this.permissionActive,
+    required this.sessionAccess,
+  });
+
+  @override
+  int get hashCode =>
+      workspaceId.hashCode ^
+      displayPath.hashCode ^
+      permissionVersion.hashCode ^
+      permissionActive.hashCode ^
+      sessionAccess.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WorkspaceView &&
+          runtimeType == other.runtimeType &&
+          workspaceId == other.workspaceId &&
+          displayPath == other.displayPath &&
+          permissionVersion == other.permissionVersion &&
+          permissionActive == other.permissionActive &&
+          sessionAccess == other.sessionAccess;
 }

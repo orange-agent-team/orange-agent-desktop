@@ -35,6 +35,10 @@ Rust1.97.1下，实际Mac应用构建完成，但打包前cdylib及打包后fram
 
 ## 当前认证边界
 
-SDK摘要/提交/版本实际通过；共享Runtime独立包的49项Rust测试和篡改拒绝通过；E05的2项Rust测试、Clippy和Dart analyze通过。真实打包Flutter/FRB/SQLite集成在1.98.1下通过，并已构建普通macOS ARM64开发app，产物摘要记录在`.local/build-evidence/flutter-macos.json`。自动将窗口置前仍有系统返回警告，因此不把后台集成测试当作完整桌面交互/可访问性认证。
+SDK摘要/提交/版本实际通过；新版共享Runtime包的57项Rust测试和篡改拒绝通过；E05的3项Rust测试、Clippy和Dart analyze通过。真实打包Flutter/FRB/SQLite流程验证了授权、重启后sessionAccess=false、显式恢复、撤销和私有根拒绝；按钮测试中的系统选择回调是明确替身，业务Rust/SQLite是真实执行。
 
-即使Mac原生调用通过，也只证明Host连接、私有SQLite、类型与旧句柄行为。完整Agent UI、云身份、工作区访问、模型执行、GPU、Windows/Linux实机、正式签名和公证仍需分别完成。
+另通过计算机使用工具观察到实际NSOpenPanel打开、用户完成目录选择、应用显示只读授权；没有读取用户目录文件内容，也未撤销用户已选择的目录。GUI撤销没有手工完成，使用隔离目录的自动化按钮流程验证。观察记录位于`.local/ui-tests/workspace-ui-observation.json`，不保存系统文件列表。
+
+普通macOS ARM64开发app及产物摘要位于`.local/build-evidence/flutter-macos.json`。自动将窗口置前仍有系统返回警告，因此不把后台集成测试当作完整交互/可访问性认证。
+
+当前证明Host/工作区元数据、私有SQLite、类型与句柄及上述只读授权流程。完整Agent UI、云身份、工具执行/模型运行、OS安全书签、GPU、Windows/Linux实机、正式签名和公证仍需分别完成。

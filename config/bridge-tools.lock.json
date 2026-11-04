@@ -3,6 +3,6 @@
   "flutter_rust_bridge": "2.13.0",
   "cargo_expand": "1.0.126",
   "integration_backend": "native-assets",
-  "public_classes": ["BridgeError", "HostView"],
-  "public_functions": ["closeHost", "initializeHost", "inspectHost", "validateAmount"]
+  "public_classes": ["BridgeError", "HostView", "WorkspaceView", "RunSummary", "RunPage"],
+  "public_functions": ["closeHost", "initializeHost", "inspectHost", "validateAmount", "authorizeWorkspace", "listWorkspaces", "restoreWorkspaceAccess", "revokeWorkspace", "listRuns"]
 }

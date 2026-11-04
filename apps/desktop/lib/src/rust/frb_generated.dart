@@ -69,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1448414285;
+  int get rustContentHash => 2083827658;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -81,6 +81,12 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  Future<WorkspaceView> crateApiHostAuthorizeWorkspace({
+    required String handle,
+    required String requestId,
+    required String selectedDirectory,
+  });
+
   Future<void> crateApiHostCloseHost({required String handle});
 
   Future<void> crateApiHostInitApp();
@@ -90,6 +96,29 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<HostView> crateApiHostInspectHost({required String handle});
+
+  Future<RunPage> crateApiHostListRuns({
+    required String handle,
+    String? workspaceId,
+    String? before,
+    required int limit,
+  });
+
+  Future<List<WorkspaceView>> crateApiHostListWorkspaces({
+    required String handle,
+    required bool includeRevoked,
+  });
+
+  Future<WorkspaceView> crateApiHostRestoreWorkspaceAccess({
+    required String handle,
+    required String workspaceId,
+  });
+
+  Future<WorkspaceView> crateApiHostRevokeWorkspace({
+    required String handle,
+    required String workspaceId,
+    required String expectedVersion,
+  });
 
   Future<String> crateApiHostValidateAmount({
     required String handle,
@@ -106,6 +135,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
+  Future<WorkspaceView> crateApiHostAuthorizeWorkspace({
+    required String handle,
+    required String requestId,
+    required String selectedDirectory,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(requestId, serializer);
+          sse_encode_String(selectedDirectory, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 1,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_workspace_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostAuthorizeWorkspaceConstMeta,
+        argValues: [handle, requestId, selectedDirectory],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostAuthorizeWorkspaceConstMeta =>
+      const TaskConstMeta(
+        debugName: "authorize_workspace",
+        argNames: ["handle", "requestId", "selectedDirectory"],
+      );
+
+  @override
   Future<void> crateApiHostCloseHost({required String handle}) {
     return handler.executeNormal(
       NormalTask(
@@ -115,7 +181,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 1,
+            funcId: 2,
             port: port_,
           );
         },
@@ -142,7 +208,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 2,
+            funcId: 3,
             port: port_,
           );
         },
@@ -172,7 +238,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 4,
             port: port_,
           );
         },
@@ -202,7 +268,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 5,
             port: port_,
           );
         },
@@ -221,6 +287,150 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "inspect_host", argNames: ["handle"]);
 
   @override
+  Future<RunPage> crateApiHostListRuns({
+    required String handle,
+    String? workspaceId,
+    String? before,
+    required int limit,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_opt_String(workspaceId, serializer);
+          sse_encode_opt_String(before, serializer);
+          sse_encode_u_16(limit, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_run_page,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostListRunsConstMeta,
+        argValues: [handle, workspaceId, before, limit],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostListRunsConstMeta => const TaskConstMeta(
+    debugName: "list_runs",
+    argNames: ["handle", "workspaceId", "before", "limit"],
+  );
+
+  @override
+  Future<List<WorkspaceView>> crateApiHostListWorkspaces({
+    required String handle,
+    required bool includeRevoked,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_bool(includeRevoked, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 7,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_workspace_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostListWorkspacesConstMeta,
+        argValues: [handle, includeRevoked],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostListWorkspacesConstMeta => const TaskConstMeta(
+    debugName: "list_workspaces",
+    argNames: ["handle", "includeRevoked"],
+  );
+
+  @override
+  Future<WorkspaceView> crateApiHostRestoreWorkspaceAccess({
+    required String handle,
+    required String workspaceId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(workspaceId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_workspace_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostRestoreWorkspaceAccessConstMeta,
+        argValues: [handle, workspaceId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostRestoreWorkspaceAccessConstMeta =>
+      const TaskConstMeta(
+        debugName: "restore_workspace_access",
+        argNames: ["handle", "workspaceId"],
+      );
+
+  @override
+  Future<WorkspaceView> crateApiHostRevokeWorkspace({
+    required String handle,
+    required String workspaceId,
+    required String expectedVersion,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(workspaceId, serializer);
+          sse_encode_String(expectedVersion, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_workspace_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostRevokeWorkspaceConstMeta,
+        argValues: [handle, workspaceId, expectedVersion],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostRevokeWorkspaceConstMeta =>
+      const TaskConstMeta(
+        debugName: "revoke_workspace",
+        argNames: ["handle", "workspaceId", "expectedVersion"],
+      );
+
+  @override
   Future<String> crateApiHostValidateAmount({
     required String handle,
     required String value,
@@ -234,7 +444,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 10,
             port: port_,
           );
         },
@@ -258,6 +468,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
+  }
+
+  @protected
+  bool dco_decode_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
   }
 
   @protected
@@ -300,6 +516,64 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<RunSummary> dco_decode_list_run_summary(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_run_summary).toList();
+  }
+
+  @protected
+  List<WorkspaceView> dco_decode_list_workspace_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_workspace_view).toList();
+  }
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
+  RunPage dco_decode_run_page(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return RunPage(
+      runs: dco_decode_list_run_summary(arr[0]),
+      nextCursor: dco_decode_opt_String(arr[1]),
+    );
+  }
+
+  @protected
+  RunSummary dco_decode_run_summary(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return RunSummary(
+      runId: dco_decode_String(arr[0]),
+      workspaceId: dco_decode_opt_String(arr[1]),
+      phase: dco_decode_String(arr[2]),
+      steps: dco_decode_u_32(arr[3]),
+      invocations: dco_decode_u_32(arr[4]),
+      active: dco_decode_bool(arr[5]),
+    );
+  }
+
+  @protected
+  int dco_decode_u_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
   int dco_decode_u_8(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -312,10 +586,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WorkspaceView dco_decode_workspace_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return WorkspaceView(
+      workspaceId: dco_decode_String(arr[0]),
+      displayPath: dco_decode_String(arr[1]),
+      permissionVersion: dco_decode_String(arr[2]),
+      permissionActive: dco_decode_bool(arr[3]),
+      sessionAccess: dco_decode_bool(arr[4]),
+    );
+  }
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_prim_u_8_strict(deserializer);
     return utf8.decoder.convert(inner);
+  }
+
+  @protected
+  bool sse_decode_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint8() != 0;
   }
 
   @protected
@@ -363,6 +658,82 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<RunSummary> sse_decode_list_run_summary(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <RunSummary>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_run_summary(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<WorkspaceView> sse_decode_list_workspace_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <WorkspaceView>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_workspace_view(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  RunPage sse_decode_run_page(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_runs = sse_decode_list_run_summary(deserializer);
+    var var_nextCursor = sse_decode_opt_String(deserializer);
+    return RunPage(runs: var_runs, nextCursor: var_nextCursor);
+  }
+
+  @protected
+  RunSummary sse_decode_run_summary(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_runId = sse_decode_String(deserializer);
+    var var_workspaceId = sse_decode_opt_String(deserializer);
+    var var_phase = sse_decode_String(deserializer);
+    var var_steps = sse_decode_u_32(deserializer);
+    var var_invocations = sse_decode_u_32(deserializer);
+    var var_active = sse_decode_bool(deserializer);
+    return RunSummary(
+      runId: var_runId,
+      workspaceId: var_workspaceId,
+      phase: var_phase,
+      steps: var_steps,
+      invocations: var_invocations,
+      active: var_active,
+    );
+  }
+
+  @protected
+  int sse_decode_u_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint16();
+  }
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
+  }
+
+  @protected
   int sse_decode_u_8(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8();
@@ -374,21 +745,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WorkspaceView sse_decode_workspace_view(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_workspaceId = sse_decode_String(deserializer);
+    var var_displayPath = sse_decode_String(deserializer);
+    var var_permissionVersion = sse_decode_String(deserializer);
+    var var_permissionActive = sse_decode_bool(deserializer);
+    var var_sessionAccess = sse_decode_bool(deserializer);
+    return WorkspaceView(
+      workspaceId: var_workspaceId,
+      displayPath: var_displayPath,
+      permissionVersion: var_permissionVersion,
+      permissionActive: var_permissionActive,
+      sessionAccess: var_sessionAccess,
+    );
+  }
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
   }
 
   @protected
-  bool sse_decode_bool(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getUint8() != 0;
-  }
-
-  @protected
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
+  }
+
+  @protected
+  void sse_encode_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint8(self ? 1 : 0);
   }
 
   @protected
@@ -428,6 +816,70 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_run_summary(
+    List<RunSummary> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_run_summary(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_workspace_view(
+    List<WorkspaceView> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_workspace_view(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_String(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_run_page(RunPage self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_run_summary(self.runs, serializer);
+    sse_encode_opt_String(self.nextCursor, serializer);
+  }
+
+  @protected
+  void sse_encode_run_summary(RunSummary self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.runId, serializer);
+    sse_encode_opt_String(self.workspaceId, serializer);
+    sse_encode_String(self.phase, serializer);
+    sse_encode_u_32(self.steps, serializer);
+    sse_encode_u_32(self.invocations, serializer);
+    sse_encode_bool(self.active, serializer);
+  }
+
+  @protected
+  void sse_encode_u_16(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint16(self);
+  }
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
+  }
+
+  @protected
   void sse_encode_u_8(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self);
@@ -439,14 +891,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_i_32(int self, SseSerializer serializer) {
+  void sse_encode_workspace_view(WorkspaceView self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putInt32(self);
+    sse_encode_String(self.workspaceId, serializer);
+    sse_encode_String(self.displayPath, serializer);
+    sse_encode_String(self.permissionVersion, serializer);
+    sse_encode_bool(self.permissionActive, serializer);
+    sse_encode_bool(self.sessionAccess, serializer);
   }
 
   @protected
-  void sse_encode_bool(bool self, SseSerializer serializer) {
+  void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putUint8(self ? 1 : 0);
+    serializer.buffer.putInt32(self);
   }
 }

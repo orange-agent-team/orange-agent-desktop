@@ -6,6 +6,6 @@ Flutter负责会话、工具批准、成果、模型/Worker、钱包团队等交
 
 平台Admin Panel位于独立网页入口，不嵌入桌面或向模型开放管理权限。桌面组织owner/admin仍是租户角色，不等同于平台管理员。用户本机GPU经Broker许可与受管监督器执行，服务端仓库归属不强制任务上云。
 
-本地Git已初始化。E05位于`crates/desktop-bridge`，E06位于`apps/desktop`；已实现私有本地记录初始化、不可猜测Host句柄、旧句柄拒绝和规范金额字符串验证。应用目前明确显示为开发预览，会话执行、模型管理、工作区授权与云身份尚未接入，不能视作完整桌面Agent。
+本地Git已初始化。E05位于`crates/desktop-bridge`，E06位于`apps/desktop`；已实现私有本地记录、Host句柄、规范金额、只读工作区选择/授权/撤销和Run状态查询。重启后保留授权记录，但须重新选择目录开放本次访问。应用仍为开发预览，会话执行、模型管理与云身份尚未接入。
 
-共享内核来自服务端固定提交的可校验源码包，存放在本仓库`vendor/runtime-628cd5f`。普通构建不读取相邻服务端目录。参见[架构与边界](docs/architecture.md)、[构建和验证](docs/build-and-verification.md)。实际原生测试和目标平台认证以执行台账为准，不能以生成了平台目录认定通过。
+共享内核来自服务端固定提交的可校验源码包，存放在本仓库`vendor/runtime-ee0e19b`。普通构建校验实际Cargo依赖路径和源码摘要，不读取相邻服务端目录。参见[架构与边界](docs/architecture.md)、[构建和验证](docs/build-and-verification.md)。实际原生测试和目标平台认证以执行台账为准。

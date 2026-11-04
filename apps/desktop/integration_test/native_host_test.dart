@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:orange_desktop/main.dart';
@@ -25,7 +28,7 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          '628cd5f3acb340c7349bfc8822f3f167e3020718',
+          'ee0e19b3a311cabcd4b58de8201460d19d729873',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(
@@ -107,6 +110,134 @@ void main() {
           (await inspectHost(handle: reopened.handle)).handle,
           reopened.handle,
         );
+        final workspace = await Directory.systemTemp.createTemp(
+          'orange-workspace-consent-',
+        );
+        try {
+          // Explicit test-only consent to this app-owned temporary directory. This
+          // proves the native boundary, not an OS picker/bookmark interaction.
+          final grant = await authorizeWorkspace(
+            handle: reopened.handle,
+            requestId: 'test-consent',
+            selectedDirectory: workspace.path,
+          );
+          expect(grant.permissionActive, isTrue);
+          expect(grant.sessionAccess, isTrue);
+          expect(
+            (await listWorkspaces(
+              handle: reopened.handle,
+              includeRevoked: false,
+            )).single.workspaceId,
+            grant.workspaceId,
+          );
+          expect(
+            (await listRuns(handle: reopened.handle, limit: 100)).runs,
+            isEmpty,
+          );
+          await closeHost(handle: reopened.handle);
+          openHandle = null;
+          final third = await initializeHost(
+            applicationDataDirectory: directory.path,
+          );
+          openHandle = third.handle;
+          final saved = (await listWorkspaces(
+            handle: third.handle,
+            includeRevoked: false,
+          )).single;
+          expect(saved.permissionActive, isTrue);
+          expect(saved.sessionAccess, isFalse);
+          expect(
+            (await restoreWorkspaceAccess(
+              handle: third.handle,
+              workspaceId: saved.workspaceId,
+            )).sessionAccess,
+            isTrue,
+          );
+          final revoked = await revokeWorkspace(
+            handle: third.handle,
+            workspaceId: saved.workspaceId,
+            expectedVersion: saved.permissionVersion,
+          );
+          expect(revoked.permissionActive, isFalse);
+          expect(revoked.sessionAccess, isFalse);
+          await expectLater(
+            restoreWorkspaceAccess(
+              handle: third.handle,
+              workspaceId: saved.workspaceId,
+            ),
+            throwsA(
+              isA<BridgeError>().having(
+                (e) => e.code,
+                'code',
+                'WORKSPACE_REVOKED',
+              ),
+            ),
+          );
+          final released = <String>[];
+          var choosePrivateRoot = false;
+          const channel = MethodChannel('orange_agent/platform');
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (call) async {
+                if (call.method == 'chooseWorkspace') {
+                  return <String, String>{
+                    'selectionId': choosePrivateRoot
+                        ? 'ui-private-fixture'
+                        : 'ui-workspace-fixture',
+                    'path': choosePrivateRoot ? directory.path : workspace.path,
+                  };
+                }
+                if (call.method == 'releaseWorkspaceSelection') {
+                  released.add(
+                    (call.arguments as Map)['selectionId'] as String,
+                  );
+                  return null;
+                }
+                throw StateError('Unexpected platform callback ${call.method}');
+              });
+          try {
+            await tester.pumpWidget(
+              OrangeDesktopApp(
+                key: UniqueKey(),
+                connect: () => inspectHost(handle: third.handle),
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.ensureVisible(find.text('选择文件夹'));
+            await tester.tap(find.text('选择文件夹'));
+            await tester.pumpAndSettle();
+            expect(find.text('本次只读访问已授权'), findsOneWidget);
+            expect(
+              (await listWorkspaces(
+                handle: third.handle,
+                includeRevoked: false,
+              )).length,
+              1,
+            );
+            await tester.ensureVisible(find.text('撤销访问'));
+            await tester.tap(find.text('撤销访问'));
+            await tester.pumpAndSettle();
+            expect(find.text('尚未授权工作区'), findsOneWidget);
+            expect(released, contains('ui-workspace-fixture'));
+            expect(
+              await listWorkspaces(handle: third.handle, includeRevoked: false),
+              isEmpty,
+            );
+            choosePrivateRoot = true;
+            await tester.tap(find.text('选择文件夹'));
+            await tester.pumpAndSettle();
+            expect(find.textContaining('受保护的应用数据'), findsOneWidget);
+            expect(released, contains('ui-private-fixture'));
+            expect(
+              await listWorkspaces(handle: third.handle, includeRevoked: false),
+              isEmpty,
+            );
+          } finally {
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+                .setMockMethodCallHandler(channel, null);
+          }
+        } finally {
+          await workspace.delete(recursive: true);
+        }
       } finally {
         if (openHandle != null) await closeHost(handle: openHandle);
         await directory.delete(recursive: true);

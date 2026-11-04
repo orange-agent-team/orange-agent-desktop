@@ -1,5 +1,6 @@
 //! Native Host state is intentionally outside the FRB API namespace.
-use crate::api::host::{BridgeError, HostView};
+use crate::api::host::{BridgeError, HostView, RunPage, RunSummary, WorkspaceView};
+use orange_agent_runtime::workspaces::WorkspaceStoreError;
 use orange_agent_runtime::{Journal, workspace};
 use orange_domain::Credits;
 use std::{
@@ -18,7 +19,8 @@ fn failure(code: &str) -> BridgeError {
 struct Host {
     root: PathBuf,
     view: HostView,
-    _journal: Journal,
+    journal: Journal,
+    grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
 }
 #[derive(Default)]
 struct HostRegistry {
@@ -75,7 +77,8 @@ impl HostRegistry {
         self.host = Some(Host {
             root,
             view: view.clone(),
-            _journal: journal,
+            journal,
+            grants: std::collections::HashMap::new(),
         });
         Ok(view)
     }
@@ -102,6 +105,142 @@ impl HostRegistry {
             .map(|c| c.to_string())
             .map_err(|_| failure("INVALID_AMOUNT"))
     }
+    fn current(&mut self, handle: &str) -> Result<&mut Host, BridgeError> {
+        self.host
+            .as_mut()
+            .filter(|h| h.view.handle == handle)
+            .ok_or_else(|| failure("STALE_HOST_HANDLE"))
+    }
+    fn authorize_workspace(
+        &mut self,
+        handle: &str,
+        request: &str,
+        path: &Path,
+    ) -> Result<WorkspaceView, BridgeError> {
+        if !path.is_absolute() {
+            return Err(failure("INVALID_WORKSPACE_DIRECTORY"));
+        }
+        let host = self.current(handle)?;
+        let view = host
+            .journal
+            .authorize_workspace(LOCAL_OWNER, request, path, READ_POLICY)
+            .map_err(workspace_error)?;
+        let grant = host
+            .journal
+            .open_workspace(LOCAL_OWNER, &view.workspace_id)
+            .map_err(workspace_error)?;
+        host.grants.insert(view.workspace_id.clone(), grant);
+        Ok(project_workspace(host, view))
+    }
+    fn list_workspaces(
+        &mut self,
+        handle: &str,
+        include_revoked: bool,
+    ) -> Result<Vec<WorkspaceView>, BridgeError> {
+        let host = self.current(handle)?;
+        Ok(host
+            .journal
+            .workspaces(LOCAL_OWNER, include_revoked)
+            .map_err(workspace_error)?
+            .into_iter()
+            .map(|view| project_workspace(host, view))
+            .collect())
+    }
+    fn restore_workspace(&mut self, handle: &str, id: &str) -> Result<WorkspaceView, BridgeError> {
+        let host = self.current(handle)?;
+        let grant = host
+            .journal
+            .open_workspace(LOCAL_OWNER, id)
+            .map_err(workspace_error)?;
+        host.grants.insert(id.into(), grant);
+        Ok(project_workspace(
+            host,
+            host.journal
+                .workspace(LOCAL_OWNER, id)
+                .map_err(workspace_error)?,
+        ))
+    }
+    fn revoke_workspace(
+        &mut self,
+        handle: &str,
+        id: &str,
+        version: &str,
+    ) -> Result<WorkspaceView, BridgeError> {
+        let host = self.current(handle)?;
+        let view = host
+            .journal
+            .revoke_workspace(LOCAL_OWNER, id, version)
+            .map_err(workspace_error)?;
+        host.grants.remove(id);
+        Ok(project_workspace(host, view))
+    }
+    fn list_runs(
+        &mut self,
+        handle: &str,
+        workspace: Option<&str>,
+        before: Option<&str>,
+        limit: u16,
+    ) -> Result<RunPage, BridgeError> {
+        let host = self.current(handle)?;
+        let page = host
+            .journal
+            .list_agent_runs(LOCAL_OWNER, workspace, before, limit)
+            .map_err(workspace_error)?;
+        Ok(RunPage {
+            runs: page
+                .runs
+                .into_iter()
+                .map(|r| RunSummary {
+                    run_id: r.run_id,
+                    workspace_id: r.workspace_id,
+                    phase: r.phase,
+                    steps: r.steps,
+                    invocations: r.invocations,
+                    active: r.active,
+                })
+                .collect(),
+            next_cursor: page.next_cursor,
+        })
+    }
+}
+// Local application profile only. Never interpreted as a cloud account/team ID.
+const LOCAL_OWNER: &str = "desktop-local-profile-v1";
+const READ_POLICY: &str = "desktop-read-only-v1";
+fn project_workspace(
+    host: &Host,
+    view: orange_agent_runtime::workspaces::WorkspaceView,
+) -> WorkspaceView {
+    WorkspaceView {
+        session_access: host
+            .grants
+            .get(&view.workspace_id)
+            .is_some_and(|g| !g.is_revoked()),
+        workspace_id: view.workspace_id,
+        display_path: view.canonical_path,
+        permission_version: view.version,
+        permission_active: view.active,
+    }
+}
+fn workspace_error(error: WorkspaceStoreError) -> BridgeError {
+    let code = match error {
+        WorkspaceStoreError::Invalid => "INVALID_WORKSPACE_REQUEST",
+        WorkspaceStoreError::NotFound => "WORKSPACE_NOT_FOUND",
+        WorkspaceStoreError::Revoked => "WORKSPACE_REVOKED",
+        WorkspaceStoreError::Conflict => "WORKSPACE_CONFLICT",
+        WorkspaceStoreError::RecoveryRequired => "WORKSPACE_RECOVERY_REQUIRED",
+        WorkspaceStoreError::Limit => "WORKSPACE_LIMIT",
+        WorkspaceStoreError::Workspace(workspace::WorkspaceError::Forbidden) => {
+            "WORKSPACE_PRIVATE_ROOT"
+        }
+        WorkspaceStoreError::Workspace(workspace::WorkspaceError::EnvironmentChanged) => {
+            "WORKSPACE_IDENTITY_CHANGED"
+        }
+        WorkspaceStoreError::Workspace(
+            workspace::WorkspaceError::PersistentIdentityUnavailable,
+        ) => "WORKSPACE_IDENTITY_UNAVAILABLE",
+        _ => "WORKSPACE_STORAGE_UNAVAILABLE",
+    };
+    failure(code)
 }
 /// The trusted UI supplies an OS application-data directory, never model input.
 /// Opening this Host grants no workspace access and starts no model.
@@ -131,6 +270,50 @@ pub(crate) fn close_host(handle: String) -> Result<(), BridgeError> {
         .map_err(|_| failure("HOST_INTERNAL"))?
         .close(&handle)
 }
+pub(crate) fn authorize_workspace(
+    handle: String,
+    request_id: String,
+    selected_directory: String,
+) -> Result<WorkspaceView, BridgeError> {
+    HOST.lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?
+        .authorize_workspace(&handle, &request_id, Path::new(&selected_directory))
+}
+pub(crate) fn list_workspaces(
+    handle: String,
+    include_revoked: bool,
+) -> Result<Vec<WorkspaceView>, BridgeError> {
+    HOST.lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?
+        .list_workspaces(&handle, include_revoked)
+}
+pub(crate) fn restore_workspace_access(
+    handle: String,
+    workspace_id: String,
+) -> Result<WorkspaceView, BridgeError> {
+    HOST.lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?
+        .restore_workspace(&handle, &workspace_id)
+}
+pub(crate) fn revoke_workspace(
+    handle: String,
+    workspace_id: String,
+    expected_version: String,
+) -> Result<WorkspaceView, BridgeError> {
+    HOST.lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?
+        .revoke_workspace(&handle, &workspace_id, &expected_version)
+}
+pub(crate) fn list_runs(
+    handle: String,
+    workspace_id: Option<String>,
+    before: Option<String>,
+    limit: u16,
+) -> Result<RunPage, BridgeError> {
+    HOST.lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?
+        .list_runs(&handle, workspace_id.as_deref(), before.as_deref(), limit)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,7 +330,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "628cd5f3acb340c7349bfc8822f3f167e3020718"
+            "ee0e19b3a311cabcd4b58de8201460d19d729873"
         );
         assert_eq!(
             registry
@@ -183,6 +366,96 @@ mod tests {
                 .mode()
                 & 0o777,
             0o755
+        );
+    }
+    #[test]
+    fn workspace_consent_survives_but_process_access_must_be_restored() {
+        let base = tempfile::tempdir().expect("base");
+        let data = base.path().join("data");
+        let work = base.path().join("workspace");
+        fs::create_dir(&work).expect("work");
+        let mut registry = HostRegistry::default();
+        let host = registry.initialize(&data).expect("host");
+        assert!(
+            registry
+                .authorize_workspace("forged", "consent", &work)
+                .is_err()
+        );
+        let view = registry
+            .authorize_workspace(&host.handle, "consent", &work)
+            .expect("explicit test consent");
+        assert!(view.permission_active && view.session_access);
+        assert_eq!(
+            registry
+                .authorize_workspace(&host.handle, "consent", &work)
+                .expect("duplicate")
+                .workspace_id,
+            view.workspace_id
+        );
+        assert!(
+            registry
+                .authorize_workspace(&host.handle, "private", &data)
+                .is_err()
+        );
+        assert!(
+            registry
+                .list_runs(&host.handle, Some(&view.workspace_id), None, 100)
+                .expect("empty history")
+                .runs
+                .is_empty()
+        );
+        registry.close(&host.handle).expect("close");
+        let next = registry.initialize(&data).expect("new host");
+        let saved = registry
+            .list_workspaces(&next.handle, false)
+            .expect("saved");
+        assert_eq!(saved.len(), 1);
+        assert!(saved[0].permission_active);
+        assert!(!saved[0].session_access);
+        assert!(
+            registry
+                .restore_workspace(&host.handle, &view.workspace_id)
+                .is_err()
+        );
+        assert!(
+            registry
+                .restore_workspace(&next.handle, &view.workspace_id)
+                .expect("OS permission revalidated by caller fixture")
+                .session_access
+        );
+        assert!(
+            registry
+                .revoke_workspace(&next.handle, &view.workspace_id, "9")
+                .is_err()
+        );
+        let revoked = registry
+            .revoke_workspace(&next.handle, &view.workspace_id, &view.permission_version)
+            .expect("revoke");
+        assert!(!revoked.permission_active && !revoked.session_access);
+        assert_eq!(
+            registry
+                .restore_workspace(&next.handle, &view.workspace_id)
+                .expect_err("no restore")
+                .code,
+            "WORKSPACE_REVOKED"
+        );
+        assert_eq!(
+            registry
+                .authorize_workspace(&next.handle, "consent", &work)
+                .expect_err("old consent")
+                .code,
+            "WORKSPACE_REVOKED"
+        );
+        let fresh = registry
+            .authorize_workspace(&next.handle, "new-consent", &work)
+            .expect("new explicit consent");
+        assert_ne!(fresh.workspace_id, view.workspace_id);
+        assert_eq!(
+            registry
+                .list_workspaces(&next.handle, true)
+                .expect("history")
+                .len(),
+            2
         );
     }
 }

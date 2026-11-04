@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'src/rust/api/host.dart';
 import 'src/rust/frb_generated.dart';
+import 'workspaces.dart';
 
 Future<String> applicationDataDirectory() async {
   if (Platform.isMacOS) {
@@ -107,41 +108,43 @@ class _OrangeDesktopAppState extends State<OrangeDesktopApp> {
                   );
                 }
                 final info = snapshot.requireData;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.auto_awesome_outlined, size: 48),
-                    const SizedBox(height: 24),
-                    Text(
-                      '本地记录已连接',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      '这是桌面端开发预览。会话执行、模型管理与云端账户尚未接入，当前不会启动模型、使用算力或产生费用。',
-                    ),
-                    const SizedBox(height: 28),
-                    Card(
-                      child: ExpansionTile(
-                        title: const Text('运行环境详情'),
-                        children: [
-                          ListTile(
-                            title: const Text('共享内核'),
-                            subtitle: Text(info.runtimeVersion),
-                          ),
-                          ListTile(
-                            title: const Text('构建来源'),
-                            subtitle: SelectableText(info.runtimeSourceCommit),
-                          ),
-                          const ListTile(
-                            title: Text('权限'),
-                            subtitle: Text('尚未授权任何工作区'),
-                          ),
-                        ],
+                return SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.auto_awesome_outlined, size: 48),
+                      const SizedBox(height: 24),
+                      Text(
+                        '本地记录已连接',
+                        style: Theme.of(context).textTheme.headlineMedium,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      const Text(
+                        '这是桌面端开发预览。会话执行、模型管理与云端账户尚未接入，当前不会启动模型、使用算力或产生费用。',
+                      ),
+                      const SizedBox(height: 28),
+                      WorkspacePanel(key: ValueKey(info.handle), host: info),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: ExpansionTile(
+                          title: const Text('运行环境详情'),
+                          children: [
+                            ListTile(
+                              title: const Text('共享内核'),
+                              subtitle: Text(info.runtimeVersion),
+                            ),
+                            ListTile(
+                              title: const Text('构建来源'),
+                              subtitle: SelectableText(
+                                info.runtimeSourceCommit,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 );
               },
             ),

@@ -13,7 +13,7 @@ subprocess.run([str(tools['cargo']),'fmt','-p','orange-desktop-bridge'],cwd=ROOT
 contract=json.loads((ROOT/'config/bridge-tools.lock.json').read_text())
 api=(APP/'lib/src/rust/api/host.dart').read_text()
 classes=sorted(re.findall(r'^(?:abstract )?class (\w+)',api,re.M))
-functions=sorted(re.findall(r'^Future<[^>]+> (\w+)\(',api,re.M))
+functions=sorted(re.findall(r'^Future<[^\n]+> (\w+)\(',api,re.M))
 if classes!=sorted(contract['public_classes']) or functions!=sorted(contract['public_functions']):
     raise SystemExit('Unreviewed FRB surface: '+str({'classes':classes,'functions':functions}))
 rust_file=ROOT/'crates/desktop-bridge/src/frb_generated.rs';dart_file=APP/'lib/src/rust/frb_generated.dart'
