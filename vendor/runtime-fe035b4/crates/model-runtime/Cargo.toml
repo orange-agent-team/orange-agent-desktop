@@ -1,0 +1,36 @@
+[package]
+name = "orange-model-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+process-test-fixture = []
+
+[[bin]]
+name = "model-process-fixture"
+required-features = ["process-test-fixture"]
+
+[[test]]
+name = "supervisor"
+required-features = ["process-test-fixture"]
+
+[dependencies]
+orange-domain.workspace = true
+orange-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+sha2.workspace = true
+hex.workspace = true
+libc.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

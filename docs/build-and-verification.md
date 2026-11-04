@@ -35,10 +35,12 @@ Rust1.97.1下，实际Mac应用构建完成，但打包前cdylib及打包后fram
 
 ## 当前认证边界
 
-SDK摘要/提交/版本实际通过；新版共享Runtime包的57项Rust测试和篡改拒绝通过；E05的3项Rust测试、Clippy和Dart analyze通过。真实打包Flutter/FRB/SQLite流程验证了授权、重启后sessionAccess=false、显式恢复、撤销和私有根拒绝；按钮测试中的系统选择回调是明确替身，业务Rust/SQLite是真实执行。
+SDK摘要/提交/版本实际通过；固定fe035b4共享Runtime包的62项Rust测试和篡改拒绝通过；E05的3项Rust测试、Clippy和Dart analyze通过。真实打包Flutter/FRB/SQLite流程验证了授权、重启后sessionAccess=false、显式恢复、撤销和私有根拒绝；按钮测试中的系统选择回调是明确替身，业务Rust/SQLite是真实执行。
 
 另通过计算机使用工具观察到实际NSOpenPanel打开、用户完成目录选择、应用显示只读授权；没有读取用户目录文件内容，也未撤销用户已选择的目录。GUI撤销没有手工完成，使用隔离目录的自动化按钮流程验证。观察记录位于`.local/ui-tests/workspace-ui-observation.json`，不保存系统文件列表。
 
 普通macOS ARM64开发app及产物摘要位于`.local/build-evidence/flutter-macos.json`。自动将窗口置前仍有系统返回警告，因此不把后台集成测试当作完整交互/可访问性认证。
 
 当前证明Host/工作区元数据、私有SQLite、类型与句柄及上述只读授权流程。完整Agent UI、云身份、工具执行/模型运行、OS安全书签、GPU、Windows/Linux实机、正式签名和公证仍需分别完成。
+
+本次固定源码包为fe035b4e822550e5fd71d1da1aa10c7ae06fccd3，95406字节，归档SHA-256为5893ecf0df83856ee51782825f72e4123af8dea2baea7351d05ff90adcceb5cb。已通过重建、独立导入和篡改拒绝；旧vendor目录从工作树移除，可通过Git历史回退。该升级仅将真实Agent验证过的内核交给桌面消费，尚未新增聊天、模型管理或工具批准界面。

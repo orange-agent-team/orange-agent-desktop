@@ -11,8 +11,8 @@ publish = false
 
 [workspace.dependencies]
 flutter_rust_bridge = "=2.13.0"
-orange-agent-runtime = { path = "vendor/runtime-ee0e19b/crates/agent-runtime", version = "=0.1.0" }
-orange-domain = { path = "vendor/runtime-ee0e19b/crates/domain", version = "=0.1.0" }
+orange-agent-runtime = { path = "vendor/runtime-fe035b4/crates/agent-runtime", version = "=0.1.0" }
+orange-domain = { path = "vendor/runtime-fe035b4/crates/domain", version = "=0.1.0" }
 serde_json = { version = "=1.0.154", features = ["float_roundtrip"] }
 uuid = { version = "=1.29.0", features = ["v4"] }
 tempfile = "=3.27.0"
