@@ -1,0 +1,25 @@
+[workspace]
+members = ["crates/desktop-bridge"]
+exclude = ["vendor/runtime-628cd5f"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[workspace.dependencies]
+flutter_rust_bridge = "=2.13.0"
+orange-agent-runtime = { path = "vendor/runtime-628cd5f/crates/agent-runtime", version = "=0.1.0" }
+orange-domain = { path = "vendor/runtime-628cd5f/crates/domain", version = "=0.1.0" }
+serde_json = { version = "=1.0.154", features = ["float_roundtrip"] }
+uuid = { version = "=1.29.0", features = ["v4"] }
+tempfile = "=3.27.0"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
