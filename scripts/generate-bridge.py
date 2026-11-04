@@ -21,7 +21,7 @@ rust_hash=re.search(r'FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = (-?\d+)',r
 dart_hash=re.search(r'rustContentHash => (-?\d+)',dart_file.read_text()).group(1)
 if rust_hash!=dart_hash:raise SystemExit('Rust/Dart codegen hash mismatch')
 files=[rust_file,*sorted((APP/'lib/src/rust').rglob('*.dart'))]
-inputs=[ROOT/'Cargo.toml',ROOT/'Cargo.lock',ROOT/'config/runtime.lock.json',ROOT/'config/bridge-tools.lock.json',ROOT/'crates/desktop-bridge/Cargo.toml',ROOT/'crates/desktop-bridge/rust-toolchain.toml',ROOT/'crates/desktop-bridge/src/lib.rs',ROOT/'crates/desktop-bridge/src/host.rs',ROOT/'crates/desktop-bridge/src/api/mod.rs',ROOT/'crates/desktop-bridge/src/api/host.rs',APP/'flutter_rust_bridge.yaml',APP/'pubspec.lock']
+inputs=[ROOT/'Cargo.toml',ROOT/'Cargo.lock',ROOT/'config/runtime.lock.json',ROOT/'config/bridge-tools.lock.json',ROOT/'crates/desktop-bridge/Cargo.toml',ROOT/'crates/desktop-bridge/rust-toolchain.toml',ROOT/'crates/desktop-bridge/src/lib.rs',ROOT/'crates/desktop-bridge/src/host.rs',ROOT/'crates/desktop-bridge/src/actor.rs',ROOT/'crates/desktop-bridge/src/host/runs.rs',ROOT/'crates/desktop-bridge/src/api/mod.rs',ROOT/'crates/desktop-bridge/src/api/host.rs',APP/'flutter_rust_bridge.yaml',APP/'pubspec.lock']
 manifest={'codegen_version':contract['flutter_rust_bridge'],'content_hash':rust_hash,'source_sha256':{str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs},'generated_sha256':{str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}
 (ROOT/'config/generated-bridge.lock.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print('PASS reviewed DTO/command surface and paired Rust/Dart generation hash')

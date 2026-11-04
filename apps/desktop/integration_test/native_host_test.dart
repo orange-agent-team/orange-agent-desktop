@@ -9,6 +9,20 @@ import 'package:orange_desktop/main.dart';
 import 'package:orange_desktop/src/rust/api/host.dart';
 import 'package:orange_desktop/src/rust/frb_generated.dart';
 
+Future<HostView> reopenHost(String directory) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 3));
+  while (true) {
+    try {
+      return await initializeHost(applicationDataDirectory: directory);
+    } on BridgeError catch (error) {
+      if (error.code != 'HOST_BUSY' || DateTime.now().isAfter(deadline)) {
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+  }
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async => RustLib.init());
@@ -28,7 +42,7 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          'fe035b4e822550e5fd71d1da1aa10c7ae06fccd3',
+          'f5b364410c3f8f48471c67111fb6da5afdc4a144',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(
@@ -91,9 +105,7 @@ void main() {
             ),
           ),
         );
-        final reopened = await initializeHost(
-          applicationDataDirectory: directory.path,
-        );
+        final reopened = await reopenHost(directory.path);
         openHandle = reopened.handle;
         expect(reopened.handle, isNot(host.handle));
         await expectLater(
@@ -123,6 +135,35 @@ void main() {
           );
           expect(grant.permissionActive, isTrue);
           expect(grant.sessionAccess, isTrue);
+          await expectLater(
+            startRun(
+              handle: reopened.handle,
+              workspaceId: grant.workspaceId,
+              requestId: 'native-run-no-model',
+              prompt: 'Read proof.txt',
+            ),
+            throwsA(
+              isA<BridgeError>().having(
+                (e) => e.code,
+                'code',
+                'MODEL_NOT_CONFIGURED',
+              ),
+            ),
+          );
+          await expectLater(
+            connectLocalModel(
+              handle: reopened.handle,
+              selectedDirectory: workspace.path,
+            ),
+            throwsA(
+              isA<BridgeError>().having(
+                (e) => e.code,
+                'code',
+                'MODEL_SERVICE_OUTSIDE_HOST_STORAGE',
+              ),
+            ),
+          );
+          await disconnectLocalModel(handle: reopened.handle);
           expect(
             (await listWorkspaces(
               handle: reopened.handle,
@@ -136,9 +177,7 @@ void main() {
           );
           await closeHost(handle: reopened.handle);
           openHandle = null;
-          final third = await initializeHost(
-            applicationDataDirectory: directory.path,
-          );
+          final third = await reopenHost(directory.path);
           openHandle = third.handle;
           final saved = (await listWorkspaces(
             handle: third.handle,

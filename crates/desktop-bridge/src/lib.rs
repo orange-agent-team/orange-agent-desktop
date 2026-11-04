@@ -1,3 +1,4 @@
+mod actor;
 pub mod api;
 mod host;
 // Reviewed upstream FFI/codec assertions live only in generated glue. Handwritten

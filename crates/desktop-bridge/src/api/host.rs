@@ -42,6 +42,73 @@ pub struct RunPage {
     pub runs: Vec<RunSummary>,
     pub next_cursor: Option<String>,
 }
+#[derive(Debug, Clone)]
+pub struct ModelConnectionView {
+    pub model_id: String,
+    pub display_name: String,
+    pub context_tokens: u32,
+    pub verification: String,
+}
+#[derive(Debug, Clone)]
+pub struct ToolApprovalView {
+    pub operation_id: String,
+    pub tool_name: String,
+    pub arguments_json: String,
+    pub argument_digest: String,
+}
+#[derive(Debug, Clone)]
+pub struct AgentRunView {
+    pub run_id: String,
+    pub workspace_id: String,
+    pub model_id: String,
+    pub phase: String,
+    pub revision: String,
+    pub steps: u32,
+    pub invocations: u32,
+    pub pending: Vec<ToolApprovalView>,
+    pub final_text: Option<String>,
+    pub failure: Option<String>,
+}
+/// Trusted application model manager supplies a service directory inside private
+/// Host storage. The model cannot configure its own endpoint.
+pub async fn connect_local_model(
+    handle: String,
+    selected_directory: String,
+) -> Result<ModelConnectionView, BridgeError> {
+    crate::host::connect_local_model(handle, selected_directory).await
+}
+pub async fn disconnect_local_model(handle: String) -> Result<(), BridgeError> {
+    crate::host::disconnect_local_model(handle).await
+}
+pub async fn start_run(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    prompt: String,
+) -> Result<AgentRunView, BridgeError> {
+    crate::host::start_run(handle, workspace_id, request_id, prompt).await
+}
+pub async fn inspect_run(handle: String, run_id: String) -> Result<AgentRunView, BridgeError> {
+    crate::host::inspect_run(handle, run_id).await
+}
+pub async fn approve_tool(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    expected_digest: String,
+) -> Result<AgentRunView, BridgeError> {
+    crate::host::approve_tool(handle, run_id, operation_id, expected_digest).await
+}
+pub async fn advance_run(
+    handle: String,
+    run_id: String,
+    expected_revision: String,
+) -> Result<AgentRunView, BridgeError> {
+    crate::host::advance_run(handle, run_id, expected_revision).await
+}
+pub async fn cancel_run(handle: String, run_id: String) -> Result<AgentRunView, BridgeError> {
+    crate::host::cancel_run(handle, run_id).await
+}
 /// The trusted UI supplies an OS application-data directory, never model input.
 pub fn initialize_host(application_data_directory: String) -> Result<HostView, BridgeError> {
     crate::host::initialize_host(application_data_directory)
@@ -58,40 +125,40 @@ pub fn close_host(handle: String) -> Result<(), BridgeError> {
     crate::host::close_host(handle)
 }
 /// Called only after the trusted platform UI obtains explicit directory consent.
-pub fn authorize_workspace(
+pub async fn authorize_workspace(
     handle: String,
     request_id: String,
     selected_directory: String,
 ) -> Result<WorkspaceView, BridgeError> {
-    crate::host::authorize_workspace(handle, request_id, selected_directory)
+    crate::host::authorize_workspace(handle, request_id, selected_directory).await
 }
-pub fn list_workspaces(
+pub async fn list_workspaces(
     handle: String,
     include_revoked: bool,
 ) -> Result<Vec<WorkspaceView>, BridgeError> {
-    crate::host::list_workspaces(handle, include_revoked)
+    crate::host::list_workspaces(handle, include_revoked).await
 }
 /// Restore only after the platform has revalidated its OS permission/bookmark.
-pub fn restore_workspace_access(
+pub async fn restore_workspace_access(
     handle: String,
     workspace_id: String,
 ) -> Result<WorkspaceView, BridgeError> {
-    crate::host::restore_workspace_access(handle, workspace_id)
+    crate::host::restore_workspace_access(handle, workspace_id).await
 }
-pub fn revoke_workspace(
+pub async fn revoke_workspace(
     handle: String,
     workspace_id: String,
     expected_version: String,
 ) -> Result<WorkspaceView, BridgeError> {
-    crate::host::revoke_workspace(handle, workspace_id, expected_version)
+    crate::host::revoke_workspace(handle, workspace_id, expected_version).await
 }
-pub fn list_runs(
+pub async fn list_runs(
     handle: String,
     workspace_id: Option<String>,
     before: Option<String>,
     limit: u16,
 ) -> Result<RunPage, BridgeError> {
-    crate::host::list_runs(handle, workspace_id, before, limit)
+    crate::host::list_runs(handle, workspace_id, before, limit).await
 }
 
 #[flutter_rust_bridge::frb(init)]

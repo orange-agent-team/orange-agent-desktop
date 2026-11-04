@@ -6,11 +6,16 @@ use orange_domain::Credits;
 use std::{
     fs,
     path::{Path, PathBuf},
-    sync::{LazyLock, Mutex},
+    sync::{Arc, Mutex},
 };
 use uuid::Uuid;
+mod runs;
+pub(crate) use runs::{
+    advance_run, approve_tool, cancel_run, connect_local_model, disconnect_local_model,
+    inspect_run, start_run,
+};
 
-fn failure(code: &str) -> BridgeError {
+pub(crate) fn failure(code: &str) -> BridgeError {
     BridgeError {
         code: code.into(),
         correlation_id: Uuid::new_v4().to_string(),
@@ -21,14 +26,22 @@ struct Host {
     view: HostView,
     journal: Journal,
     grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
+    model: Option<runs::ModelConnection>,
+    run_grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
 }
 #[derive(Default)]
-struct HostRegistry {
+pub(crate) struct HostRegistry {
     host: Option<Host>,
+    pub(crate) signals: Arc<Mutex<crate::actor::Signals>>,
 }
-static HOST: LazyLock<Mutex<HostRegistry>> = LazyLock::new(|| Mutex::new(HostRegistry::default()));
 impl HostRegistry {
-    fn initialize(&mut self, path: &Path) -> Result<HostView, BridgeError> {
+    pub(crate) fn with_signals(signals: Arc<Mutex<crate::actor::Signals>>) -> Self {
+        Self {
+            host: None,
+            signals,
+        }
+    }
+    pub(crate) fn initialize(&mut self, path: &Path) -> Result<HostView, BridgeError> {
         if path.is_symlink() {
             return Err(failure("PRIVATE_STORAGE_REQUIRED"));
         }
@@ -51,8 +64,12 @@ impl HostRegistry {
             }
             return Ok(host.view.clone());
         }
-        let journal = Journal::open(&root.join("host.sqlite"))
-            .map_err(|_| failure("PRIVATE_STORAGE_OR_HOST_LOCK"))?;
+        let journal = Journal::open(&root.join("host.sqlite")).map_err(|error| {
+            failure(match error {
+                orange_agent_runtime::JournalError::Busy => "HOST_BUSY",
+                _ => "PRIVATE_STORAGE_OR_HOST_LOCK",
+            })
+        })?;
         let lock: serde_json::Value = serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../config/runtime.lock.json"
@@ -79,9 +96,12 @@ impl HostRegistry {
             view: view.clone(),
             journal,
             grants: std::collections::HashMap::new(),
+            model: None,
+            run_grants: std::collections::HashMap::new(),
         });
         Ok(view)
     }
+    #[cfg(test)]
     fn inspect(&self, handle: &str) -> Result<HostView, BridgeError> {
         let host = self
             .host
@@ -90,11 +110,17 @@ impl HostRegistry {
             .ok_or_else(|| failure("STALE_HOST_HANDLE"))?;
         Ok(host.view.clone())
     }
+    #[cfg(test)]
     fn close(&mut self, handle: &str) -> Result<(), BridgeError> {
         self.inspect(handle)?;
+        self.signals
+            .lock()
+            .map_err(|_| failure("HOST_INTERNAL"))?
+            .stop_all();
         self.host.take();
         Ok(())
     }
+    #[cfg(test)]
     fn validate_amount(&self, handle: &str, value: &str) -> Result<String, BridgeError> {
         self.inspect(handle)?;
         if value.len() > 19 {
@@ -120,6 +146,7 @@ impl HostRegistry {
         if !path.is_absolute() {
             return Err(failure("INVALID_WORKSPACE_DIRECTORY"));
         }
+        let signals = self.signals.clone();
         let host = self.current(handle)?;
         let view = host
             .journal
@@ -130,6 +157,15 @@ impl HostRegistry {
             .open_workspace(LOCAL_OWNER, &view.workspace_id)
             .map_err(workspace_error)?;
         host.grants.insert(view.workspace_id.clone(), grant);
+        let revoker = host
+            .journal
+            .workspace_revoker(LOCAL_OWNER, &view.workspace_id)
+            .map_err(workspace_error)?;
+        signals
+            .lock()
+            .map_err(|_| failure("HOST_INTERNAL"))?
+            .workspaces
+            .insert(view.workspace_id.clone(), (view.version.clone(), revoker));
         Ok(project_workspace(host, view))
     }
     fn list_workspaces(
@@ -147,12 +183,26 @@ impl HostRegistry {
             .collect())
     }
     fn restore_workspace(&mut self, handle: &str, id: &str) -> Result<WorkspaceView, BridgeError> {
+        let signals = self.signals.clone();
         let host = self.current(handle)?;
         let grant = host
             .journal
             .open_workspace(LOCAL_OWNER, id)
             .map_err(workspace_error)?;
         host.grants.insert(id.into(), grant);
+        let view = host
+            .journal
+            .workspace(LOCAL_OWNER, id)
+            .map_err(workspace_error)?;
+        let revoker = host
+            .journal
+            .workspace_revoker(LOCAL_OWNER, id)
+            .map_err(workspace_error)?;
+        signals
+            .lock()
+            .map_err(|_| failure("HOST_INTERNAL"))?
+            .workspaces
+            .insert(id.into(), (view.version.clone(), revoker));
         Ok(project_workspace(
             host,
             host.journal
@@ -166,12 +216,18 @@ impl HostRegistry {
         id: &str,
         version: &str,
     ) -> Result<WorkspaceView, BridgeError> {
+        let signals = self.signals.clone();
         let host = self.current(handle)?;
         let view = host
             .journal
             .revoke_workspace(LOCAL_OWNER, id, version)
             .map_err(workspace_error)?;
         host.grants.remove(id);
+        signals
+            .lock()
+            .map_err(|_| failure("HOST_INTERNAL"))?
+            .workspaces
+            .remove(id);
         Ok(project_workspace(host, view))
     }
     fn list_runs(
@@ -249,70 +305,73 @@ pub(crate) fn initialize_host(application_data_directory: String) -> Result<Host
     if !directory.is_absolute() {
         return Err(failure("INVALID_DATA_DIRECTORY"));
     }
-    HOST.lock()
-        .map_err(|_| failure("HOST_INTERNAL"))?
-        .initialize(&directory)
+    crate::actor::initialize(&directory)
 }
 pub(crate) fn inspect_host(handle: String) -> Result<HostView, BridgeError> {
-    HOST.lock()
-        .map_err(|_| failure("HOST_INTERNAL"))?
-        .inspect(&handle)
+    crate::actor::inspect(&handle)
 }
-/// Pure canonical amount validation; does not create a budget or transfer money.
-pub(crate) fn validate_amount(handle: String, value: String) -> Result<String, BridgeError> {
-    HOST.lock()
-        .map_err(|_| failure("HOST_INTERNAL"))?
-        .validate_amount(&handle, &value)
-}
-/// Closes this local storage handle. No GPU/Job resource release is asserted.
 pub(crate) fn close_host(handle: String) -> Result<(), BridgeError> {
-    HOST.lock()
-        .map_err(|_| failure("HOST_INTERNAL"))?
-        .close(&handle)
+    crate::actor::close(&handle)
 }
-pub(crate) fn authorize_workspace(
+pub(crate) fn validate_amount(handle: String, value: String) -> Result<String, BridgeError> {
+    crate::actor::inspect(&handle)?;
+    if value.len() > 19 {
+        return Err(failure("INVALID_AMOUNT"));
+    }
+    value
+        .parse::<Credits>()
+        .map(|v| v.to_string())
+        .map_err(|_| failure("INVALID_AMOUNT"))
+}
+pub(crate) async fn authorize_workspace(
     handle: String,
     request_id: String,
     selected_directory: String,
 ) -> Result<WorkspaceView, BridgeError> {
-    HOST.lock()
-        .map_err(|_| failure("HOST_INTERNAL"))?
-        .authorize_workspace(&handle, &request_id, Path::new(&selected_directory))
+    crate::actor::call(handle.clone(), move |host, _| {
+        host.authorize_workspace(&handle, &request_id, Path::new(&selected_directory))
+    })
+    .await
 }
-pub(crate) fn list_workspaces(
+pub(crate) async fn list_workspaces(
     handle: String,
     include_revoked: bool,
 ) -> Result<Vec<WorkspaceView>, BridgeError> {
-    HOST.lock()
-        .map_err(|_| failure("HOST_INTERNAL"))?
-        .list_workspaces(&handle, include_revoked)
+    crate::actor::call(handle.clone(), move |host, _| {
+        host.list_workspaces(&handle, include_revoked)
+    })
+    .await
 }
-pub(crate) fn restore_workspace_access(
+pub(crate) async fn restore_workspace_access(
     handle: String,
     workspace_id: String,
 ) -> Result<WorkspaceView, BridgeError> {
-    HOST.lock()
-        .map_err(|_| failure("HOST_INTERNAL"))?
-        .restore_workspace(&handle, &workspace_id)
+    crate::actor::call(handle.clone(), move |host, _| {
+        host.restore_workspace(&handle, &workspace_id)
+    })
+    .await
 }
-pub(crate) fn revoke_workspace(
+pub(crate) async fn revoke_workspace(
     handle: String,
     workspace_id: String,
     expected_version: String,
 ) -> Result<WorkspaceView, BridgeError> {
-    HOST.lock()
-        .map_err(|_| failure("HOST_INTERNAL"))?
-        .revoke_workspace(&handle, &workspace_id, &expected_version)
+    crate::actor::signal_revoke(&handle, &workspace_id, &expected_version)?;
+    crate::actor::call(handle.clone(), move |host, _| {
+        host.revoke_workspace(&handle, &workspace_id, &expected_version)
+    })
+    .await
 }
-pub(crate) fn list_runs(
+pub(crate) async fn list_runs(
     handle: String,
     workspace_id: Option<String>,
     before: Option<String>,
     limit: u16,
 ) -> Result<RunPage, BridgeError> {
-    HOST.lock()
-        .map_err(|_| failure("HOST_INTERNAL"))?
-        .list_runs(&handle, workspace_id.as_deref(), before.as_deref(), limit)
+    crate::actor::call(handle.clone(), move |host, _| {
+        host.list_runs(&handle, workspace_id.as_deref(), before.as_deref(), limit)
+    })
+    .await
 }
 #[cfg(test)]
 mod tests {
@@ -330,7 +389,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "fe035b4e822550e5fd71d1da1aa10c7ae06fccd3"
+            "f5b364410c3f8f48471c67111fb6da5afdc4a144"
         );
         assert_eq!(
             registry

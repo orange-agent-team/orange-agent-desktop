@@ -7,7 +7,64 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+
+/// Trusted application model manager supplies a service directory inside private
+/// Host storage. The model cannot configure its own endpoint.
+Future<ModelConnectionView> connectLocalModel({
+  required String handle,
+  required String selectedDirectory,
+}) => RustLib.instance.api.crateApiHostConnectLocalModel(
+  handle: handle,
+  selectedDirectory: selectedDirectory,
+);
+
+Future<void> disconnectLocalModel({required String handle}) =>
+    RustLib.instance.api.crateApiHostDisconnectLocalModel(handle: handle);
+
+Future<AgentRunView> startRun({
+  required String handle,
+  required String workspaceId,
+  required String requestId,
+  required String prompt,
+}) => RustLib.instance.api.crateApiHostStartRun(
+  handle: handle,
+  workspaceId: workspaceId,
+  requestId: requestId,
+  prompt: prompt,
+);
+
+Future<AgentRunView> inspectRun({
+  required String handle,
+  required String runId,
+}) => RustLib.instance.api.crateApiHostInspectRun(handle: handle, runId: runId);
+
+Future<AgentRunView> approveTool({
+  required String handle,
+  required String runId,
+  required String operationId,
+  required String expectedDigest,
+}) => RustLib.instance.api.crateApiHostApproveTool(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+  expectedDigest: expectedDigest,
+);
+
+Future<AgentRunView> advanceRun({
+  required String handle,
+  required String runId,
+  required String expectedRevision,
+}) => RustLib.instance.api.crateApiHostAdvanceRun(
+  handle: handle,
+  runId: runId,
+  expectedRevision: expectedRevision,
+);
+
+Future<AgentRunView> cancelRun({
+  required String handle,
+  required String runId,
+}) => RustLib.instance.api.crateApiHostCancelRun(handle: handle, runId: runId);
 
 /// The trusted UI supplies an OS application-data directory, never model input.
 Future<HostView> initializeHost({required String applicationDataDirectory}) =>
@@ -81,6 +138,61 @@ Future<RunPage> listRuns({
   limit: limit,
 );
 
+class AgentRunView {
+  final String runId;
+  final String workspaceId;
+  final String modelId;
+  final String phase;
+  final String revision;
+  final int steps;
+  final int invocations;
+  final List<ToolApprovalView> pending;
+  final String? finalText;
+  final String? failure;
+
+  const AgentRunView({
+    required this.runId,
+    required this.workspaceId,
+    required this.modelId,
+    required this.phase,
+    required this.revision,
+    required this.steps,
+    required this.invocations,
+    required this.pending,
+    this.finalText,
+    this.failure,
+  });
+
+  @override
+  int get hashCode =>
+      runId.hashCode ^
+      workspaceId.hashCode ^
+      modelId.hashCode ^
+      phase.hashCode ^
+      revision.hashCode ^
+      steps.hashCode ^
+      invocations.hashCode ^
+      pending.hashCode ^
+      finalText.hashCode ^
+      failure.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AgentRunView &&
+          runtimeType == other.runtimeType &&
+          runId == other.runId &&
+          workspaceId == other.workspaceId &&
+          modelId == other.modelId &&
+          phase == other.phase &&
+          revision == other.revision &&
+          steps == other.steps &&
+          invocations == other.invocations &&
+          pending == other.pending &&
+          finalText == other.finalText &&
+          failure == other.failure;
+}
+
 class BridgeError implements FrbException {
   final String code;
   final String correlationId;
@@ -132,6 +244,37 @@ class HostView {
           runtimeVersion == other.runtimeVersion &&
           runtimeSourceCommit == other.runtimeSourceCommit &&
           availableReadTools == other.availableReadTools;
+}
+
+class ModelConnectionView {
+  final String modelId;
+  final String displayName;
+  final int contextTokens;
+  final String verification;
+
+  const ModelConnectionView({
+    required this.modelId,
+    required this.displayName,
+    required this.contextTokens,
+    required this.verification,
+  });
+
+  @override
+  int get hashCode =>
+      modelId.hashCode ^
+      displayName.hashCode ^
+      contextTokens.hashCode ^
+      verification.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ModelConnectionView &&
+          runtimeType == other.runtimeType &&
+          modelId == other.modelId &&
+          displayName == other.displayName &&
+          contextTokens == other.contextTokens &&
+          verification == other.verification;
 }
 
 class RunPage {
@@ -189,6 +332,37 @@ class RunSummary {
           steps == other.steps &&
           invocations == other.invocations &&
           active == other.active;
+}
+
+class ToolApprovalView {
+  final String operationId;
+  final String toolName;
+  final String argumentsJson;
+  final String argumentDigest;
+
+  const ToolApprovalView({
+    required this.operationId,
+    required this.toolName,
+    required this.argumentsJson,
+    required this.argumentDigest,
+  });
+
+  @override
+  int get hashCode =>
+      operationId.hashCode ^
+      toolName.hashCode ^
+      argumentsJson.hashCode ^
+      argumentDigest.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ToolApprovalView &&
+          runtimeType == other.runtimeType &&
+          operationId == other.operationId &&
+          toolName == other.toolName &&
+          argumentsJson == other.argumentsJson &&
+          argumentDigest == other.argumentDigest;
 }
 
 class WorkspaceView {

@@ -25,6 +25,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AgentRunView dco_decode_agent_run_view(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
 
   @protected
@@ -43,7 +46,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<RunSummary> dco_decode_list_run_summary(dynamic raw);
 
   @protected
+  List<ToolApprovalView> dco_decode_list_tool_approval_view(dynamic raw);
+
+  @protected
   List<WorkspaceView> dco_decode_list_workspace_view(dynamic raw);
+
+  @protected
+  ModelConnectionView dco_decode_model_connection_view(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -53,6 +62,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RunSummary dco_decode_run_summary(dynamic raw);
+
+  @protected
+  ToolApprovalView dco_decode_tool_approval_view(dynamic raw);
 
   @protected
   int dco_decode_u_16(dynamic raw);
@@ -73,6 +85,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  AgentRunView sse_decode_agent_run_view(SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
@@ -91,7 +106,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<RunSummary> sse_decode_list_run_summary(SseDeserializer deserializer);
 
   @protected
+  List<ToolApprovalView> sse_decode_list_tool_approval_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<WorkspaceView> sse_decode_list_workspace_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ModelConnectionView sse_decode_model_connection_view(
     SseDeserializer deserializer,
   );
 
@@ -103,6 +128,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RunSummary sse_decode_run_summary(SseDeserializer deserializer);
+
+  @protected
+  ToolApprovalView sse_decode_tool_approval_view(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_16(SseDeserializer deserializer);
@@ -124,6 +152,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_agent_run_view(AgentRunView self, SseSerializer serializer);
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
@@ -150,8 +181,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_tool_approval_view(
+    List<ToolApprovalView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_workspace_view(
     List<WorkspaceView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_model_connection_view(
+    ModelConnectionView self,
     SseSerializer serializer,
   );
 
@@ -163,6 +206,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_run_summary(RunSummary self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tool_approval_view(
+    ToolApprovalView self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_u_16(int self, SseSerializer serializer);
