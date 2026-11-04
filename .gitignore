@@ -1,0 +1,8 @@
+target/
+.dart_tool/
+build/
+.flutter-plugins-dependencies
+.env
+.env.*
+!.env.example
+.DS_Store
