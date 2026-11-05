@@ -26,7 +26,8 @@
     "crates/model-runtime/src/bin/model-process-fixture.rs": "1addd5c4f906076afc664370db8642a964116a6bd5f43fc05c955bf636368a84",
     "crates/model-runtime/src/bin/model-smoke.rs": "767424089b8831bafcad8e082f758d41b377d724b3bb9cb76467e78d4eadf11e",
     "crates/model-runtime/src/bin/orange-model-host.rs": "a286069dfab0d58b4543cd3adb496837b53b78602c4c9568e00fb299dac28e5c",
-    "crates/model-runtime/src/cache.rs": "d1409c10fab3f6be1285e33a5ac334a2c9e5ff33931b3dc0156c79ed36d9b162",
+    "crates/model-runtime/src/cache.rs": "0454879b2cf21f2c47c3e2d988e560ddb6ff94ec59213b68df36cc3e55c1b839",
+    "crates/model-runtime/src/cache/import.rs": "2c5d0eea1534a0c20bf4c120db3b494e3881778ce732297ebbdf5060f4213a01",
     "crates/model-runtime/src/lib.rs": "18ac9d9e8a45c5272c5d891f4a42ea6f2e73f687495094b97006ef59cc0d039e",
     "crates/model-runtime/src/llama.rs": "4276d42ca4704977c524ae253a51d327d6cc9bccebf9e32d2acf9a56a58134cb",
     "crates/model-runtime/src/metering.rs": "4138f8d4b871897c7c67429420a4567f58253f5db6490df551a34728d72ddfe9",
@@ -50,7 +51,7 @@
     "crates/agent-runtime",
     "crates/model-runtime"
   ],
-  "origin_commit": "ddc315114eef3969ebb7b848734896896181f267",
+  "origin_commit": "376f8832dc5ccb14f393717fd9c4cfbb1310f196",
   "origin_repository": "orange-agent-server",
   "schema": "orange-shared-runtime-source-v1",
   "source_sha256": {
@@ -80,7 +81,8 @@
     "crates/model-runtime/src/bin/model-process-fixture.rs": "1addd5c4f906076afc664370db8642a964116a6bd5f43fc05c955bf636368a84",
     "crates/model-runtime/src/bin/model-smoke.rs": "767424089b8831bafcad8e082f758d41b377d724b3bb9cb76467e78d4eadf11e",
     "crates/model-runtime/src/bin/orange-model-host.rs": "a286069dfab0d58b4543cd3adb496837b53b78602c4c9568e00fb299dac28e5c",
-    "crates/model-runtime/src/cache.rs": "d1409c10fab3f6be1285e33a5ac334a2c9e5ff33931b3dc0156c79ed36d9b162",
+    "crates/model-runtime/src/cache.rs": "0454879b2cf21f2c47c3e2d988e560ddb6ff94ec59213b68df36cc3e55c1b839",
+    "crates/model-runtime/src/cache/import.rs": "2c5d0eea1534a0c20bf4c120db3b494e3881778ce732297ebbdf5060f4213a01",
     "crates/model-runtime/src/lib.rs": "18ac9d9e8a45c5272c5d891f4a42ea6f2e73f687495094b97006ef59cc0d039e",
     "crates/model-runtime/src/llama.rs": "4276d42ca4704977c524ae253a51d327d6cc9bccebf9e32d2acf9a56a58134cb",
     "crates/model-runtime/src/metering.rs": "4138f8d4b871897c7c67429420a4567f58253f5db6490df551a34728d72ddfe9",

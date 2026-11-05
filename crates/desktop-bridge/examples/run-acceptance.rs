@@ -1,8 +1,40 @@
 //! Opt-in real-model API acceptance. The driver owns the temporary workspace;
 //! approvals here are bounded test-owner decisions, never product auto-approval.
 use orange_desktop_bridge::api::host::*;
+use orange_model_runtime::cache::{ArtifactSpec, ModelCache};
 use serde::Deserialize;
 use std::{error::Error, fs, time::Duration};
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImportConfig {
+    source: String,
+    cache: String,
+    url: String,
+    sha256: String,
+    bytes: u64,
+}
+async fn import_selected(config: ImportConfig) -> Result<(), Box<dyn Error>> {
+    let spec = ArtifactSpec::new(
+        &config.url,
+        &config.sha256,
+        config.bytes,
+        &["huggingface.co"],
+        b"GGUF",
+    )?;
+    let cache = ModelCache::new(
+        std::path::Path::new(&config.cache),
+        config.bytes.checked_mul(2).ok_or("quota overflow")?,
+    )?;
+    let imported = cache
+        .import_file(&spec, std::path::Path::new(&config.source))
+        .await?;
+    println!(
+        "{}",
+        serde_json::json!({"imported":true,"cached":imported.is_cached(),"sha256":imported.sha256(),"bytes":imported.bytes().to_string()})
+    );
+    Ok(())
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -124,12 +156,28 @@ async fn accept(config: Config) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 fn main() -> Result<(), Box<dyn Error>> {
-    let path = std::env::args_os()
-        .nth(1)
+    let mut arguments = std::env::args_os().skip(1);
+    let first = arguments
+        .next()
         .ok_or("private fixture configuration required")?;
-    let config = serde_json::from_slice(&fs::read(path)?)?;
-    tokio::runtime::Builder::new_current_thread()
+    let import = first == "--import";
+    let path = if import {
+        arguments
+            .next()
+            .ok_or("private import configuration required")?
+    } else {
+        first
+    };
+    if arguments.next().is_some() {
+        return Err("unexpected acceptance arguments".into());
+    }
+    let bytes = fs::read(path)?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .build()?
-        .block_on(accept(config))
+        .build()?;
+    if import {
+        runtime.block_on(import_selected(serde_json::from_slice(&bytes)?))
+    } else {
+        runtime.block_on(accept(serde_json::from_slice(&bytes)?))
+    }
 }

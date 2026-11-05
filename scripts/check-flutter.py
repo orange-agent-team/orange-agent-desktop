@@ -8,6 +8,7 @@ import plistlib
 import subprocess
 import sys
 from environment import ROOT,APP,tool_environment
+from model_bundle import STAGED,verify_embedded,digest
 if platform.system()!='Darwin' or platform.machine()!='arm64':raise SystemExit('This evidence command is for the available macOS ARM64 host')
 environment,tools=tool_environment()
 lock=json.loads((ROOT/'config/flutter.lock.json').read_text())
@@ -22,8 +23,15 @@ if len(apps)!=1:raise SystemExit('Expected exactly one built development app')
 app=apps[0];info=plistlib.loads((app/'Contents/Info.plist').read_bytes());binary=app/'Contents/MacOS'/info['CFBundleExecutable']
 native=app/'Contents/Frameworks/orange_desktop_bridge.framework/Versions/A/orange_desktop_bridge'
 if not native.is_file():raise SystemExit('Native bridge framework was not bundled')
+model_bundle=None
+if STAGED.exists():
+    model_bundle=verify_embedded(app/'Contents')
+subprocess.run(['codesign','--verify','--deep','--strict',str(app)],check=True,capture_output=True)
 architectures=subprocess.check_output(['xcrun','lipo','-archs',str(binary)],text=True).strip().split()
 if 'arm64' not in architectures:raise SystemExit('Built app does not include the tested host architecture')
 report={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'flutter':lock['version'],'dart':lock['dart_version'],'framework_revision':lock['framework_revision'],'rust':json.loads((ROOT/'config/bridge-tools.lock.json').read_text())['rust'],'platform':'macos-arm64','app':str(app.relative_to(ROOT)),'architectures':architectures,'executable_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'native_bridge_sha256':hashlib.sha256(native.read_bytes()).hexdigest(),'certification':'local development build only; no production signing/notarization, Windows/Linux or Agent feature certification'}
 folder=ROOT/'.local/build-evidence';folder.mkdir(parents=True,exist_ok=True);(folder/'flutter-macos.json').write_text(json.dumps(report,indent=2)+'\n')
+if model_bundle is not None:
+    report['model_bundle']={'manifest_sha256':digest(app/'Contents/Resources/OrangeModelService/manifest.json'),'minimum_macos':model_bundle['minimum_macos'],'runtime_commit':model_bundle['runtime_commit'],'development_only':model_bundle['development_only']}
+    (folder/'flutter-macos.json').write_text(json.dumps(report,indent=2)+'\n')
 print(json.dumps(report,indent=2))

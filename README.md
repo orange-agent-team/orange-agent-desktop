@@ -10,4 +10,6 @@ Flutter负责会话、工具批准、成果、模型/Worker、钱包团队等交
 
 Rust Host及生成的FRB接口另已实现Run创建/查看/批准/推进/取消和私有本地模型连接。实际CPU模型验收通过批准、真实文件读取、恢复不重放和删除源拒绝；另以明确模型协议替身验证了真实沙箱Flutter批准界面、FRB、私有Unix IPC与文件工具；打包模型服务和真实模型UI闭环仍待验证，详见[本地Agent接口与验证](docs/local-agent-api.md)。测试示例和模型验收驱动不是额外产品工程。
 
-共享内核来自服务端固定提交的可校验源码包，存放在本仓库`vendor/runtime-ddc3151`。普通构建校验实际Cargo依赖路径和源码摘要，不读取相邻服务端目录。参见[架构与边界](docs/architecture.md)、[构建和验证](docs/build-and-verification.md)。实际原生测试和目标平台认证以执行台账为准。
+共享内核来自服务端固定提交的可校验源码包，存放在本仓库`vendor/runtime-376f883`。普通构建校验实际Cargo依赖路径和源码摘要，不读取相邻服务端目录。参见[架构与边界](docs/architecture.md)、[构建和验证](docs/build-and-verification.md)。实际原生测试和目标平台认证以执行台账为准。
+
+模型组件可由明确artifact生成开发包；当前已验证真实沙箱子程序启动与错误父认证拒绝，完整权重也已通过Rust私有缓存导入及推理验收。安装界面与应用拥有的服务生命周期仍待接入，见[模型组件打包](docs/model-service-packaging.md)。

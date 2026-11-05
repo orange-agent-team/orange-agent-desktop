@@ -61,6 +61,19 @@ def main():
         private.chmod(0o700)
         workspace.mkdir(mode=0o700)
         ipc.mkdir(mode=0o700)
+        import_config=base/'import.json'
+        descriptor=lock['model']
+        write(import_config,{'source':str(model),'cache':str(private/'models'),'url':'https://huggingface.co/'+descriptor['repository']+'/resolve/'+descriptor['revision']+'/'+descriptor['file'],'sha256':descriptor['sha256'],'bytes':descriptor['bytes']})
+        import_command=[str(ROOT/'target/debug/examples/run-acceptance'),'--import',str(import_config)]
+        imported=json.loads(subprocess.check_output(import_command,env=environment,text=True,timeout=180))
+        reused=json.loads(subprocess.check_output(import_command,env=environment,text=True,timeout=180))
+        if imported!={'imported':True,'cached':False,'sha256':descriptor['sha256'],'bytes':str(descriptor['bytes'])} or reused!={**imported,'cached':True}:
+            raise RuntimeError('Actual private model import/cache reuse failed')
+        installed=private/'models'/(descriptor['sha256']+'.gguf')
+        if digest(installed)!=descriptor['sha256'] or installed.stat().st_nlink!=1 or (installed.stat().st_dev,installed.stat().st_ino)==(model.stat().st_dev,model.stat().st_ino):
+            raise RuntimeError('Installed artifact is not an independently verified copy')
+        report['actual_private_model_import']=True
+        report['verified_cache_reuse']=True
         report['separate_private_ipc'] = True
         report['durable_socket_path_bytes'] = len(os.fsencode(runtime / 'engine.sock'))
         report['actual_socket_path_bytes'] = len(os.fsencode(ipc / 'engine.sock'))
@@ -70,7 +83,7 @@ def main():
         (workspace / 'proof.txt').write_text(sentinel + '\n')
         nonce, instance = uuid.uuid4().hex + uuid.uuid4().hex, uuid.uuid4().hex
         write(runtime / 'profile.json', {'protocol': 1, 'runtime_directory': str(runtime), 'socket_directory': str(ipc), 'executable': str(backend),
-              'executable_sha256': build['executable_sha256'], 'model': str(model), 'model_sha256': lock['model']['sha256'],
+              'executable_sha256': build['executable_sha256'], 'model': str(installed), 'model_sha256': lock['model']['sha256'],
               'model_bytes': lock['model']['bytes'], 'model_version': 'qwen-desktop-acceptance-v1', 'context_tokens': 4096,
               'startup_timeout_seconds': 120, 'control_nonce': nonce, 'instance_id': instance})
         config = base / 'acceptance.json'

@@ -18,6 +18,15 @@ class MainFlutterWindow: NSWindow {
       binaryMessenger: flutterViewController.engine.binaryMessenger)
     platformChannel?.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(FlutterError(code: "WINDOW_CLOSED", message: nil, details: nil)); return }
+      if call.method == "modelServiceEnvironment" {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        result([
+          "contentsDirectory": Bundle.main.bundleURL.appendingPathComponent("Contents", isDirectory: true).path,
+          "ipcDirectory": FileManager.default.temporaryDirectory.appendingPathComponent("om", isDirectory: true).path,
+          "osVersion": "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+        ])
+        return
+      }
       if call.method == "chooseWorkspace" {
         guard !self.pickerActive else { result(FlutterError(code: "PICKER_BUSY", message: nil, details: nil)); return }
         self.pickerActive = true
