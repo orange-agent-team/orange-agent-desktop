@@ -26,6 +26,7 @@ struct Host {
     view: HostView,
     journal: Journal,
     grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
+    access_tokens: std::collections::HashMap<String, String>,
     model: Option<runs::ModelConnection>,
     run_grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
 }
@@ -96,6 +97,7 @@ impl HostRegistry {
             view: view.clone(),
             journal,
             grants: std::collections::HashMap::new(),
+            access_tokens: std::collections::HashMap::new(),
             model: None,
             run_grants: std::collections::HashMap::new(),
         });
@@ -148,6 +150,15 @@ impl HostRegistry {
         }
         let signals = self.signals.clone();
         let host = self.current(handle)?;
+        {
+            let controls = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+            if controls.closed_selections.contains(request) {
+                return Err(failure("WORKSPACE_SELECTION_CLOSED"));
+            }
+            if controls.closed_selections.len() >= 8192 {
+                return Err(failure("WORKSPACE_SELECTION_LIMIT"));
+            }
+        }
         let view = host
             .journal
             .authorize_workspace(LOCAL_OWNER, request, path, READ_POLICY)
@@ -156,16 +167,29 @@ impl HostRegistry {
             .journal
             .open_workspace(LOCAL_OWNER, &view.workspace_id)
             .map_err(workspace_error)?;
-        host.grants.insert(view.workspace_id.clone(), grant);
         let revoker = host
             .journal
             .workspace_revoker(LOCAL_OWNER, &view.workspace_id)
             .map_err(workspace_error)?;
-        signals
-            .lock()
-            .map_err(|_| failure("HOST_INTERNAL"))?
-            .workspaces
-            .insert(view.workspace_id.clone(), (view.version.clone(), revoker));
+        let mut controls = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+        if controls.closed_selections.contains(request) || controls.closed_selections.len() >= 8192
+        {
+            grant.request_revoke();
+            return Err(failure("WORKSPACE_SELECTION_CLOSED"));
+        }
+        let session_token = request.to_owned();
+        host.grants.insert(view.workspace_id.clone(), grant.clone());
+        host.access_tokens
+            .insert(view.workspace_id.clone(), session_token.clone());
+        controls.workspaces.insert(
+            view.workspace_id.clone(),
+            crate::actor::WorkspaceSignal {
+                version: view.version.clone(),
+                session_token,
+                revoker,
+                grant,
+            },
+        );
         Ok(project_workspace(host, view))
     }
     fn list_workspaces(
@@ -189,7 +213,9 @@ impl HostRegistry {
             .journal
             .open_workspace(LOCAL_OWNER, id)
             .map_err(workspace_error)?;
-        host.grants.insert(id.into(), grant);
+        host.grants.insert(id.into(), grant.clone());
+        let session_token = Uuid::new_v4().to_string();
+        host.access_tokens.insert(id.into(), session_token.clone());
         let view = host
             .journal
             .workspace(LOCAL_OWNER, id)
@@ -202,7 +228,15 @@ impl HostRegistry {
             .lock()
             .map_err(|_| failure("HOST_INTERNAL"))?
             .workspaces
-            .insert(id.into(), (view.version.clone(), revoker));
+            .insert(
+                id.into(),
+                crate::actor::WorkspaceSignal {
+                    version: view.version.clone(),
+                    session_token,
+                    revoker,
+                    grant,
+                },
+            );
         Ok(project_workspace(
             host,
             host.journal
@@ -223,11 +257,71 @@ impl HostRegistry {
             .revoke_workspace(LOCAL_OWNER, id, version)
             .map_err(workspace_error)?;
         host.grants.remove(id);
+        host.access_tokens.remove(id);
         signals
             .lock()
             .map_err(|_| failure("HOST_INTERNAL"))?
             .workspaces
             .remove(id);
+        Ok(project_workspace(host, view))
+    }
+    fn suspend_workspace(
+        &mut self,
+        handle: &str,
+        id: &str,
+        token: &str,
+    ) -> Result<WorkspaceView, BridgeError> {
+        use orange_agent_runtime::engine::Phase;
+        let signals = self.signals.clone();
+        let host = self.current(handle)?;
+        let view = host
+            .journal
+            .workspace(LOCAL_OWNER, id)
+            .map_err(workspace_error)?;
+        if host
+            .access_tokens
+            .get(id)
+            .is_some_and(|current| current != token)
+        {
+            return Err(failure("WORKSPACE_SESSION_CHANGED"));
+        }
+        let runs: Vec<String> = signals
+            .lock()
+            .map_err(|_| failure("HOST_INTERNAL"))?
+            .runs
+            .iter()
+            .filter(|(_, run)| run.workspace == id)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for run in &runs {
+            if let Some(grant) = host.run_grants.get(run) {
+                grant.request_revoke();
+            }
+            let state = host
+                .journal
+                .agent_view(LOCAL_OWNER, run)
+                .map_err(|_| failure("RUN_STORAGE_UNAVAILABLE"))?;
+            if matches!(
+                state.phase,
+                Phase::Ready | Phase::ModelPending | Phase::ToolsPending
+            ) {
+                host.journal
+                    .cancel_agent_run(LOCAL_OWNER, run)
+                    .map_err(|_| failure("RUN_STORAGE_UNAVAILABLE"))?;
+            }
+        }
+        for run in &runs {
+            host.run_grants.remove(run);
+        }
+        if let Some(grant) = host.grants.remove(id) {
+            grant.request_revoke();
+        }
+        host.access_tokens.remove(id);
+        let mut controls = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+        controls.workspaces.remove(id);
+        for run in runs {
+            controls.runs.remove(&run);
+        }
         Ok(project_workspace(host, view))
     }
     fn list_runs(
@@ -267,6 +361,12 @@ fn project_workspace(
     view: orange_agent_runtime::workspaces::WorkspaceView,
 ) -> WorkspaceView {
     WorkspaceView {
+        session_token: host
+            .grants
+            .get(&view.workspace_id)
+            .filter(|g| !g.is_revoked())
+            .and_then(|_| host.access_tokens.get(&view.workspace_id))
+            .cloned(),
         session_access: host
             .grants
             .get(&view.workspace_id)
@@ -351,6 +451,33 @@ pub(crate) async fn restore_workspace_access(
     })
     .await
 }
+pub(crate) async fn suspend_workspace_access(
+    handle: String,
+    workspace_id: String,
+    session_token: String,
+) -> Result<WorkspaceView, BridgeError> {
+    crate::actor::signal_suspend(&handle, &workspace_id, &session_token)?;
+    crate::actor::call(handle.clone(), move |host, _| {
+        host.suspend_workspace(&handle, &workspace_id, &session_token)
+    })
+    .await
+}
+pub(crate) async fn suspend_workspace_selection(
+    handle: String,
+    request_id: String,
+) -> Result<(), BridgeError> {
+    let Some(workspace) = crate::actor::signal_release_selection(&handle, &request_id)? else {
+        return Ok(());
+    };
+    crate::actor::call(handle.clone(), move |host, _| {
+        match host.suspend_workspace(&handle, &workspace, &request_id) {
+            Ok(_) => Ok(()),
+            Err(error) if error.code == "WORKSPACE_SESSION_CHANGED" => Ok(()),
+            Err(error) => Err(error),
+        }
+    })
+    .await
+}
 pub(crate) async fn revoke_workspace(
     handle: String,
     workspace_id: String,
@@ -389,7 +516,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "f5b364410c3f8f48471c67111fb6da5afdc4a144"
+            "ddc315114eef3969ebb7b848734896896181f267"
         );
         assert_eq!(
             registry

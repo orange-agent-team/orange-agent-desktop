@@ -8,8 +8,17 @@ import 'src/rust/api/host.dart';
 const _platform = MethodChannel('orange_agent/platform');
 
 class WorkspacePanel extends StatefulWidget {
-  const WorkspacePanel({super.key, required this.host});
+  const WorkspacePanel({
+    super.key,
+    required this.host,
+    this.onChanged,
+    this.onAccessStopping,
+    this.onOpenRun,
+  });
   final HostView host;
+  final void Function(List<WorkspaceView>)? onChanged;
+  final void Function(String)? onAccessStopping;
+  final void Function(RunSummary)? onOpenRun;
   @override
   State<WorkspacePanel> createState() => _WorkspacePanelState();
 }
@@ -27,11 +36,8 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
 
   @override
   void dispose() {
-    for (final selection in selections.values) {
-      _platform
-          .invokeMethod<void>('releaseWorkspaceSelection', {
-            'selectionId': selection,
-          })
+    for (final entry in selections.entries) {
+      releaseSelection(entry.value)
           .catchError((Object failure, StackTrace stack) {
             FlutterError.reportError(
               FlutterErrorDetails(
@@ -43,6 +49,23 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
           });
     }
     super.dispose();
+  }
+
+  Future<void> releaseSelection(String id) async {
+    try {
+      // ID is known before authorization dispatch, even if its reply is lost.
+      await suspendWorkspaceSelection(
+        handle: widget.host.handle,
+        requestId: id,
+      );
+    } on BridgeError catch (error) {
+      if (error.code != 'STALE_HOST_HANDLE') {
+        rethrow;
+      }
+    }
+    await _platform.invokeMethod<void>('releaseWorkspaceSelection', {
+      'selectionId': id,
+    });
   }
 
   String describe(Object failure) {
@@ -72,6 +95,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
           workspaces = rows;
           error = null;
         });
+        widget.onChanged?.call(rows);
       }
     } catch (failure) {
       if (mounted) setState(() => error = describe(failure));
@@ -107,13 +131,15 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
         selectedDirectory: path,
       );
       if (!mounted || widget.host.handle != handle) return;
+      final token = workspace.sessionToken;
+      if (token == null) {
+        throw const FormatException('Missing workspace session token');
+      }
       final previous = selections[workspace.workspaceId];
       selections[workspace.workspaceId] = id;
       pending = null;
       if (previous != null) {
-        await _platform.invokeMethod<void>('releaseWorkspaceSelection', {
-          'selectionId': previous,
-        });
+        await releaseSelection(previous);
       }
       await refresh();
     } catch (failure) {
@@ -121,9 +147,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
     } finally {
       if (pending != null) {
         try {
-          await _platform.invokeMethod<void>('releaseWorkspaceSelection', {
-            'selectionId': pending,
-          });
+          await releaseSelection(pending);
         } catch (failure) {
           FlutterError.reportError(
             FlutterErrorDetails(
@@ -160,6 +184,12 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
                         ListTile(
                           title: Text(run.runId),
                           subtitle: Text('${run.phase} · ${run.steps} 步'),
+                          onTap: widget.onOpenRun == null
+                              ? null
+                              : () {
+                                  Navigator.of(context).pop();
+                                  widget.onOpenRun!(run);
+                                },
                         ),
                       if (page.nextCursor != null)
                         const ListTile(title: Text('当前显示最近 100 条记录')),
@@ -175,6 +205,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
 
   Future<void> revoke(WorkspaceView workspace) async {
     if (busy) return;
+    widget.onAccessStopping?.call(workspace.workspaceId);
     setState(() {
       busy = true;
       error = null;
@@ -187,9 +218,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
       );
       final selection = selections.remove(workspace.workspaceId);
       if (selection != null) {
-        await _platform.invokeMethod<void>('releaseWorkspaceSelection', {
-          'selectionId': selection,
-        });
+        await releaseSelection(selection);
       }
       await refresh();
     } catch (failure) {
@@ -222,7 +251,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             ],
           ),
           const SizedBox(height: 12),
-          const Text('只读授权；应用重启后，请重新选择目录恢复本次访问。会话执行尚未接入桌面。'),
+          const Text('只读授权；应用重启后，请重新选择目录恢复本次访问。每次工具读取仍需明确批准。'),
           if (error != null)
             Padding(
               padding: const EdgeInsets.only(top: 12),

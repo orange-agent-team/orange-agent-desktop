@@ -228,6 +228,41 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
         completed.final_text
     );
     assert_eq!(model.calls.load(Ordering::SeqCst), 2);
+    let old_token = grant.session_token.clone().expect("session scope token");
+    let suspended =
+        api::suspend_workspace_access(h.clone(), grant.workspace_id.clone(), old_token.clone())
+            .await
+            .expect("stop OS session access");
+    assert!(
+        suspended.permission_active
+            && !suspended.session_access
+            && suspended.session_token.is_none()
+    );
+    assert_eq!(
+        api::inspect_run(h.clone(), "run-1".into())
+            .await
+            .expect_err("suspended content denied")
+            .code,
+        "WORKSPACE_SESSION_ACCESS_REQUIRED"
+    );
+    let restored = api::restore_workspace_access(h.clone(), grant.workspace_id.clone())
+        .await
+        .expect("fixture owner revalidates OS access");
+    assert_ne!(restored.session_token, Some(old_token.clone()));
+    assert_eq!(
+        api::suspend_workspace_access(h.clone(), grant.workspace_id.clone(), old_token)
+            .await
+            .expect_err("old scope cannot suspend newer access")
+            .code,
+        "WORKSPACE_SESSION_CHANGED"
+    );
+    assert_eq!(
+        api::inspect_run(h.clone(), "run-1".into())
+            .await
+            .expect("authorized completed history")
+            .final_text,
+        completed.final_text
+    );
     fs::remove_file(&source).expect("fixture operation succeeds");
     assert_eq!(
         api::inspect_run(h.clone(), "run-1".into())
@@ -243,13 +278,89 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
     assert!(cancelled.final_text.is_none());
     fs::write(&source, "actual fixture data").expect("fixture operation succeeds");
 
+    let lost = temporary.path().join("lost-authorization-reply");
+    fs::create_dir(&lost).expect("lost reply fixture");
+    // The caller deliberately discards the returned workspace identity/token.
+    api::authorize_workspace(
+        h.clone(),
+        "lost-selection".into(),
+        lost.display().to_string(),
+    )
+    .await
+    .expect("committed authorization");
+    api::suspend_workspace_selection(h.clone(), "lost-selection".into())
+        .await
+        .expect("cleanup using pre-dispatch ID only");
+    let replacement = api::authorize_workspace(
+        h.clone(),
+        "replacement-selection".into(),
+        lost.display().to_string(),
+    )
+    .await
+    .expect("fresh OS selection");
+    api::suspend_workspace_selection(h.clone(), "lost-selection".into())
+        .await
+        .expect("obsolete cleanup is idempotent");
+    assert!(
+        api::list_workspaces(h.clone(), false)
+            .await
+            .expect("metadata")
+            .iter()
+            .any(|w| w.workspace_id == replacement.workspace_id && w.session_access)
+    );
+    assert_eq!(
+        api::authorize_workspace(
+            h.clone(),
+            "lost-selection".into(),
+            lost.display().to_string()
+        )
+        .await
+        .expect_err("closed selection cannot be replayed")
+        .code,
+        "WORKSPACE_SELECTION_CLOSED"
+    );
+    api::suspend_workspace_selection(h.clone(), "replacement-selection".into())
+        .await
+        .expect("stop replacement");
+    assert!(
+        api::list_workspaces(h.clone(), false)
+            .await
+            .expect("metadata")
+            .iter()
+            .any(|w| w.workspace_id == replacement.workspace_id
+                && w.permission_active
+                && !w.session_access)
+    );
+
     let pending = waiting_run(h, &grant.workspace_id, "run-cancel").await;
+    let queued_path = temporary.path().join("queued-selection");
+    fs::create_dir(&queued_path).expect("queued fixture");
+    let authorize_handle = h.clone();
+    let path = queued_path.display().to_string();
+    let late_authorization = tokio::spawn(async move {
+        api::authorize_workspace(authorize_handle, "queued-selection".into(), path).await
+    });
+    tokio::task::yield_now().await;
+    bounded(api::suspend_workspace_selection(
+        h.clone(),
+        "queued-selection".into(),
+    ))
+    .await
+    .expect("close selection even while owner awaits another model");
     let read_handle = h.clone();
     let queued = tokio::spawn(async move { api::list_runs(read_handle, None, None, 100).await });
     let cancelled = bounded(api::cancel_run(h.clone(), "run-cancel".into()))
         .await
         .expect("fixture operation succeeds");
     assert_eq!(cancelled.phase, "cancelled");
+    assert_eq!(
+        bounded(late_authorization)
+            .await
+            .expect("queued authorization task")
+            .expect_err("queued selection already closed")
+            .code,
+        "WORKSPACE_SELECTION_CLOSED"
+    );
     assert_eq!(
         bounded(pending)
             .await
@@ -269,7 +380,10 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
     assert!(
         api::list_workspaces(h.clone(), false)
             .await
-            .expect("fixture operation succeeds")[0]
+            .expect("fixture operation succeeds")
+            .iter()
+            .find(|row| row.workspace_id == grant.workspace_id)
+            .expect("original workspace remains registered")
             .session_access,
         "cancelling one Run must preserve workspace consent"
     );
@@ -318,6 +432,38 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
             .expect_err("unsafe or stale operation must be rejected")
             .code,
         "WORKSPACE_SESSION_ACCESS_REQUIRED"
+    );
+
+    let suspension_workspace = temporary.path().join("suspension-workspace");
+    fs::create_dir(&suspension_workspace).expect("new scope fixture");
+    let scope = api::authorize_workspace(
+        h.clone(),
+        "scope-consent".into(),
+        suspension_workspace.display().to_string(),
+    )
+    .await
+    .expect("scope consent");
+    let pending = waiting_run(h, &scope.workspace_id, "run-suspend").await;
+    let suspended = bounded(api::suspend_workspace_access(
+        h.clone(),
+        scope.workspace_id.clone(),
+        scope.session_token.expect("scope token"),
+    ))
+    .await
+    .expect("bounded scope suspension");
+    assert!(suspended.permission_active && !suspended.session_access);
+    let stopped = bounded(pending)
+        .await
+        .expect("step task")
+        .expect("cancelled step");
+    assert_eq!(stopped.phase, "cancelled");
+    assert!(stopped.pending.is_empty() && stopped.final_text.is_none());
+    assert_eq!(
+        api::restore_workspace_access(h.clone(), scope.workspace_id)
+            .await
+            .expect_err("unknown invocation remains quarantined")
+            .code,
+        "WORKSPACE_RECOVERY_REQUIRED"
     );
 
     let workspace2 = temporary.path().join("workspace2");

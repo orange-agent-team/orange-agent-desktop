@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,6 +10,8 @@ import 'package:integration_test/integration_test.dart';
 import 'package:orange_desktop/main.dart';
 import 'package:orange_desktop/src/rust/api/host.dart';
 import 'package:orange_desktop/src/rust/frb_generated.dart';
+
+import 'local_model_fixture.dart';
 
 Future<HostView> reopenHost(String directory) async {
   final deadline = DateTime.now().add(const Duration(seconds: 3));
@@ -27,6 +31,103 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async => RustLib.init());
   testWidgets(
+    'native UI approval uses real private IPC and filesystem, with explicit model protocol fixture',
+    (tester) async {
+      final directory = await Directory.systemTemp.createTemp(
+        'orange-agent-ui-',
+      );
+      final workspace = await Directory.systemTemp.createTemp(
+        'orange-agent-work-',
+      );
+      final sentinel = 'NATIVE_UI_${DateTime.now().microsecondsSinceEpoch}';
+      final source = await File('${workspace.path}/proof.txt')
+          .writeAsString(sentinel);
+      LocalModelFixture? runningFixture;
+      String? handle;
+      const channel = MethodChannel('orange_agent/platform');
+      final released = Completer<void>();
+      try {
+        final fixture = await LocalModelFixture.start(directory, sentinel);
+        runningFixture = fixture;
+        final host = await reopenHost(directory.path);
+        handle = host.handle;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              if (call.method == 'chooseWorkspace') {
+                return <String, String>{
+                  'selectionId': 'native-run-scope',
+                  'path': workspace.path,
+                };
+              }
+              if (call.method == 'releaseWorkspaceSelection') {
+                final rows = await listWorkspaces(
+                  handle: host.handle,
+                  includeRevoked: false,
+                );
+                expect(rows.single.permissionActive, isTrue);
+                expect(rows.single.sessionAccess, isFalse);
+                if (!released.isCompleted) released.complete();
+                return null;
+              }
+              throw StateError('Unexpected test platform callback');
+            });
+        await tester.pumpWidget(
+          OrangeDesktopApp(
+            connect: () async => host,
+            modelServiceDirectory: () async => fixture.root.path,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('选择文件夹'));
+        await tester.tap(find.text('选择文件夹'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('连接本地模型'));
+        await tester.tap(find.text('连接本地模型'));
+        await tester.pumpAndSettle();
+        expect(find.text('native-fixture-v1'), findsOneWidget);
+        await tester.ensureVisible(
+          find.byType(DropdownButtonFormField<String>),
+        );
+        await tester.tap(find.byType(DropdownButtonFormField<String>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(workspace.path).last);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byType(TextField));
+        await tester.enterText(find.byType(TextField), 'Read proof.txt');
+        await tester.pump();
+        await tester.ensureVisible(find.text('开始会话'));
+        await tester.tap(find.text('开始会话'));
+        await tester.pumpAndSettle();
+        expect(fixture.calls, 1);
+        expect(fixture.failures, isEmpty);
+        expect(find.text('批准这一次读取'), findsOneWidget);
+        expect(find.textContaining('Native fixture observed:'), findsNothing);
+        await tester.ensureVisible(find.text('批准这一次读取'));
+        await tester.tap(find.text('批准这一次读取'));
+        await tester.pumpAndSettle();
+        expect(fixture.failures, isEmpty);
+        expect(fixture.calls, 2);
+        expect(find.text('Native fixture observed: $sentinel'), findsOneWidget);
+        await source.delete();
+        await tester.ensureVisible(find.text('核对状态'));
+        await tester.tap(find.text('核对状态'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Native fixture observed:'), findsNothing);
+        expect(find.textContaining('来源文件已改变'), findsOneWidget);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await released.future.timeout(const Duration(seconds: 3));
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+        if (handle != null) await closeHost(handle: handle);
+        await runningFixture?.close();
+        await workspace.delete(recursive: true);
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+  testWidgets(
     'real native Host, integer transport and stale handle rejection',
     (tester) async {
       final directory = await Directory.systemTemp.createTemp(
@@ -36,13 +137,25 @@ void main() {
       try {
         final platformData = await applicationDataDirectory();
         expect(platformData, isNotEmpty);
+        debugPrint(
+          jsonEncode({
+            'sandboxPathProbe': true,
+            'supportSocketBytes': utf8
+                .encode('$platformData/m/engine.sock')
+                .length,
+            'temporarySocketBytes': utf8
+                .encode('${Directory.systemTemp.path}/o/engine.sock')
+                .length,
+            'unixSocketLimit': 100,
+          }),
+        );
         final host = await initializeHost(
           applicationDataDirectory: directory.path,
         );
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          'f5b364410c3f8f48471c67111fb6da5afdc4a144',
+          'ddc315114eef3969ebb7b848734896896181f267',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(
@@ -213,22 +326,35 @@ void main() {
             ),
           );
           final released = <String>[];
+          final disposedScopeReleased = Completer<void>();
           var choosePrivateRoot = false;
+          var selectionCounter = 0;
           const channel = MethodChannel('orange_agent/platform');
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
               .setMockMethodCallHandler(channel, (call) async {
                 if (call.method == 'chooseWorkspace') {
+                  selectionCounter++;
                   return <String, String>{
                     'selectionId': choosePrivateRoot
                         ? 'ui-private-fixture'
-                        : 'ui-workspace-fixture',
+                        : 'ui-workspace-fixture-$selectionCounter',
                     'path': choosePrivateRoot ? directory.path : workspace.path,
                   };
                 }
                 if (call.method == 'releaseWorkspaceSelection') {
+                  // The real Rust API must stop process access before the
+                  // explicit test-only OS selection callback is released.
+                  final rows = await listWorkspaces(
+                    handle: third.handle,
+                    includeRevoked: false,
+                  );
+                  expect(rows.every((row) => !row.sessionAccess), isTrue);
                   released.add(
                     (call.arguments as Map)['selectionId'] as String,
                   );
+                  if (!disposedScopeReleased.isCompleted) {
+                    disposedScopeReleased.complete();
+                  }
                   return null;
                 }
                 throw StateError('Unexpected platform callback ${call.method}');
@@ -245,6 +371,29 @@ void main() {
             await tester.tap(find.text('选择文件夹'));
             await tester.pumpAndSettle();
             expect(find.text('本次只读访问已授权'), findsOneWidget);
+            await tester.pumpWidget(const SizedBox.shrink());
+            await disposedScopeReleased.future.timeout(
+              const Duration(seconds: 3),
+            );
+            final suspended = (await listWorkspaces(
+              handle: third.handle,
+              includeRevoked: false,
+            )).single;
+            expect(suspended.permissionActive, isTrue);
+            expect(suspended.sessionAccess, isFalse);
+            expect(suspended.sessionToken, isNull);
+            await tester.pumpWidget(
+              OrangeDesktopApp(
+                key: UniqueKey(),
+                connect: () => inspectHost(handle: third.handle),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(find.text('已记住目录，需重新选择以恢复访问'), findsOneWidget);
+            await tester.ensureVisible(find.text('选择文件夹'));
+            await tester.tap(find.text('选择文件夹'));
+            await tester.pumpAndSettle();
+            expect(find.text('本次只读访问已授权'), findsOneWidget);
             expect(
               (await listWorkspaces(
                 handle: third.handle,
@@ -256,12 +405,13 @@ void main() {
             await tester.tap(find.text('撤销访问'));
             await tester.pumpAndSettle();
             expect(find.text('尚未授权工作区'), findsOneWidget);
-            expect(released, contains('ui-workspace-fixture'));
+            expect(released, contains('ui-workspace-fixture-1'));
             expect(
               await listWorkspaces(handle: third.handle, includeRevoked: false),
               isEmpty,
             );
             choosePrivateRoot = true;
+            await tester.ensureVisible(find.text('选择文件夹'));
             await tester.tap(find.text('选择文件夹'));
             await tester.pumpAndSettle();
             expect(find.textContaining('受保护的应用数据'), findsOneWidget);

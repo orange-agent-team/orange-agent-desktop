@@ -199,6 +199,7 @@ impl HostRegistry {
             .or_insert_with(|| crate::actor::RunSignal {
                 workspace: workspace.clone(),
                 cancel: watch::channel(false).0,
+                grant: grant.clone(),
             });
         Ok((workspace, config, grant, control.cancel.subscribe()))
     }
@@ -267,9 +268,29 @@ impl HostRegistry {
         }
         let key = String::from_utf8(private_read(&root.join("api.key"), 1024)?)
             .map_err(|_| failure("INVALID_MODEL_SERVICE"))?;
+        // Only the authenticated filesystem endpoint may live in a short
+        // private IPC directory. Profile, key, journal and process state remain
+        // in Host storage; the model never chooses a network URL.
+        let socket_root = match profile.get("socket_directory") {
+            None | Some(serde_json::Value::Null) => root.clone(),
+            Some(serde_json::Value::String(value)) => {
+                let selected = Path::new(value);
+                if !selected.is_absolute() || selected.is_symlink() {
+                    return Err(failure("PRIVATE_MODEL_SERVICE_REQUIRED"));
+                }
+                let private = selected
+                    .canonicalize()
+                    .map_err(|_| failure("MODEL_SERVICE_UNAVAILABLE"))?;
+                host.journal
+                    .reserve_private_directory(&private)
+                    .map_err(workspace_error)?;
+                private
+            }
+            _ => return Err(failure("INVALID_MODEL_SERVICE")),
+        };
         #[cfg(unix)]
         let client = LlamaClient::private_socket(
-            &root.join("engine.sock"),
+            &socket_root.join("engine.sock"),
             key.trim().into(),
             alias.clone(),
             context,

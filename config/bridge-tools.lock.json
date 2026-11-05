@@ -29,6 +29,8 @@
     "inspectRun",
     "approveTool",
     "advanceRun",
-    "cancelRun"
+    "cancelRun",
+    "suspendWorkspaceAccess",
+    "suspendWorkspaceSelection"
   ]
 }

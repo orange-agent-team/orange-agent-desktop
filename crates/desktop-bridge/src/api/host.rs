@@ -27,6 +27,8 @@ pub struct WorkspaceView {
     pub permission_version: String,
     pub permission_active: bool,
     pub session_access: bool,
+    /// Opaque ownership of the current OS access scope, not durable consent.
+    pub session_token: Option<String>,
 }
 #[derive(Debug, Clone)]
 pub struct RunSummary {
@@ -144,6 +146,23 @@ pub async fn restore_workspace_access(
     workspace_id: String,
 ) -> Result<WorkspaceView, BridgeError> {
     crate::host::restore_workspace_access(handle, workspace_id).await
+}
+/// Stop process access before releasing the corresponding native OS scope.
+/// Durable user consent remains; a later OS selection creates a fresh token.
+pub async fn suspend_workspace_access(
+    handle: String,
+    workspace_id: String,
+    session_token: String,
+) -> Result<WorkspaceView, BridgeError> {
+    crate::host::suspend_workspace_access(handle, workspace_id, session_token).await
+}
+/// Revoke process access by the trusted native selection/request ID, including
+/// when its authorization reply was lost or the request is still queued.
+pub async fn suspend_workspace_selection(
+    handle: String,
+    request_id: String,
+) -> Result<(), BridgeError> {
+    crate::host::suspend_workspace_selection(handle, request_id).await
 }
 pub async fn revoke_workspace(
     handle: String,

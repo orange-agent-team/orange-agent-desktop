@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1131204094;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 102476858;
 
 // Section: executor
 
@@ -679,6 +679,90 @@ fn wire__crate__api__host__start_run_impl(
         },
     )
 }
+fn wire__crate__api__host__suspend_workspace_access_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "suspend_workspace_access",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <String>::sse_decode(&mut deserializer);
+            let api_workspace_id = <String>::sse_decode(&mut deserializer);
+            let api_session_token = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::host::BridgeError>(
+                    (move || async move {
+                        let output_ok = crate::api::host::suspend_workspace_access(
+                            api_handle,
+                            api_workspace_id,
+                            api_session_token,
+                        )
+                        .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__host__suspend_workspace_selection_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "suspend_workspace_selection",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <String>::sse_decode(&mut deserializer);
+            let api_request_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::host::BridgeError>(
+                    (move || async move {
+                        let output_ok = crate::api::host::suspend_workspace_selection(
+                            api_handle,
+                            api_request_id,
+                        )
+                        .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__host__validate_amount_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -960,12 +1044,14 @@ impl SseDecode for crate::api::host::WorkspaceView {
         let mut var_permissionVersion = <String>::sse_decode(deserializer);
         let mut var_permissionActive = <bool>::sse_decode(deserializer);
         let mut var_sessionAccess = <bool>::sse_decode(deserializer);
+        let mut var_sessionToken = <Option<String>>::sse_decode(deserializer);
         return crate::api::host::WorkspaceView {
             workspace_id: var_workspaceId,
             display_path: var_displayPath,
             permission_version: var_permissionVersion,
             permission_active: var_permissionActive,
             session_access: var_sessionAccess,
+            session_token: var_sessionToken,
         };
     }
 }
@@ -1004,7 +1090,16 @@ fn pde_ffi_dispatcher_primary_impl(
         }
         15 => wire__crate__api__host__revoke_workspace_impl(port, ptr, rust_vec_len, data_len),
         16 => wire__crate__api__host__start_run_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__host__validate_amount_impl(port, ptr, rust_vec_len, data_len),
+        17 => {
+            wire__crate__api__host__suspend_workspace_access_impl(port, ptr, rust_vec_len, data_len)
+        }
+        18 => wire__crate__api__host__suspend_workspace_selection_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        19 => wire__crate__api__host__validate_amount_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1182,6 +1277,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::host::WorkspaceView {
             self.permission_version.into_into_dart().into_dart(),
             self.permission_active.into_into_dart().into_dart(),
             self.session_access.into_into_dart().into_dart(),
+            self.session_token.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1381,6 +1477,7 @@ impl SseEncode for crate::api::host::WorkspaceView {
         <String>::sse_encode(self.permission_version, serializer);
         <bool>::sse_encode(self.permission_active, serializer);
         <bool>::sse_encode(self.session_access, serializer);
+        <Option<String>>::sse_encode(self.session_token, serializer);
     }
 }
 

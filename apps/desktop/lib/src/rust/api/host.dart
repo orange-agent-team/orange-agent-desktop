@@ -116,6 +116,28 @@ Future<WorkspaceView> restoreWorkspaceAccess({
   workspaceId: workspaceId,
 );
 
+/// Stop process access before releasing the corresponding native OS scope.
+/// Durable user consent remains; a later OS selection creates a fresh token.
+Future<WorkspaceView> suspendWorkspaceAccess({
+  required String handle,
+  required String workspaceId,
+  required String sessionToken,
+}) => RustLib.instance.api.crateApiHostSuspendWorkspaceAccess(
+  handle: handle,
+  workspaceId: workspaceId,
+  sessionToken: sessionToken,
+);
+
+/// Revoke process access by the trusted native selection/request ID, including
+/// when its authorization reply was lost or the request is still queued.
+Future<void> suspendWorkspaceSelection({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostSuspendWorkspaceSelection(
+  handle: handle,
+  requestId: requestId,
+);
+
 Future<WorkspaceView> revokeWorkspace({
   required String handle,
   required String workspaceId,
@@ -372,12 +394,16 @@ class WorkspaceView {
   final bool permissionActive;
   final bool sessionAccess;
 
+  /// Opaque ownership of the current OS access scope, not durable consent.
+  final String? sessionToken;
+
   const WorkspaceView({
     required this.workspaceId,
     required this.displayPath,
     required this.permissionVersion,
     required this.permissionActive,
     required this.sessionAccess,
+    this.sessionToken,
   });
 
   @override
@@ -386,7 +412,8 @@ class WorkspaceView {
       displayPath.hashCode ^
       permissionVersion.hashCode ^
       permissionActive.hashCode ^
-      sessionAccess.hashCode;
+      sessionAccess.hashCode ^
+      sessionToken.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -397,5 +424,6 @@ class WorkspaceView {
           displayPath == other.displayPath &&
           permissionVersion == other.permissionVersion &&
           permissionActive == other.permissionActive &&
-          sessionAccess == other.sessionAccess;
+          sessionAccess == other.sessionAccess &&
+          sessionToken == other.sessionToken;
 }

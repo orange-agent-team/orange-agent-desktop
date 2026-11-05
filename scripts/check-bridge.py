@@ -27,10 +27,11 @@ if not {'orange-domain','orange-protocol','orange-agent-runtime'}<=seen:raise Sy
 for arguments in [ ['fmt','-p','orange-desktop-bridge','--check'],['test','-p','orange-desktop-bridge','--locked','--offline'],['clippy','-p','orange-desktop-bridge','--all-targets','--locked','--offline','--','-D','warnings'] ]:
     subprocess.run([str(tools['cargo']),*arguments],cwd=ROOT,env=environment,check=True)
 subprocess.run([str(tools['flutter']),'--suppress-analytics','pub','get','--offline','--enforce-lockfile'],cwd=APP,env=environment,check=True)
-subprocess.run([str(tools['dart']),'--suppress-analytics','format','--output=none','--set-exit-if-changed','lib','integration_test','hook'],cwd=APP,env=environment,check=True)
+subprocess.run([str(tools['dart']),'--suppress-analytics','format','--output=none','--set-exit-if-changed','lib','test','integration_test','hook'],cwd=APP,env=environment,check=True)
 subprocess.run([str(tools['flutter']),'--suppress-analytics','analyze','--no-pub'],cwd=APP,env=environment,check=True)
+subprocess.run([str(tools['flutter']),'--suppress-analytics','test','--no-pub','test'],cwd=APP,env=environment,check=True,timeout=300)
 if args.native:
     subprocess.run([str(tools['flutter']),'--suppress-analytics','test','integration_test/native_host_test.dart','-d','macos','--no-pub'],cwd=APP,env=environment,check=True,timeout=900)
-    print('PASS actual macOS Flutter/FRB/SQLite Host and workspace consent/revocation; exact integer strings and stale handles. OS selector callbacks in button tests are explicit fixtures; no model/cloud/GPU or persistent OS-bookmark certificate')
+    print('PASS actual macOS Flutter/FRB/private Unix IPC/SQLite/file-tool approval UI and scoped access cleanup; exact integer strings and stale handles. Model protocol and OS selection callbacks are explicit fixtures. Real CPU API inference is check-real-run.py; no bundled model manager, cloud, GPU or persistent OS-bookmark certificate')
 else:
     print('PASS Rust host and Dart static checks; native FFI application not exercised without --native')

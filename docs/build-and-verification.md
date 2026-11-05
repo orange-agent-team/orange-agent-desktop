@@ -35,7 +35,7 @@ Rust1.97.1下，实际Mac应用构建完成，但打包前cdylib及打包后fram
 
 ## 当前认证边界
 
-SDK摘要/提交/版本实际通过；固定f5b3644共享Runtime包的63项Rust测试和篡改拒绝通过；E05的4项Rust测试、Clippy和Dart analyze通过。真实打包Flutter/FRB/SQLite流程验证了授权、重启后sessionAccess=false、显式恢复、撤销和私有根拒绝；按钮测试中的系统选择回调是明确替身，业务Rust/SQLite是真实执行。
+SDK摘要/提交/版本实际通过；固定ddc3151共享Runtime包的63项Rust测试和篡改拒绝通过；E05的4项Rust测试、Clippy和Dart analyze通过。真实打包Flutter/FRB/SQLite流程验证了授权、重启后sessionAccess=false、显式恢复、撤销和私有根拒绝；按钮测试中的系统选择回调是明确替身，业务Rust/SQLite是真实执行。
 
 另通过计算机使用工具观察到实际NSOpenPanel打开、用户完成目录选择、应用显示只读授权；没有读取用户目录文件内容，也未撤销用户已选择的目录。GUI撤销没有手工完成，使用隔离目录的自动化按钮流程验证。观察记录位于`.local/ui-tests/workspace-ui-observation.json`，不保存系统文件列表。
 
@@ -43,4 +43,4 @@ SDK摘要/提交/版本实际通过；固定f5b3644共享Runtime包的63项Rust�
 
 当前证明Host/工作区元数据、私有SQLite、类型与句柄及上述只读授权流程。真实桌面Rust Host API另已完成CPU模型→显式批准→文件工具→最终答案→重开与删除源拒绝，详情见[本地Agent接口](local-agent-api.md)。完整Agent UI、云身份、App Sandbox模型传输、OS安全书签、GPU、Windows/Linux实机、正式签名和公证仍需分别完成。
 
-本次固定源码包为f5b364410c3f8f48471c67111fb6da5afdc4a144，96158字节，归档SHA-256为20c7819d59cea316b53edc2d6a02efbadd92ca17bbda38d4f45ab6f279f262f5。已通过重建、独立导入和篡改拒绝；旧vendor目录从工作树移除，可通过Git历史回退。本次还增加了串行Host执行器、即时取消/撤权信号、Run/批准/推进/取消及本地模型连接接口，并通过生成的FRB边界调用；聊天、模型管理或工具批准界面仍待实现。
+本次固定源码包为ddc315114eef3969ebb7b848734896896181f267，97730字节，归档SHA-256为23d2224d555ddba9e3bd917ee1ecca01a1b83f4c5b4e8d16ed013474b40a5468。已通过重建、独立导入和篡改拒绝；旧vendor目录从工作树移除，可通过Git历史回退。本次还增加了串行Host执行器、即时取消/撤权信号、Run/批准/推进/取消及本地模型连接接口，并通过生成的FRB边界调用；单次会话和工具批准界面已接入，6项替身界面测试与真实原生/私有IPC/文件工具流程通过；模型协议为明确替身。真实模型的Rust API闭环另行通过。模型安装、打包监督服务、完整多轮会话仍待实现。

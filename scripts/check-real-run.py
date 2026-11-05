@@ -55,14 +55,21 @@ def main():
     with tempfile.TemporaryDirectory(prefix='oa-desktop-', dir='/private/tmp' if os.uname().sysname == 'Darwin' else None) as temporary:
         base = Path(temporary).resolve()
         private, workspace = base / 'h', base / 'w'
-        runtime = private / 'm'
+        runtime = private / ('durable-model-state-' * 6)
+        ipc = base / 'm'
         runtime.mkdir(parents=True, mode=0o700)
         private.chmod(0o700)
         workspace.mkdir(mode=0o700)
+        ipc.mkdir(mode=0o700)
+        report['separate_private_ipc'] = True
+        report['durable_socket_path_bytes'] = len(os.fsencode(runtime / 'engine.sock'))
+        report['actual_socket_path_bytes'] = len(os.fsencode(ipc / 'engine.sock'))
+        if report['durable_socket_path_bytes'] <= 100 or report['actual_socket_path_bytes'] > 100:
+            raise RuntimeError('Long-state/short-IPC regression not exercised')
         sentinel = 'ORANGE_DESKTOP_' + uuid.uuid4().hex
         (workspace / 'proof.txt').write_text(sentinel + '\n')
         nonce, instance = uuid.uuid4().hex + uuid.uuid4().hex, uuid.uuid4().hex
-        write(runtime / 'profile.json', {'protocol': 1, 'runtime_directory': str(runtime), 'executable': str(backend),
+        write(runtime / 'profile.json', {'protocol': 1, 'runtime_directory': str(runtime), 'socket_directory': str(ipc), 'executable': str(backend),
               'executable_sha256': build['executable_sha256'], 'model': str(model), 'model_sha256': lock['model']['sha256'],
               'model_bytes': lock['model']['bytes'], 'model_version': 'qwen-desktop-acceptance-v1', 'context_tokens': 4096,
               'startup_timeout_seconds': 120, 'control_nonce': nonce, 'instance_id': instance})

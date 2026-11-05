@@ -6,7 +6,7 @@
 
 `apps/desktop` 是Flutter应用E06；`crates/desktop-bridge` 是Rust桥接E05。Flutter通过FRB 2.13.0的配对生成物调用经过审阅的DTO和命令，Native Assets hook编译/打包Rust库。当前没有额外业务工程、Node BFF或Cargokit拷贝。
 
-E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`f5b364410c3f8f48471c67111fb6da5afdc4a144`的源码发行包；`config/runtime.lock.json`绑定archive和release manifest摘要，`vendor/runtime-f5b3644`保存独立源码。供应方只从Git commit导出；接收方校验文件清单及Cargo实际依赖路径。vendor副本不改变核心工程所有权，也不按新增项目或自研代码量重复统计。
+E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`ddc315114eef3969ebb7b848734896896181f267`的源码发行包；`config/runtime.lock.json`绑定archive和release manifest摘要，`vendor/runtime-ddc3151`保存独立源码。供应方只从Git commit导出；接收方校验文件清单及Cargo实际依赖路径。vendor副本不改变核心工程所有权，也不按新增项目或自研代码量重复统计。
 
 桌面虚拟Cargo workspace只有E05，明确排除vendor中的共享workspace，防止其继承桌面错误的依赖定义。依赖锁从已验证Runtime锁出发，增加固定FRB依赖；真实客户端锁记录在桌面根Cargo.lock。E04源码随固定包提供，当前E05并未启动任何模型引擎。
 
@@ -37,8 +37,8 @@ FRB生成Rust/Dart配对内容摘要，构建前检查`config/generated-bridge.l
 
 ## 后续接口演进
 
-Run启动/推进/批准/取消及本地私有模型连接已实现并生成FRB接口，[本地Agent接口](local-agent-api.md)记录约束与真实CPU验收。接续E05-W02～W04仍需聊天与批准UI、应用模型服务管理、持久事件游标、慢消费者背压、成果句柄和退出排空；完整OS书签/多平台权限恢复另行认证。不得在Dart复制E03状态机，不得让模型批准工具。
+Run启动/推进/批准/取消及本地私有模型连接已实现并生成FRB接口，[本地Agent接口](local-agent-api.md)记录约束与真实CPU验收。已有单次Run与只读工具批准UI；接续E05-W02～W04仍需完整多轮会话、应用模型服务管理、持久事件游标、慢消费者背压、成果句柄和退出排空；完整OS书签/多平台权限恢复另行认证。不得在Dart复制E03状态机，不得让模型批准工具。
 
 模型与GPU引擎由独立受管进程执行；桌面UI进程不加载GPU模型。接E08 Broker时必须区分本地存储关闭、Run取消、引擎退出和设备清理证据。云账户将接单独的原生授权流程，不能复用Admin cookie或把Web开发token复制到桌面。
 
-UI当前只展示真实本地记录状态和开发预览边界；没有假余额、假模型响应或假供给成功页面。其余既定页面和功能仍在总计划中待实现。
+UI已连接真实Host接口，可创建单次Run、逐次批准只读工具、停止、核对状态和查看已授权结果。模型服务缺失时明确拒绝启动，没有产品内的假模型响应。界面测试的协议替身仅在integration_test/test目录。模型安装与常驻服务等其余既定功能仍待实现。

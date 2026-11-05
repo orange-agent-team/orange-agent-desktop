@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'src/rust/api/host.dart';
 import 'src/rust/frb_generated.dart';
-import 'workspaces.dart';
+import 'local_agent_shell.dart';
 
 Future<String> applicationDataDirectory() async {
   if (Platform.isMacOS) {
@@ -44,8 +44,13 @@ void main() {
 }
 
 class OrangeDesktopApp extends StatefulWidget {
-  const OrangeDesktopApp({super.key, required this.connect});
+  const OrangeDesktopApp({
+    super.key,
+    required this.connect,
+    this.modelServiceDirectory,
+  });
   final Future<HostView> Function() connect;
+  final Future<String> Function()? modelServiceDirectory;
   @override
   State<OrangeDesktopApp> createState() => _OrangeDesktopAppState();
 }
@@ -120,11 +125,15 @@ class _OrangeDesktopAppState extends State<OrangeDesktopApp> {
                         style: Theme.of(context).textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        '这是桌面端开发预览。会话执行、模型管理与云端账户尚未接入，当前不会启动模型、使用算力或产生费用。',
-                      ),
+                      const Text('这是桌面端开发预览。本地会话使用已配置的模型服务；云端账户和模型安装仍在开发中。'),
                       const SizedBox(height: 28),
-                      WorkspacePanel(key: ValueKey(info.handle), host: info),
+                      LocalAgentShell(
+                        key: ValueKey(info.handle),
+                        host: info,
+                        serviceDirectory:
+                            widget.modelServiceDirectory ??
+                            () async => '${await applicationDataDirectory()}/m',
+                      ),
                       const SizedBox(height: 16),
                       Card(
                         child: ExpansionTile(

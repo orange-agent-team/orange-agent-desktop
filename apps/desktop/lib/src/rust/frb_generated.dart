@@ -69,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1131204094;
+  int get rustContentHash => 102476858;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -155,6 +155,17 @@ abstract class RustLibApi extends BaseApi {
     required String workspaceId,
     required String requestId,
     required String prompt,
+  });
+
+  Future<WorkspaceView> crateApiHostSuspendWorkspaceAccess({
+    required String handle,
+    required String workspaceId,
+    required String sessionToken,
+  });
+
+  Future<void> crateApiHostSuspendWorkspaceSelection({
+    required String handle,
+    required String requestId,
   });
 
   Future<String> crateApiHostValidateAmount({
@@ -714,6 +725,78 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<WorkspaceView> crateApiHostSuspendWorkspaceAccess({
+    required String handle,
+    required String workspaceId,
+    required String sessionToken,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(workspaceId, serializer);
+          sse_encode_String(sessionToken, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_workspace_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostSuspendWorkspaceAccessConstMeta,
+        argValues: [handle, workspaceId, sessionToken],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostSuspendWorkspaceAccessConstMeta =>
+      const TaskConstMeta(
+        debugName: "suspend_workspace_access",
+        argNames: ["handle", "workspaceId", "sessionToken"],
+      );
+
+  @override
+  Future<void> crateApiHostSuspendWorkspaceSelection({
+    required String handle,
+    required String requestId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(requestId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 18,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostSuspendWorkspaceSelectionConstMeta,
+        argValues: [handle, requestId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostSuspendWorkspaceSelectionConstMeta =>
+      const TaskConstMeta(
+        debugName: "suspend_workspace_selection",
+        argNames: ["handle", "requestId"],
+      );
+
+  @override
   Future<String> crateApiHostValidateAmount({
     required String handle,
     required String value,
@@ -727,7 +810,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 19,
             port: port_,
           );
         },
@@ -926,14 +1009,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WorkspaceView dco_decode_workspace_view(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return WorkspaceView(
       workspaceId: dco_decode_String(arr[0]),
       displayPath: dco_decode_String(arr[1]),
       permissionVersion: dco_decode_String(arr[2]),
       permissionActive: dco_decode_bool(arr[3]),
       sessionAccess: dco_decode_bool(arr[4]),
+      sessionToken: dco_decode_opt_String(arr[5]),
     );
   }
 
@@ -1162,12 +1246,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_permissionVersion = sse_decode_String(deserializer);
     var var_permissionActive = sse_decode_bool(deserializer);
     var var_sessionAccess = sse_decode_bool(deserializer);
+    var var_sessionToken = sse_decode_opt_String(deserializer);
     return WorkspaceView(
       workspaceId: var_workspaceId,
       displayPath: var_displayPath,
       permissionVersion: var_permissionVersion,
       permissionActive: var_permissionActive,
       sessionAccess: var_sessionAccess,
+      sessionToken: var_sessionToken,
     );
   }
 
@@ -1359,6 +1445,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.permissionVersion, serializer);
     sse_encode_bool(self.permissionActive, serializer);
     sse_encode_bool(self.sessionAccess, serializer);
+    sse_encode_opt_String(self.sessionToken, serializer);
   }
 
   @protected

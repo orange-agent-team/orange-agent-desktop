@@ -4,9 +4,9 @@ use crate::{
     api::host::{BridgeError, HostView},
     host::{HostRegistry, failure},
 };
-use orange_agent_runtime::workspaces::WorkspaceRevoker;
+use orange_agent_runtime::{workspace::WorkspaceGrant, workspaces::WorkspaceRevoker};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::{
         Arc, LazyLock, Mutex,
@@ -20,16 +20,24 @@ use tokio::sync::{oneshot, watch};
 pub(crate) struct RunSignal {
     pub workspace: String,
     pub cancel: watch::Sender<bool>,
+    pub grant: WorkspaceGrant,
+}
+pub(crate) struct WorkspaceSignal {
+    pub version: String,
+    pub session_token: String,
+    pub revoker: WorkspaceRevoker,
+    pub grant: WorkspaceGrant,
 }
 #[derive(Default)]
 pub(crate) struct Signals {
-    pub workspaces: HashMap<String, (String, WorkspaceRevoker)>,
+    pub workspaces: HashMap<String, WorkspaceSignal>,
     pub runs: HashMap<String, RunSignal>,
+    pub closed_selections: HashSet<String>,
 }
 impl Signals {
     pub fn stop_all(&self) {
-        for (_, revoker) in self.workspaces.values() {
-            revoker.request_revoke();
+        for workspace in self.workspaces.values() {
+            workspace.revoker.request_revoke();
         }
         for run in self.runs.values() {
             run.cancel.send_replace(true);
@@ -227,11 +235,11 @@ pub(crate) fn signal_revoke(
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
-    if let Some((current, revoker)) = signals.workspaces.get(workspace) {
-        if current != version {
+    if let Some(current) = signals.workspaces.get(workspace) {
+        if current.version != version {
             return Err(failure("WORKSPACE_CONFLICT"));
         }
-        revoker.request_revoke();
+        current.revoker.request_revoke();
         for run in signals
             .runs
             .values()
@@ -241,4 +249,74 @@ pub(crate) fn signal_revoke(
         }
     }
     Ok(())
+}
+pub(crate) fn signal_suspend(
+    handle: &str,
+    workspace: &str,
+    session_token: &str,
+) -> Result<(), BridgeError> {
+    let registry = SESSION.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+    let session = registry
+        .as_ref()
+        .filter(|s| s.view.handle == handle && !s.closed.load(Ordering::Acquire))
+        .ok_or_else(|| failure("STALE_HOST_HANDLE"))?;
+    let mut signals = session
+        .signals
+        .lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?;
+    if let Some(current) = signals.workspaces.get(workspace) {
+        if current.session_token != session_token {
+            return Err(failure("WORKSPACE_SESSION_CHANGED"));
+        }
+        current.grant.request_revoke();
+        for run in signals
+            .runs
+            .values()
+            .filter(|run| run.workspace == workspace)
+        {
+            run.grant.request_revoke();
+            run.cancel.send_replace(true);
+        }
+        signals.closed_selections.insert(session_token.into());
+    }
+    Ok(())
+}
+/// The native selection ID is known before authorization is dispatched, so a
+/// lost reply cannot leave process access behind after its OS scope is released.
+pub(crate) fn signal_release_selection(
+    handle: &str,
+    request: &str,
+) -> Result<Option<String>, BridgeError> {
+    if !orange_protocol::valid_id(request) {
+        return Err(failure("INVALID_WORKSPACE_REQUEST"));
+    }
+    let registry = SESSION.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+    let session = registry
+        .as_ref()
+        .filter(|s| s.view.handle == handle && !s.closed.load(Ordering::Acquire))
+        .ok_or_else(|| failure("STALE_HOST_HANDLE"))?;
+    let mut signals = session
+        .signals
+        .lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?;
+    let workspace = signals
+        .workspaces
+        .iter()
+        .find(|(_, value)| value.session_token == request)
+        .map(|(id, _)| id.clone());
+    // At the limit, all new authorizations fail before publication. Existing
+    // active scopes (at most32) must still be allowed to close.
+    if signals.closed_selections.len() < 8192 || workspace.is_some() {
+        signals.closed_selections.insert(request.into());
+    }
+    if let Some(id) = &workspace {
+        if let Some(current) = signals.workspaces.get(id) {
+            current.grant.request_revoke();
+        }
+        for run in signals.runs.values().filter(|run| &run.workspace == id) {
+            run.grant.request_revoke();
+            run.cancel.send_replace(true);
+        }
+    }
+    Ok(workspace)
 }
