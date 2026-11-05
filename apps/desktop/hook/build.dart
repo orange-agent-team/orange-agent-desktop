@@ -18,9 +18,32 @@ void main(List<String> args) async {
         'Shared Runtime source verification failed: ${result.stderr}${result.stdout}',
       );
     }
-    await const FlutterRustBridgeNativeAssetsBuilder(
+    final fingerprintTool = input.packageRoot.resolve(
+      '../../scripts/model-bundle-fingerprint.py',
+    );
+    final bundleManifest = input.packageRoot.resolve(
+      '../../.local/model-bundle/manifest.json',
+    );
+    output.dependencies.addAll([
+      fingerprintTool,
+      input.packageRoot.resolve('../../scripts/model_bundle.py'),
+    ]);
+    if (await File.fromUri(bundleManifest).exists()) {
+      output.dependencies.add(bundleManifest);
+    }
+    final fingerprint = await Process.run('python3', [
+      File.fromUri(fingerprintTool).path,
+    ]);
+    final digest = (fingerprint.stdout as String).trim();
+    if (fingerprint.exitCode != 0 ||
+        !(digest == 'not-packaged' ||
+            RegExp(r'^[0-9a-f]{64}$').hasMatch(digest))) {
+      throw StateError('Model bundle fingerprint verification failed');
+    }
+    await FlutterRustBridgeNativeAssetsBuilder(
       cratePath: '../../crates/desktop-bridge',
       extraCargoBuildArgs: ['--locked'],
+      extraCargoEnvironmentVariables: {'ORANGE_MODEL_BUNDLE_SHA256': digest},
     ).run(input: input, output: output);
   });
 }

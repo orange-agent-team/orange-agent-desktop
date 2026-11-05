@@ -9,7 +9,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 use uuid::Uuid;
+mod managed;
 mod runs;
+pub(crate) use managed::{
+    cancel_model_start, close_model_import, configure_model_service, current_model_connection,
+    import_model, inspect_model_service, start_model_service, stop_model_service,
+};
 pub(crate) use runs::{
     advance_run, approve_tool, cancel_run, connect_local_model, disconnect_local_model,
     inspect_run, start_run,
@@ -28,6 +33,7 @@ struct Host {
     grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
     access_tokens: std::collections::HashMap<String, String>,
     model: Option<runs::ModelConnection>,
+    service: Option<crate::service::Client>,
     run_grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
 }
 #[derive(Default)]
@@ -99,6 +105,7 @@ impl HostRegistry {
             grants: std::collections::HashMap::new(),
             access_tokens: std::collections::HashMap::new(),
             model: None,
+            service: None,
             run_grants: std::collections::HashMap::new(),
         });
         Ok(view)

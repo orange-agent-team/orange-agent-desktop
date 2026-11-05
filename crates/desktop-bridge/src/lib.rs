@@ -1,6 +1,7 @@
 mod actor;
 pub mod api;
 mod host;
+mod service;
 // Reviewed upstream FFI/codec assertions live only in generated glue. Handwritten
 // Host code keeps deny(unsafe_code) and Clippy's unwrap check. Generation hashes
 // and real native tests guard this boundary; no business logic belongs here.

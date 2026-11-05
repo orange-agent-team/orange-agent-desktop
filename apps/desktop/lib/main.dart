@@ -125,11 +125,12 @@ class _OrangeDesktopAppState extends State<OrangeDesktopApp> {
                         style: Theme.of(context).textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 12),
-                      const Text('这是桌面端开发预览。本地会话使用已配置的模型服务；云端账户和模型安装仍在开发中。'),
+                      const Text('这是桌面端开发预览。可导入清单中的本地模型并运行只读会话；云端账户仍待接入。'),
                       const SizedBox(height: 28),
                       LocalAgentShell(
                         key: ValueKey(info.handle),
                         host: info,
+                        manageService: widget.modelServiceDirectory == null,
                         serviceDirectory:
                             widget.modelServiceDirectory ??
                             () async => '${await applicationDataDirectory()}/m',

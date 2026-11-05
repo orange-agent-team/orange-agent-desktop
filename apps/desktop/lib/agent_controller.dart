@@ -313,6 +313,15 @@ class AgentController extends ChangeNotifier {
     _changed();
   }
 
+  void clearModel() {
+    model = null;
+    if (runId == null) {
+      _changed();
+    } else {
+      hideContent();
+    }
+  }
+
   @override
   void dispose() {
     _alive = false;

@@ -32,6 +32,6 @@ subprocess.run([str(tools['flutter']),'--suppress-analytics','analyze','--no-pub
 subprocess.run([str(tools['flutter']),'--suppress-analytics','test','--no-pub','test'],cwd=APP,env=environment,check=True,timeout=300)
 if args.native:
     subprocess.run([str(tools['flutter']),'--suppress-analytics','test','integration_test/native_host_test.dart','-d','macos','--no-pub'],cwd=APP,env=environment,check=True,timeout=900)
-    print('PASS actual macOS Flutter/FRB/private Unix IPC/SQLite/file-tool approval UI and scoped access cleanup; exact integer strings and stale handles. Model protocol and OS selection callbacks are explicit fixtures. Real CPU API inference is check-real-run.py; no bundled model manager, cloud, GPU or persistent OS-bookmark certificate')
+    print('PASS actual macOS Flutter/FRB/private Unix IPC/SQLite/file-tool approval UI and scoped access cleanup; exact integer strings and stale handles. Model protocol and OS selection callbacks are explicit fixtures. Real API inference is check-real-run.py; actual managed model lifecycle/UI is check-managed-model.py. No cloud, GPU or persistent OS-bookmark certificate')
 else:
     print('PASS Rust host and Dart static checks; native FFI application not exercised without --native')

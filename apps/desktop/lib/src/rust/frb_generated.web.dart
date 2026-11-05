@@ -57,6 +57,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ModelConnectionView dco_decode_model_connection_view(dynamic raw);
 
   @protected
+  ModelServiceView dco_decode_model_service_view(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
@@ -121,6 +124,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ModelConnectionView sse_decode_model_connection_view(
     SseDeserializer deserializer,
   );
+
+  @protected
+  ModelServiceView sse_decode_model_service_view(SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -197,6 +203,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_model_connection_view(
     ModelConnectionView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_model_service_view(
+    ModelServiceView self,
     SseSerializer serializer,
   );
 

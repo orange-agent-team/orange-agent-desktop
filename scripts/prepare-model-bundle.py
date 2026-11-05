@@ -90,6 +90,13 @@ def main():
                 verify_bundle(backup, require_current=False); shutil.rmtree(backup)
             os.replace(STAGED, backup)
         os.replace(stage, STAGED)
+    # A first package can appear after a previous no-package hook was cached.
+    # Invalidate only this app's generated native hook cache, never user data.
+    hook_cache=ROOT/'apps/desktop/.dart_tool/hooks_runner'
+    if hook_cache.is_symlink():
+        raise RuntimeError('Linked generated hook cache refused')
+    if hook_cache.exists():
+        shutil.rmtree(hook_cache)
     print(json.dumps({'bundle': str(STAGED), 'manifest_sha256': digest(STAGED / 'manifest.json'), 'minimum_macos': minimum,
                       'test_model_included': args.test_model is not None, 'certification': 'ad-hoc development artifact integrity only; no production signing, packaged execution or lower-OS runtime certificate'}, indent=2))
 

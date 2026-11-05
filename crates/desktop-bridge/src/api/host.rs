@@ -52,6 +52,61 @@ pub struct ModelConnectionView {
     pub verification: String,
 }
 #[derive(Debug, Clone)]
+pub struct ModelServiceView {
+    pub phase: String,
+    pub model_name: String,
+    pub model_bytes: String,
+    pub installed: bool,
+    pub instance_id: Option<String>,
+    pub failure: Option<String>,
+}
+/// Paths and OS version come from the trusted native application environment.
+pub async fn configure_model_service(
+    handle: String,
+    contents_directory: String,
+    ipc_directory: String,
+    os_version: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::configure_model_service(handle, contents_directory, ipc_directory, os_version)
+        .await
+}
+pub async fn inspect_model_service(handle: String) -> Result<ModelServiceView, BridgeError> {
+    crate::host::inspect_model_service(handle).await
+}
+pub async fn current_model_connection(handle: String) -> Result<ModelConnectionView, BridgeError> {
+    crate::host::current_model_connection(handle).await
+}
+pub async fn cancel_model_start(
+    handle: String,
+    request_id: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::cancel_model_start(handle, request_id).await
+}
+/// Operation ID is known before file selection is released, including lost replies.
+pub async fn import_model(
+    handle: String,
+    operation_id: String,
+    selected_file: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::import_model(handle, operation_id, selected_file).await
+}
+/// Stops further file reads and drains the owned import before native scope release.
+pub async fn close_model_import(handle: String, operation_id: String) -> Result<(), BridgeError> {
+    crate::host::close_model_import(handle, operation_id).await
+}
+pub async fn start_model_service(
+    handle: String,
+    request_id: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::start_model_service(handle, request_id).await
+}
+pub async fn stop_model_service(
+    handle: String,
+    instance_id: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::stop_model_service(handle, instance_id).await
+}
+#[derive(Debug, Clone)]
 pub struct ToolApprovalView {
     pub operation_id: String,
     pub tool_name: String,

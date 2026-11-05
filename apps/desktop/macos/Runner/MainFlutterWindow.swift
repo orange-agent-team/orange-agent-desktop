@@ -1,5 +1,6 @@
 import Cocoa
 import FlutterMacOS
+import UniformTypeIdentifiers
 
 class MainFlutterWindow: NSWindow {
   private var platformChannel: FlutterMethodChannel?
@@ -27,16 +28,18 @@ class MainFlutterWindow: NSWindow {
         ])
         return
       }
-      if call.method == "chooseWorkspace" {
+      if call.method == "chooseWorkspace" || call.method == "chooseModelFile" {
         guard !self.pickerActive else { result(FlutterError(code: "PICKER_BUSY", message: nil, details: nil)); return }
         self.pickerActive = true
         let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
+        let modelSelection = call.method == "chooseModelFile"
+        panel.canChooseDirectories = !modelSelection
+        panel.canChooseFiles = modelSelection
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        panel.prompt = "允许只读访问"
-        panel.message = "请选择 Orange Agent 可读取的工作区。不会授予写入或执行程序的权限。"
+        panel.prompt = modelSelection ? "导入模型" : "允许只读访问"
+        panel.message = modelSelection ? "请选择清单对应的 GGUF 文件。仅在大小与摘要校验通过后复制到应用缓存，不修改原文件。" : "请选择 Orange Agent 可读取的工作区。不会授予写入或执行程序的权限。"
+        if modelSelection { panel.allowedContentTypes = [UTType(filenameExtension: "gguf") ?? .data] }
         panel.beginSheetModal(for: self) { response in
           self.pickerActive = false
           guard response == .OK, let url = panel.url else { result(nil); return }
@@ -48,7 +51,7 @@ class MainFlutterWindow: NSWindow {
         }
         return
       }
-      if call.method == "releaseWorkspaceSelection" {
+      if call.method == "releaseWorkspaceSelection" || call.method == "releaseModelSelection" {
         guard let arguments = call.arguments as? [String: Any], let id = arguments["selectionId"] as? String else {
           result(FlutterError(code: "INVALID_SELECTION", message: nil, details: nil)); return
         }

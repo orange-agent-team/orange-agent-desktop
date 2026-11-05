@@ -203,7 +203,7 @@ impl HostRegistry {
             });
         Ok((workspace, config, grant, control.cancel.subscribe()))
     }
-    async fn connect_model(
+    pub(super) async fn connect_model(
         &mut self,
         handle: &str,
         path: &Path,
@@ -217,6 +217,13 @@ impl HostRegistry {
         let host = self.current(handle)?;
         if !root.starts_with(&host.root) {
             return Err(failure("MODEL_SERVICE_OUTSIDE_HOST_STORAGE"));
+        }
+        if host
+            .service
+            .as_ref()
+            .is_some_and(|service| !service.ready() || service.settings().root != root)
+        {
+            return Err(failure("MODEL_SERVICE_UNAVAILABLE"));
         }
         host.journal
             .reserve_private_directory(&root)
@@ -350,6 +357,14 @@ impl HostRegistry {
         if !host.run_grants.contains_key(id) && host.run_grants.len() >= 256 {
             return Err(failure("RUN_SESSION_LIMIT"));
         }
+        if host.model.is_some()
+            && host
+                .service
+                .as_ref()
+                .is_some_and(|service| !service.ready())
+        {
+            return Err(failure("MODEL_SERVICE_UNAVAILABLE"));
+        }
         if !host.grants.get(workspace).is_some_and(|g| !g.is_revoked()) {
             return Err(failure("WORKSPACE_SESSION_ACCESS_REQUIRED"));
         }
@@ -394,6 +409,16 @@ impl HostRegistry {
                 &grant,
             )
             .map_err(engine_error)?;
+        if host
+            .service
+            .as_ref()
+            .is_some_and(|service| !service.ready())
+        {
+            host.journal
+                .cancel_agent_run(LOCAL_OWNER, id)
+                .map_err(engine_error)?;
+            return Err(failure("MODEL_SERVICE_UNAVAILABLE"));
+        }
         self.inspect_run(handle, id).await
     }
     async fn inspect_run(&mut self, handle: &str, run: &str) -> Result<AgentRunView, BridgeError> {
@@ -446,6 +471,13 @@ impl HostRegistry {
     ) -> Result<AgentRunView, BridgeError> {
         let (workspace, config, grant, cancel) = self.run_context(handle, run)?;
         let host = self.current(handle)?;
+        if host
+            .service
+            .as_ref()
+            .is_some_and(|service| !service.ready())
+        {
+            return Err(failure("MODEL_SERVICE_UNAVAILABLE"));
+        }
         let view = host
             .journal
             .agent_view(LOCAL_OWNER, run)

@@ -33,9 +33,18 @@ pub(crate) struct Signals {
     pub workspaces: HashMap<String, WorkspaceSignal>,
     pub runs: HashMap<String, RunSignal>,
     pub closed_selections: HashSet<String>,
+    pub service: Option<crate::service::Client>,
+    pub imports: HashMap<String, (String, watch::Sender<bool>)>,
+    pub closed_imports: HashSet<String>,
 }
 impl Signals {
     pub fn stop_all(&self) {
+        if let Some(service) = &self.service {
+            service.close();
+        }
+        for (_, cancel) in self.imports.values() {
+            cancel.send_replace(true);
+        }
         for workspace in self.workspaces.values() {
             workspace.revoker.request_revoke();
         }
@@ -43,6 +52,103 @@ impl Signals {
             run.cancel.send_replace(true);
         }
     }
+}
+pub(crate) fn import_signal(
+    handle: &str,
+    id: &str,
+    path: &str,
+) -> Result<watch::Receiver<bool>, BridgeError> {
+    if !orange_protocol::valid_id(id) {
+        return Err(failure("INVALID_MODEL_REQUEST"));
+    }
+    let registry = SESSION.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+    let session = registry
+        .as_ref()
+        .filter(|s| s.view.handle == handle && !s.closed.load(Ordering::Acquire))
+        .ok_or_else(|| failure("STALE_HOST_HANDLE"))?;
+    let mut controls = session
+        .signals
+        .lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?;
+    if controls.closed_imports.contains(id) {
+        return Err(failure("MODEL_IMPORT_CLOSED"));
+    }
+    if controls.imports.len() >= 256 && !controls.imports.contains_key(id) {
+        return Err(failure("MODEL_COMMAND_LIMIT"));
+    }
+    let entry = controls
+        .imports
+        .entry(id.into())
+        .or_insert_with(|| (path.into(), watch::channel(false).0));
+    if entry.0 != path {
+        return Err(failure("MODEL_IMPORT_CONFLICT"));
+    }
+    Ok(entry.1.subscribe())
+}
+pub(crate) fn close_import_signal(handle: &str, id: &str) -> Result<(), BridgeError> {
+    if !orange_protocol::valid_id(id) {
+        return Err(failure("INVALID_MODEL_REQUEST"));
+    }
+    let registry = SESSION.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+    let session = registry
+        .as_ref()
+        .filter(|s| s.view.handle == handle && !s.closed.load(Ordering::Acquire))
+        .ok_or_else(|| failure("STALE_HOST_HANDLE"))?;
+    let mut controls = session
+        .signals
+        .lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?;
+    if controls.closed_imports.len() >= 8192 && !controls.closed_imports.contains(id) {
+        return Err(failure("MODEL_COMMAND_LIMIT"));
+    }
+    controls.closed_imports.insert(id.into());
+    if let Some((_, cancel)) = controls.imports.get(id) {
+        cancel.send_replace(true);
+    }
+    Ok(())
+}
+pub(crate) fn stop_model_signal(handle: &str, instance: &str) -> Result<(), BridgeError> {
+    let (service, runs) = {
+        let registry = SESSION.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+        let session = registry
+            .as_ref()
+            .filter(|s| s.view.handle == handle && !s.closed.load(Ordering::Acquire))
+            .ok_or_else(|| failure("STALE_HOST_HANDLE"))?;
+        let controls = session
+            .signals
+            .lock()
+            .map_err(|_| failure("HOST_INTERNAL"))?;
+        (
+            controls
+                .service
+                .clone()
+                .ok_or_else(|| failure("MODEL_SERVICE_NOT_CONFIGURED"))?,
+            controls
+                .runs
+                .values()
+                .map(|run| run.cancel.clone())
+                .collect::<Vec<_>>(),
+        )
+    };
+    service.signal_stop(instance)?;
+    for cancel in runs {
+        cancel.send_replace(true);
+    }
+    Ok(())
+}
+pub(crate) fn model_service(handle: &str) -> Result<crate::service::Client, BridgeError> {
+    let registry = SESSION.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+    let session = registry
+        .as_ref()
+        .filter(|s| s.view.handle == handle && !s.closed.load(Ordering::Acquire))
+        .ok_or_else(|| failure("STALE_HOST_HANDLE"))?;
+    session
+        .signals
+        .lock()
+        .map_err(|_| failure("HOST_INTERNAL"))?
+        .service
+        .clone()
+        .ok_or_else(|| failure("MODEL_SERVICE_NOT_CONFIGURED"))
 }
 type Task = Box<dyn FnOnce(&mut HostRegistry, &tokio::runtime::Runtime) + Send>;
 struct Session {

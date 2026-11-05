@@ -69,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 102476858;
+  int get rustContentHash => -1394029581;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -100,6 +100,11 @@ abstract class RustLibApi extends BaseApi {
     required String selectedDirectory,
   });
 
+  Future<ModelServiceView> crateApiHostCancelModelStart({
+    required String handle,
+    required String requestId,
+  });
+
   Future<AgentRunView> crateApiHostCancelRun({
     required String handle,
     required String runId,
@@ -107,12 +112,34 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiHostCloseHost({required String handle});
 
+  Future<void> crateApiHostCloseModelImport({
+    required String handle,
+    required String operationId,
+  });
+
+  Future<ModelServiceView> crateApiHostConfigureModelService({
+    required String handle,
+    required String contentsDirectory,
+    required String ipcDirectory,
+    required String osVersion,
+  });
+
   Future<ModelConnectionView> crateApiHostConnectLocalModel({
     required String handle,
     required String selectedDirectory,
   });
 
+  Future<ModelConnectionView> crateApiHostCurrentModelConnection({
+    required String handle,
+  });
+
   Future<void> crateApiHostDisconnectLocalModel({required String handle});
+
+  Future<ModelServiceView> crateApiHostImportModel({
+    required String handle,
+    required String operationId,
+    required String selectedFile,
+  });
 
   Future<void> crateApiHostInitApp();
 
@@ -121,6 +148,10 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<HostView> crateApiHostInspectHost({required String handle});
+
+  Future<ModelServiceView> crateApiHostInspectModelService({
+    required String handle,
+  });
 
   Future<AgentRunView> crateApiHostInspectRun({
     required String handle,
@@ -150,11 +181,21 @@ abstract class RustLibApi extends BaseApi {
     required String expectedVersion,
   });
 
+  Future<ModelServiceView> crateApiHostStartModelService({
+    required String handle,
+    required String requestId,
+  });
+
   Future<AgentRunView> crateApiHostStartRun({
     required String handle,
     required String workspaceId,
     required String requestId,
     required String prompt,
+  });
+
+  Future<ModelServiceView> crateApiHostStopModelService({
+    required String handle,
+    required String instanceId,
   });
 
   Future<WorkspaceView> crateApiHostSuspendWorkspaceAccess({
@@ -294,6 +335,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<ModelServiceView> crateApiHostCancelModelStart({
+    required String handle,
+    required String requestId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(requestId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_model_service_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostCancelModelStartConstMeta,
+        argValues: [handle, requestId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostCancelModelStartConstMeta =>
+      const TaskConstMeta(
+        debugName: "cancel_model_start",
+        argNames: ["handle", "requestId"],
+      );
+
+  @override
   Future<AgentRunView> crateApiHostCancelRun({
     required String handle,
     required String runId,
@@ -307,7 +383,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 5,
             port: port_,
           );
         },
@@ -337,7 +413,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 6,
             port: port_,
           );
         },
@@ -356,6 +432,80 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "close_host", argNames: ["handle"]);
 
   @override
+  Future<void> crateApiHostCloseModelImport({
+    required String handle,
+    required String operationId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(operationId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 7,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostCloseModelImportConstMeta,
+        argValues: [handle, operationId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostCloseModelImportConstMeta =>
+      const TaskConstMeta(
+        debugName: "close_model_import",
+        argNames: ["handle", "operationId"],
+      );
+
+  @override
+  Future<ModelServiceView> crateApiHostConfigureModelService({
+    required String handle,
+    required String contentsDirectory,
+    required String ipcDirectory,
+    required String osVersion,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(contentsDirectory, serializer);
+          sse_encode_String(ipcDirectory, serializer);
+          sse_encode_String(osVersion, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_model_service_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostConfigureModelServiceConstMeta,
+        argValues: [handle, contentsDirectory, ipcDirectory, osVersion],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostConfigureModelServiceConstMeta =>
+      const TaskConstMeta(
+        debugName: "configure_model_service",
+        argNames: ["handle", "contentsDirectory", "ipcDirectory", "osVersion"],
+      );
+
+  @override
   Future<ModelConnectionView> crateApiHostConnectLocalModel({
     required String handle,
     required String selectedDirectory,
@@ -369,7 +519,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 9,
             port: port_,
           );
         },
@@ -391,6 +541,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<ModelConnectionView> crateApiHostCurrentModelConnection({
+    required String handle,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_model_connection_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostCurrentModelConnectionConstMeta,
+        argValues: [handle],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostCurrentModelConnectionConstMeta =>
+      const TaskConstMeta(
+        debugName: "current_model_connection",
+        argNames: ["handle"],
+      );
+
+  @override
   Future<void> crateApiHostDisconnectLocalModel({required String handle}) {
     return handler.executeNormal(
       NormalTask(
@@ -400,7 +583,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 11,
             port: port_,
           );
         },
@@ -422,6 +605,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<ModelServiceView> crateApiHostImportModel({
+    required String handle,
+    required String operationId,
+    required String selectedFile,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(operationId, serializer);
+          sse_encode_String(selectedFile, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 12,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_model_service_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostImportModelConstMeta,
+        argValues: [handle, operationId, selectedFile],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostImportModelConstMeta => const TaskConstMeta(
+    debugName: "import_model",
+    argNames: ["handle", "operationId", "selectedFile"],
+  );
+
+  @override
   Future<void> crateApiHostInitApp() {
     return handler.executeNormal(
       NormalTask(
@@ -430,7 +649,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 13,
             port: port_,
           );
         },
@@ -460,7 +679,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 14,
             port: port_,
           );
         },
@@ -490,7 +709,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 15,
             port: port_,
           );
         },
@@ -509,6 +728,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "inspect_host", argNames: ["handle"]);
 
   @override
+  Future<ModelServiceView> crateApiHostInspectModelService({
+    required String handle,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_model_service_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostInspectModelServiceConstMeta,
+        argValues: [handle],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostInspectModelServiceConstMeta =>
+      const TaskConstMeta(
+        debugName: "inspect_model_service",
+        argNames: ["handle"],
+      );
+
+  @override
   Future<AgentRunView> crateApiHostInspectRun({
     required String handle,
     required String runId,
@@ -522,7 +774,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 17,
             port: port_,
           );
         },
@@ -560,7 +812,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 18,
             port: port_,
           );
         },
@@ -594,7 +846,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 19,
             port: port_,
           );
         },
@@ -628,7 +880,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 20,
             port: port_,
           );
         },
@@ -665,7 +917,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 21,
             port: port_,
           );
         },
@@ -687,6 +939,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<ModelServiceView> crateApiHostStartModelService({
+    required String handle,
+    required String requestId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(requestId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 22,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_model_service_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostStartModelServiceConstMeta,
+        argValues: [handle, requestId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostStartModelServiceConstMeta =>
+      const TaskConstMeta(
+        debugName: "start_model_service",
+        argNames: ["handle", "requestId"],
+      );
+
+  @override
   Future<AgentRunView> crateApiHostStartRun({
     required String handle,
     required String workspaceId,
@@ -704,7 +991,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 23,
             port: port_,
           );
         },
@@ -725,6 +1012,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<ModelServiceView> crateApiHostStopModelService({
+    required String handle,
+    required String instanceId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(instanceId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 24,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_model_service_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostStopModelServiceConstMeta,
+        argValues: [handle, instanceId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostStopModelServiceConstMeta =>
+      const TaskConstMeta(
+        debugName: "stop_model_service",
+        argNames: ["handle", "instanceId"],
+      );
+
+  @override
   Future<WorkspaceView> crateApiHostSuspendWorkspaceAccess({
     required String handle,
     required String workspaceId,
@@ -740,7 +1062,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 25,
             port: port_,
           );
         },
@@ -775,7 +1097,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 26,
             port: port_,
           );
         },
@@ -810,7 +1132,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 27,
             port: port_,
           );
         },
@@ -930,6 +1252,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       displayName: dco_decode_String(arr[1]),
       contextTokens: dco_decode_u_32(arr[2]),
       verification: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
+  ModelServiceView dco_decode_model_service_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return ModelServiceView(
+      phase: dco_decode_String(arr[0]),
+      modelName: dco_decode_String(arr[1]),
+      modelBytes: dco_decode_String(arr[2]),
+      installed: dco_decode_bool(arr[3]),
+      instanceId: dco_decode_opt_String(arr[4]),
+      failure: dco_decode_opt_String(arr[5]),
     );
   }
 
@@ -1163,6 +1501,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ModelServiceView sse_decode_model_service_view(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_phase = sse_decode_String(deserializer);
+    var var_modelName = sse_decode_String(deserializer);
+    var var_modelBytes = sse_decode_String(deserializer);
+    var var_installed = sse_decode_bool(deserializer);
+    var var_instanceId = sse_decode_opt_String(deserializer);
+    var var_failure = sse_decode_opt_String(deserializer);
+    return ModelServiceView(
+      phase: var_phase,
+      modelName: var_modelName,
+      modelBytes: var_modelBytes,
+      installed: var_installed,
+      instanceId: var_instanceId,
+      failure: var_failure,
+    );
+  }
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1372,6 +1729,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.displayName, serializer);
     sse_encode_u_32(self.contextTokens, serializer);
     sse_encode_String(self.verification, serializer);
+  }
+
+  @protected
+  void sse_encode_model_service_view(
+    ModelServiceView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.phase, serializer);
+    sse_encode_String(self.modelName, serializer);
+    sse_encode_String(self.modelBytes, serializer);
+    sse_encode_bool(self.installed, serializer);
+    sse_encode_opt_String(self.instanceId, serializer);
+    sse_encode_opt_String(self.failure, serializer);
   }
 
   @protected

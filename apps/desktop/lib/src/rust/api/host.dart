@@ -7,7 +7,70 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+
+/// Paths and OS version come from the trusted native application environment.
+Future<ModelServiceView> configureModelService({
+  required String handle,
+  required String contentsDirectory,
+  required String ipcDirectory,
+  required String osVersion,
+}) => RustLib.instance.api.crateApiHostConfigureModelService(
+  handle: handle,
+  contentsDirectory: contentsDirectory,
+  ipcDirectory: ipcDirectory,
+  osVersion: osVersion,
+);
+
+Future<ModelServiceView> inspectModelService({required String handle}) =>
+    RustLib.instance.api.crateApiHostInspectModelService(handle: handle);
+
+Future<ModelConnectionView> currentModelConnection({required String handle}) =>
+    RustLib.instance.api.crateApiHostCurrentModelConnection(handle: handle);
+
+Future<ModelServiceView> cancelModelStart({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostCancelModelStart(
+  handle: handle,
+  requestId: requestId,
+);
+
+/// Operation ID is known before file selection is released, including lost replies.
+Future<ModelServiceView> importModel({
+  required String handle,
+  required String operationId,
+  required String selectedFile,
+}) => RustLib.instance.api.crateApiHostImportModel(
+  handle: handle,
+  operationId: operationId,
+  selectedFile: selectedFile,
+);
+
+/// Stops further file reads and drains the owned import before native scope release.
+Future<void> closeModelImport({
+  required String handle,
+  required String operationId,
+}) => RustLib.instance.api.crateApiHostCloseModelImport(
+  handle: handle,
+  operationId: operationId,
+);
+
+Future<ModelServiceView> startModelService({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostStartModelService(
+  handle: handle,
+  requestId: requestId,
+);
+
+Future<ModelServiceView> stopModelService({
+  required String handle,
+  required String instanceId,
+}) => RustLib.instance.api.crateApiHostStopModelService(
+  handle: handle,
+  instanceId: instanceId,
+);
 
 /// Trusted application model manager supplies a service directory inside private
 /// Host storage. The model cannot configure its own endpoint.
@@ -297,6 +360,45 @@ class ModelConnectionView {
           displayName == other.displayName &&
           contextTokens == other.contextTokens &&
           verification == other.verification;
+}
+
+class ModelServiceView {
+  final String phase;
+  final String modelName;
+  final String modelBytes;
+  final bool installed;
+  final String? instanceId;
+  final String? failure;
+
+  const ModelServiceView({
+    required this.phase,
+    required this.modelName,
+    required this.modelBytes,
+    required this.installed,
+    this.instanceId,
+    this.failure,
+  });
+
+  @override
+  int get hashCode =>
+      phase.hashCode ^
+      modelName.hashCode ^
+      modelBytes.hashCode ^
+      installed.hashCode ^
+      instanceId.hashCode ^
+      failure.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ModelServiceView &&
+          runtimeType == other.runtimeType &&
+          phase == other.phase &&
+          modelName == other.modelName &&
+          modelBytes == other.modelBytes &&
+          installed == other.installed &&
+          instanceId == other.instanceId &&
+          failure == other.failure;
 }
 
 class RunPage {

@@ -1026,6 +1026,7 @@ name = "orange-desktop-bridge"
 version = "0.1.0"
 dependencies = [
  "flutter_rust_bridge",
+ "hex",
  "libc",
  "orange-agent-runtime",
  "orange-domain",
@@ -1033,6 +1034,7 @@ dependencies = [
  "orange-protocol",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "tokio",
  "uuid",

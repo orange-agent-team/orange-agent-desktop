@@ -1,6 +1,6 @@
 # 本地 Agent 执行接口与验证边界
 
-2026-11-05。此切片实现 Rust Host、生成的 Flutter/FRB 接口和单次会话/工具批准界面。模型安装与打包模型服务尚未完成，不据此标记完整桌面 Agent 完成。当前界面连接已配置的本地服务；真实模型 API 验收与沙箱 UI 的模型协议替身验收分别记录。
+2026-11-05。此切片实现 Rust Host、生成的 Flutter/FRB 接口和单次会话/工具批准界面。固定本地模型的导入与受管启动/停止已接入，完整模型管理与孤儿恢复尚未完成，不据此标记完整桌面 Agent 完成。当前界面连接已配置的本地服务；真实模型 API 验收与沙箱 UI 的模型协议替身验收分别记录。
 
 ## 所有权与并发
 
@@ -17,7 +17,7 @@ flowchart LR
   Owner --> Files[能力目录内的只读工具]
   Owner --> Gateway[固定模型适配器]
   Gateway --> Socket[短私有 Unix socket]
-  Socket --> Model[已配置模型服务：当前外部启动]
+  Socket --> Model[受管模型宿主与 CPU 后端]
   Model --> State[持久密钥 / 进程记录 / 执行租约]
   Owner -. 停止已确认后释放 OS 作用域 .-> OS
 ```
@@ -60,7 +60,7 @@ AgentRunView 包含 run/workspace/model 身份、phase、revision、steps、invo
 
 macOS 声明网络客户端能力以连接本机服务，App Sandbox 和只读用户选择权限仍保留。模型服务子进程不能依赖 UI 启动后取得的工作区权限；模型权重与配置必须由应用安装到它自己的存储。[Apple App Sandbox 权限与继承](https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html)
 
-连接显示 `local-development-configuration`：这是私有配置和健康检查，不是生产模型审批、二进制远程证明或生命周期所有权。外部服务的停止、崩溃回收、重启及 App Sandbox 集成仍需由独立模型管理工程完成。模型密钥不通过 FRB 返回，也不能放在用户授权工作区。
+连接显示 `local-development-configuration`：这是私有配置和健康检查，不是生产模型审批、二进制远程证明或生命周期所有权。默认界面的服务所有权、停止、重开与 App Sandbox 链路见[受管模型服务](managed-model-service.md)；仍不允许凭外部进程记录接管或杀掉未知进程。模型密钥不通过 FRB 返回，也不能放在用户授权工作区。
 
 ## 验证方式
 
@@ -74,4 +74,4 @@ macOS 声明网络客户端能力以连接本机服务，App Sandbox 和只读�
 
 工作区 scope 拥有者与会话面板保持同时挂载，查看历史不释放权限。新建 Run 的原编号和原提示词在创建响应未知时被冻结；核对时只重发同一幂等请求。自动推进停在每个工具请求，展示不可编辑的参数和摘要；当前只支持明确的读取/列目录批准，未来未知工具不能继承只读批准按钮。停止按钮在模型等待期间可用；停止、撤权、重新查看和应用转入后台会清除现有结果/工具预览并丢弃晚到的旧响应；用户输入的任务草稿不在这项清理中。恢复查看不自动推进或重放 unknown。
 
-界面显示的是单次 Run 与最终结果，尚未实现完整多轮会话编辑、流式事件/分页、成果工作台、模型安装和服务生命周期管理。这些仍属于后继目标，不能用当前页面或替身测试替代。
+界面显示的是单次 Run 与最终结果，尚未实现完整多轮会话编辑、流式事件/分页、成果工作台、完整模型目录管理及作业级崩溃恢复。这些仍属于后继目标，不能用当前页面或替身测试替代。

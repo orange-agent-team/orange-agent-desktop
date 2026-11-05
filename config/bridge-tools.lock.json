@@ -11,7 +11,8 @@
     "RunPage",
     "ModelConnectionView",
     "ToolApprovalView",
-    "AgentRunView"
+    "AgentRunView",
+    "ModelServiceView"
   ],
   "public_functions": [
     "closeHost",
@@ -31,6 +32,14 @@
     "advanceRun",
     "cancelRun",
     "suspendWorkspaceAccess",
-    "suspendWorkspaceSelection"
+    "suspendWorkspaceSelection",
+    "configureModelService",
+    "inspectModelService",
+    "importModel",
+    "closeModelImport",
+    "startModelService",
+    "stopModelService",
+    "currentModelConnection",
+    "cancelModelStart"
   ]
 }
