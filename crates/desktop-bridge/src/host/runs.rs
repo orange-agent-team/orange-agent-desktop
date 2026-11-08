@@ -1,12 +1,15 @@
 use super::*;
 #[cfg(test)]
 mod tests;
-use crate::api::host::{AgentRunView, ModelConnectionView, ToolApprovalView};
+use crate::api::host::{
+    AgentRunView, ModelConnectionView, ToolApprovalView, UserQuestionGroupView, UserQuestionView,
+};
 use orange_agent_runtime::engine::{
     EngineError, GatewayFailure, ModelFuture, ModelGateway, RunConfig, RunView,
 };
 use orange_model_runtime::llama::LlamaClient;
 use orange_protocol::model::{GenerateRequest, Message, Role};
+use orange_protocol::questions::AnswerUser;
 use std::{
     io::Read,
     time::{SystemTime, UNIX_EPOCH},
@@ -101,6 +104,18 @@ fn project(view: RunView, workspace: String, model: String) -> Result<AgentRunVi
         steps: view.steps,
         invocations: view.invocations,
         pending,
+        user_question: view.user_question.map(|group| UserQuestionGroupView {
+            question_id: group.question_id,
+            argument_digest: group.argument_digest,
+            questions: group
+                .questions
+                .into_iter()
+                .map(|q| UserQuestionView {
+                    prompt: q.prompt,
+                    choices: q.choices,
+                })
+                .collect(),
+        }),
         final_text: view.final_text,
         failure: view.failure,
     })
@@ -349,6 +364,7 @@ impl HostRegistry {
         workspace: &str,
         id: &str,
         prompt: &str,
+        interactive: bool,
     ) -> Result<AgentRunView, BridgeError> {
         if !orange_protocol::valid_id(id) || prompt.trim().is_empty() || prompt.len() > 64 * 1024 {
             return Err(failure("INVALID_RUN_REQUEST"));
@@ -402,13 +418,14 @@ impl HostRegistry {
             },
             Err(error) => return Err(engine_error(error)),
         };
-        host.journal
-            .start_agent(
-                &config,
-                vec![Message::plain(Role::User, prompt.into())],
-                &grant,
-            )
-            .map_err(engine_error)?;
+        let messages = vec![Message::plain(Role::User, prompt.into())];
+        if interactive {
+            host.journal
+                .start_agent_interactive(&config, messages, &grant)
+        } else {
+            host.journal.start_agent(&config, messages, &grant)
+        }
+        .map_err(engine_error)?;
         if host
             .service
             .as_ref()
@@ -463,6 +480,30 @@ impl HostRegistry {
             .map_err(engine_error)?;
         self.inspect_run(handle, run).await
     }
+    async fn answer_question(
+        &mut self,
+        handle: &str,
+        run: &str,
+        question: &str,
+        digest: &str,
+        answers: Vec<String>,
+    ) -> Result<AgentRunView, BridgeError> {
+        let (workspace, config, grant, cancel) = self.run_context(handle, run)?;
+        let host = self.current(handle)?;
+        let answer = AnswerUser {
+            question_id: question.into(),
+            argument_digest: digest.into(),
+            answers,
+        };
+        // Runtime validates immutable response binding, current source versions,
+        // exact replay, cancellation and limits. No model or approval is invoked.
+        let view = host
+            .journal
+            .answer_agent_question(LOCAL_OWNER, run, &answer, &grant, cancel)
+            .await
+            .map_err(engine_error)?;
+        project(view, workspace, config.model_version)
+    }
     async fn advance_run(
         &mut self,
         handle: &str,
@@ -506,7 +547,10 @@ impl HostRegistry {
             .journal
             .agent_view(LOCAL_OWNER, run)
             .map_err(engine_error)?;
-        let view = if view.final_text.is_some() || !view.pending.is_empty() {
+        let view = if view.final_text.is_some()
+            || !view.pending.is_empty()
+            || view.user_question.is_some()
+        {
             host.journal
                 .agent_view_authorized(LOCAL_OWNER, run, &grant)
                 .await
@@ -568,7 +612,30 @@ pub(crate) async fn start_run(
     prompt: String,
 ) -> Result<AgentRunView, BridgeError> {
     crate::actor::call(handle.clone(), move |host, rt| {
-        rt.block_on(host.start_run(&handle, &workspace_id, &request_id, &prompt))
+        rt.block_on(host.start_run(&handle, &workspace_id, &request_id, &prompt, false))
+    })
+    .await
+}
+pub(crate) async fn start_interactive_run(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    prompt: String,
+) -> Result<AgentRunView, BridgeError> {
+    crate::actor::call(handle.clone(), move |host, rt| {
+        rt.block_on(host.start_run(&handle, &workspace_id, &request_id, &prompt, true))
+    })
+    .await
+}
+pub(crate) async fn answer_user_question(
+    handle: String,
+    run_id: String,
+    question_id: String,
+    expected_digest: String,
+    answers: Vec<String>,
+) -> Result<AgentRunView, BridgeError> {
+    crate::actor::call(handle.clone(), move |host, rt| {
+        rt.block_on(host.answer_question(&handle, &run_id, &question_id, &expected_digest, answers))
     })
     .await
 }

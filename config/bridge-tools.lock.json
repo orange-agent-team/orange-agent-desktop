@@ -12,7 +12,9 @@
     "ModelConnectionView",
     "ToolApprovalView",
     "AgentRunView",
-    "ModelServiceView"
+    "ModelServiceView",
+    "UserQuestionView",
+    "UserQuestionGroupView"
   ],
   "public_functions": [
     "closeHost",
@@ -40,6 +42,8 @@
     "startModelService",
     "stopModelService",
     "currentModelConnection",
-    "cancelModelStart"
+    "cancelModelStart",
+    "startInteractiveRun",
+    "answerUserQuestion"
   ]
 }

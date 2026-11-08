@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
@@ -9,9 +10,20 @@ import 'src/rust/api/host.dart' as api;
 abstract interface class AgentCommands {
   Future<api.ModelConnectionView> connect(String directory);
   Future<void> disconnect();
-  Future<api.AgentRunView> start(String workspace, String id, String prompt);
+  Future<api.AgentRunView> start(
+    String workspace,
+    String id,
+    String prompt, {
+    bool allowQuestions = false,
+  });
   Future<api.AgentRunView> inspect(String id);
   Future<api.AgentRunView> approve(String id, String operation, String digest);
+  Future<api.AgentRunView> answer(
+    String id,
+    String question,
+    String digest,
+    List<String> answers,
+  );
   Future<api.AgentRunView> advance(String id, String revision);
   Future<api.AgentRunView> cancel(String id);
 }
@@ -25,13 +37,24 @@ class NativeAgentCommands implements AgentCommands {
   @override
   Future<void> disconnect() => api.disconnectLocalModel(handle: handle);
   @override
-  Future<api.AgentRunView> start(String workspace, String id, String prompt) =>
-      api.startRun(
-        handle: handle,
-        workspaceId: workspace,
-        requestId: id,
-        prompt: prompt,
-      );
+  Future<api.AgentRunView> start(
+    String workspace,
+    String id,
+    String prompt, {
+    bool allowQuestions = false,
+  }) => allowQuestions
+      ? api.startInteractiveRun(
+          handle: handle,
+          workspaceId: workspace,
+          requestId: id,
+          prompt: prompt,
+        )
+      : api.startRun(
+          handle: handle,
+          workspaceId: workspace,
+          requestId: id,
+          prompt: prompt,
+        );
   @override
   Future<api.AgentRunView> inspect(String id) =>
       api.inspectRun(handle: handle, runId: id);
@@ -45,6 +68,19 @@ class NativeAgentCommands implements AgentCommands {
     runId: id,
     operationId: operation,
     expectedDigest: digest,
+  );
+  @override
+  Future<api.AgentRunView> answer(
+    String id,
+    String question,
+    String digest,
+    List<String> answers,
+  ) => api.answerUserQuestion(
+    handle: handle,
+    runId: id,
+    questionId: question,
+    expectedDigest: digest,
+    answers: answers,
   );
   @override
   Future<api.AgentRunView> advance(String id, String revision) =>
@@ -73,7 +109,8 @@ class AgentController extends ChangeNotifier {
   bool busy = false, connecting = false, cancelling = false;
   bool _alive = true;
   int _epoch = 0;
-  ({String workspace, String id, String prompt})? _submission;
+  ({String workspace, String id, String prompt, bool allowQuestions})?
+  _submission;
   bool get startUnconfirmed => _submission != null;
   bool get active =>
       runId != null &&
@@ -131,7 +168,11 @@ class AgentController extends ChangeNotifier {
     }
   }
 
-  Future<void> start(String workspace, String prompt) async {
+  Future<void> start(
+    String workspace,
+    String prompt, {
+    bool allowQuestions = false,
+  }) async {
     if (busy ||
         cancelling ||
         active ||
@@ -142,7 +183,12 @@ class AgentController extends ChangeNotifier {
     final random = Random.secure();
     final id =
         'run-${List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
-    _submission = (workspace: workspace, id: id, prompt: prompt);
+    _submission = (
+      workspace: workspace,
+      id: id,
+      prompt: prompt,
+      allowQuestions: allowQuestions,
+    );
     workspaceId = workspace;
     runId = id;
     await retryStart();
@@ -162,6 +208,7 @@ class AgentController extends ChangeNotifier {
         submission.workspace,
         submission.id,
         submission.prompt,
+        allowQuestions: submission.allowQuestions,
       );
       if (!_current(epoch)) return;
       _submission = null;
@@ -201,6 +248,49 @@ class AgentController extends ChangeNotifier {
     _changed();
     try {
       await _pump(epoch);
+    } catch (failure) {
+      if (_current(epoch)) _failed(failure);
+    } finally {
+      if (_current(epoch)) {
+        busy = false;
+        _changed();
+      }
+    }
+  }
+
+  Future<void> answerQuestion(List<String> answers) async {
+    final current = view;
+    final question = current?.userQuestion;
+    if (busy ||
+        cancelling ||
+        current == null ||
+        question == null ||
+        current.phase != 'awaiting_user' ||
+        answers.length != question.questions.length ||
+        answers.any(
+          (a) =>
+              a.trim().isEmpty ||
+              a.contains('\u0000') ||
+              utf8.encode(a).length > 4096,
+        )) {
+      return;
+    }
+    final epoch = ++_epoch;
+    busy = true;
+    error = null;
+    notice = null;
+    _changed();
+    try {
+      final answered = await commands.answer(
+        current.runId,
+        question.questionId,
+        question.argumentDigest,
+        List<String>.of(answers),
+      );
+      if (!_current(epoch)) return;
+      view = answered;
+      _changed();
+      if (model != null && matchingModel) await _pump(epoch);
     } catch (failure) {
       if (_current(epoch)) _failed(failure);
     } finally {

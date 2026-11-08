@@ -634,3 +634,367 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
     );
     api::close_host(reopened.handle).expect("fixture operation succeeds");
 }
+
+struct QuestionGateway(Arc<AtomicUsize>);
+impl ModelGateway for QuestionGateway {
+    fn generate<'a>(
+        &'a self,
+        request: &'a GenerateRequest,
+        _: watch::Receiver<bool>,
+    ) -> ModelFuture<'a> {
+        Box::pin(async move {
+            request.validate().expect("valid interactive request");
+            let index = self.0.fetch_add(1, Ordering::SeqCst);
+            let (name, arguments) = match index {
+                0 => (
+                    "ask_user",
+                    serde_json::json!({"questions":[{"prompt":"Which file?","choices":["note.txt","other.txt"]}]}),
+                ),
+                1 => {
+                    assert!(
+                        request
+                            .messages
+                            .iter()
+                            .any(|m| m.role == Role::Tool && m.content.contains("note.txt"))
+                    );
+                    ("read_file", serde_json::json!({"path":"note.txt"}))
+                }
+                2 => {
+                    assert!(
+                        request
+                            .messages
+                            .iter()
+                            .any(|m| m.role == Role::Tool
+                                && m.content.contains("actual fixture data"))
+                    );
+                    (
+                        "ask_user",
+                        serde_json::json!({"questions":[{"prompt":"Use the content just read?"}]}),
+                    )
+                }
+                _ => panic!("question waiting or answer must not dispatch a model"),
+            };
+            Ok(ResponseCandidate {
+                response_id: format!("question-response-{index}"),
+                text: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: format!("question-call-{index}"),
+                    name: name.into(),
+                    arguments,
+                }],
+                native_usage: None,
+                finish_reason: "tool_calls".into(),
+            })
+        })
+    }
+}
+fn install_question_gateway(registry: &mut HostRegistry, handle: &str, calls: Arc<AtomicUsize>) {
+    registry
+        .current(handle)
+        .expect("question fixture operation succeeds")
+        .model = Some(ModelConnection {
+        view: ModelConnectionView {
+            model_id: "question-model-fixture".into(),
+            display_name: "Explicit question transport fixture".into(),
+            context_tokens: 4096,
+            verification: "test-substitute".into(),
+        },
+        gateway: Box::new(QuestionGateway(calls)),
+    });
+}
+#[tokio::test]
+async fn questions_restore_reply_independently_then_revalidate_source() {
+    let root = tempfile::tempdir().expect("question fixture operation succeeds");
+    let private = root.path().join("private");
+    let workspace = root.path().join("workspace");
+    fs::create_dir(&workspace).expect("question fixture operation succeeds");
+    fs::write(workspace.join("note.txt"), "actual fixture data")
+        .expect("question fixture operation succeeds");
+    let mut registry = HostRegistry::default();
+    let h = registry
+        .initialize(&private)
+        .expect("question fixture operation succeeds")
+        .handle;
+    let grant = registry
+        .authorize_workspace(&h, "question-consent", &workspace)
+        .expect("question fixture operation succeeds");
+    let calls = Arc::new(AtomicUsize::new(0));
+    install_question_gateway(&mut registry, &h, calls.clone());
+    let start = registry
+        .start_run(
+            &h,
+            &grant.workspace_id,
+            "question-run",
+            "Ask before reading",
+            true,
+        )
+        .await
+        .expect("question fixture operation succeeds");
+    assert_eq!(
+        registry
+            .start_run(
+                &h,
+                &grant.workspace_id,
+                "question-run",
+                "Ask before reading",
+                false
+            )
+            .await
+            .expect_err("invalid question authority must be rejected")
+            .code,
+        "RUN_CONFLICT"
+    );
+    let view = registry
+        .advance_run(&h, &start.run_id, &start.revision)
+        .await
+        .expect("question fixture operation succeeds");
+    assert_eq!(view.phase, "awaiting_user");
+    assert!(view.pending.is_empty());
+    let question = view
+        .user_question
+        .expect("question fixture operation succeeds");
+    assert_eq!(
+        question.questions[0]
+            .choices
+            .as_ref()
+            .expect("question fixture operation succeeds")
+            .len(),
+        2
+    );
+    assert_eq!(
+        registry
+            .approve_tool(
+                &h,
+                &start.run_id,
+                &question.question_id,
+                &question.argument_digest
+            )
+            .await
+            .expect_err("invalid question authority must be rejected")
+            .code,
+        "TOOL_PREVIEW_CHANGED"
+    );
+    assert!(
+        registry
+            .answer_question(
+                &h,
+                &start.run_id,
+                &question.question_id,
+                &"0".repeat(64),
+                vec!["note.txt".into()]
+            )
+            .await
+            .is_err()
+    );
+    assert!(
+        registry
+            .answer_question(
+                &h,
+                &start.run_id,
+                &question.question_id,
+                &question.argument_digest,
+                vec![]
+            )
+            .await
+            .is_err()
+    );
+    registry
+        .close(&h)
+        .expect("question fixture operation succeeds");
+    // Fresh registry models a fresh process, without reviving old cancellation signals.
+    let mut registry = HostRegistry::default();
+    let h = registry
+        .initialize(&private)
+        .expect("question fixture operation succeeds")
+        .handle;
+    assert_eq!(
+        registry
+            .inspect_run(&h, &start.run_id)
+            .await
+            .expect_err("invalid question authority must be rejected")
+            .code,
+        "WORKSPACE_SESSION_ACCESS_REQUIRED"
+    );
+    registry
+        .restore_workspace(&h, &grant.workspace_id)
+        .expect("question fixture operation succeeds");
+    let restored = registry
+        .inspect_run(&h, &start.run_id)
+        .await
+        .expect("question fixture operation succeeds");
+    assert_eq!(
+        restored
+            .user_question
+            .as_ref()
+            .expect("question fixture operation succeeds")
+            .question_id,
+        question.question_id
+    );
+    let answered = registry
+        .answer_question(
+            &h,
+            &start.run_id,
+            &question.question_id,
+            &question.argument_digest,
+            vec!["note.txt".into()],
+        )
+        .await
+        .expect("question fixture operation succeeds");
+    assert_eq!(answered.phase, "ready");
+    assert!(answered.pending.is_empty() && answered.user_question.is_none());
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        registry
+            .answer_question(
+                &h,
+                &start.run_id,
+                &question.question_id,
+                &question.argument_digest,
+                vec!["note.txt".into()]
+            )
+            .await
+            .expect("question fixture operation succeeds")
+            .revision,
+        answered.revision
+    );
+    assert_eq!(
+        registry
+            .answer_question(
+                &h,
+                &start.run_id,
+                &question.question_id,
+                &question.argument_digest,
+                vec!["other.txt".into()]
+            )
+            .await
+            .expect_err("invalid question authority must be rejected")
+            .code,
+        "RUN_CONFLICT"
+    );
+    install_question_gateway(&mut registry, &h, calls.clone());
+    let tool = registry
+        .advance_run(&h, &start.run_id, &answered.revision)
+        .await
+        .expect("question fixture operation succeeds");
+    assert_eq!(tool.pending.len(), 1);
+    assert_eq!(
+        registry
+            .advance_run(&h, &start.run_id, &tool.revision)
+            .await
+            .expect_err("invalid question authority must be rejected")
+            .code,
+        "TOOL_APPROVAL_REQUIRED"
+    );
+    let pending = &tool.pending[0];
+    let approved = registry
+        .approve_tool(
+            &h,
+            &start.run_id,
+            &pending.operation_id,
+            &pending.argument_digest,
+        )
+        .await
+        .expect("question fixture operation succeeds");
+    let read = registry
+        .advance_run(&h, &start.run_id, &approved.revision)
+        .await
+        .expect("question fixture operation succeeds");
+    let second = registry
+        .advance_run(&h, &start.run_id, &read.revision)
+        .await
+        .expect("question fixture operation succeeds");
+    let next = second
+        .user_question
+        .expect("question fixture operation succeeds");
+    assert_ne!(next.question_id, question.question_id);
+    fs::remove_file(workspace.join("note.txt")).expect("question fixture operation succeeds");
+    assert_eq!(
+        registry
+            .inspect_run(&h, &start.run_id)
+            .await
+            .expect_err("invalid question authority must be rejected")
+            .code,
+        "RUN_SOURCE_UNAVAILABLE"
+    );
+    assert_eq!(
+        registry
+            .answer_question(
+                &h,
+                &start.run_id,
+                &next.question_id,
+                &next.argument_digest,
+                vec!["yes".into()]
+            )
+            .await
+            .expect_err("invalid question authority must be rejected")
+            .code,
+        "RUN_SOURCE_UNAVAILABLE"
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+    let stopped = registry
+        .cancel_run(&h, &start.run_id)
+        .expect("question fixture operation succeeds");
+    assert_eq!(stopped.phase, "cancelled");
+    assert!(stopped.user_question.is_none());
+}
+
+#[tokio::test]
+async fn suspended_workspace_closes_waiting_question() {
+    let root = tempfile::tempdir().expect("question fixture operation succeeds");
+    let workspace = root.path().join("workspace");
+    fs::create_dir(&workspace).expect("question fixture operation succeeds");
+    let mut registry = HostRegistry::default();
+    let h = registry
+        .initialize(&root.path().join("private"))
+        .expect("question fixture operation succeeds")
+        .handle;
+    let grant = registry
+        .authorize_workspace(&h, "suspend-question", &workspace)
+        .expect("question fixture operation succeeds");
+    let calls = Arc::new(AtomicUsize::new(0));
+    install_question_gateway(&mut registry, &h, calls.clone());
+    let start = registry
+        .start_run(&h, &grant.workspace_id, "suspend-run", "Ask", true)
+        .await
+        .expect("question fixture operation succeeds");
+    let waiting = registry
+        .advance_run(&h, &start.run_id, &start.revision)
+        .await
+        .expect("question fixture operation succeeds");
+    assert!(waiting.user_question.is_some());
+    registry
+        .suspend_workspace(
+            &h,
+            &grant.workspace_id,
+            grant
+                .session_token
+                .as_deref()
+                .expect("active test scope has a token"),
+        )
+        .expect("question fixture operation succeeds");
+    registry
+        .restore_workspace(&h, &grant.workspace_id)
+        .expect("question fixture operation succeeds");
+    let stopped = registry
+        .inspect_run(&h, &start.run_id)
+        .await
+        .expect("question fixture operation succeeds");
+    assert_eq!(stopped.phase, "cancelled");
+    assert!(stopped.user_question.is_none());
+    let q = waiting
+        .user_question
+        .expect("question fixture operation succeeds");
+    assert!(
+        registry
+            .answer_question(
+                &h,
+                &start.run_id,
+                &q.question_id,
+                &q.argument_digest,
+                vec!["note.txt".into()]
+            )
+            .await
+            .is_err()
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}

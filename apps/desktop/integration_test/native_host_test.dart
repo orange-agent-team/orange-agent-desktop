@@ -30,103 +30,140 @@ Future<HostView> reopenHost(String directory) async {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async => RustLib.init());
-  testWidgets(
-    'native UI approval uses real private IPC and filesystem, with explicit model protocol fixture',
-    (tester) async {
-      final directory = await Directory.systemTemp.createTemp(
-        'orange-agent-ui-',
-      );
-      final workspace = await Directory.systemTemp.createTemp(
-        'orange-agent-work-',
-      );
-      final sentinel = 'NATIVE_UI_${DateTime.now().microsecondsSinceEpoch}';
-      final source = await File('${workspace.path}/proof.txt')
-          .writeAsString(sentinel);
-      LocalModelFixture? runningFixture;
-      String? handle;
-      const channel = MethodChannel('orange_agent/platform');
-      final released = Completer<void>();
-      try {
-        final fixture = await LocalModelFixture.start(directory, sentinel);
-        runningFixture = fixture;
-        final host = await reopenHost(directory.path);
-        handle = host.handle;
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (call) async {
-              if (call.method == 'chooseWorkspace') {
-                return <String, String>{
-                  'selectionId': 'native-run-scope',
-                  'path': workspace.path,
-                };
-              }
-              if (call.method == 'releaseWorkspaceSelection') {
-                final rows = await listWorkspaces(
-                  handle: host.handle,
-                  includeRevoked: false,
-                );
-                expect(rows.single.permissionActive, isTrue);
-                expect(rows.single.sessionAccess, isFalse);
-                if (!released.isCompleted) released.complete();
-                return null;
-              }
-              throw StateError('Unexpected test platform callback');
-            });
-        await tester.pumpWidget(
-          OrangeDesktopApp(
-            connect: () async => host,
-            modelServiceDirectory: () async => fixture.root.path,
-          ),
+  for (final askFirst in [false, true]) {
+    testWidgets(
+      'native UI approval and questions=$askFirst use real private IPC and filesystem with explicit model fixture',
+      (tester) async {
+        final directory = await Directory.systemTemp.createTemp(
+          'orange-agent-ui-',
         );
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('选择文件夹'));
-        await tester.tap(find.text('选择文件夹'));
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('连接本地模型'));
-        await tester.tap(find.text('连接本地模型'));
-        await tester.pumpAndSettle();
-        expect(find.text('native-fixture-v1'), findsOneWidget);
-        await tester.ensureVisible(
-          find.byType(DropdownButtonFormField<String>),
+        final workspace = await Directory.systemTemp.createTemp(
+          'orange-agent-work-',
         );
-        await tester.tap(find.byType(DropdownButtonFormField<String>));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text(workspace.path).last);
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.byType(TextField));
-        await tester.enterText(find.byType(TextField), 'Read proof.txt');
-        await tester.pump();
-        await tester.ensureVisible(find.text('开始会话'));
-        await tester.tap(find.text('开始会话'));
-        await tester.pumpAndSettle();
-        expect(fixture.calls, 1);
-        expect(fixture.failures, isEmpty);
-        expect(find.text('批准这一次读取'), findsOneWidget);
-        expect(find.textContaining('Native fixture observed:'), findsNothing);
-        await tester.ensureVisible(find.text('批准这一次读取'));
-        await tester.tap(find.text('批准这一次读取'));
-        await tester.pumpAndSettle();
-        expect(fixture.failures, isEmpty);
-        expect(fixture.calls, 2);
-        expect(find.text('Native fixture observed: $sentinel'), findsOneWidget);
-        await source.delete();
-        await tester.ensureVisible(find.text('核对状态'));
-        await tester.tap(find.text('核对状态'));
-        await tester.pumpAndSettle();
-        expect(find.textContaining('Native fixture observed:'), findsNothing);
-        expect(find.textContaining('来源文件已改变'), findsOneWidget);
-        await tester.pumpWidget(const SizedBox.shrink());
-        await released.future.timeout(const Duration(seconds: 3));
-      } finally {
-        await tester.pumpWidget(const SizedBox.shrink());
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, null);
-        if (handle != null) await closeHost(handle: handle);
-        await runningFixture?.close();
-        await workspace.delete(recursive: true);
-        await directory.delete(recursive: true);
-      }
-    },
-  );
+        final sentinel = 'NATIVE_UI_${DateTime.now().microsecondsSinceEpoch}';
+        final source = await File('${workspace.path}/proof.txt')
+            .writeAsString(sentinel);
+        LocalModelFixture? runningFixture;
+        String? handle;
+        const channel = MethodChannel('orange_agent/platform');
+        final released = Completer<void>();
+        try {
+          final fixture = await LocalModelFixture.start(
+            directory,
+            sentinel,
+            askFirst: askFirst,
+          );
+          runningFixture = fixture;
+          final host = await reopenHost(directory.path);
+          handle = host.handle;
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (call) async {
+                if (call.method == 'chooseWorkspace') {
+                  return <String, String>{
+                    'selectionId': 'native-run-scope',
+                    'path': workspace.path,
+                  };
+                }
+                if (call.method == 'releaseWorkspaceSelection') {
+                  final rows = await listWorkspaces(
+                    handle: host.handle,
+                    includeRevoked: false,
+                  );
+                  expect(rows.single.permissionActive, isTrue);
+                  expect(rows.single.sessionAccess, isFalse);
+                  if (!released.isCompleted) released.complete();
+                  return null;
+                }
+                throw StateError('Unexpected test platform callback');
+              });
+          await tester.pumpWidget(
+            OrangeDesktopApp(
+              connect: () async => host,
+              modelServiceDirectory: () async => fixture.root.path,
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('选择文件夹'));
+          await tester.tap(find.text('选择文件夹'));
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('连接本地模型'));
+          await tester.tap(find.text('连接本地模型'));
+          await tester.pumpAndSettle();
+          expect(find.text('native-fixture-v1'), findsOneWidget);
+          await tester.ensureVisible(
+            find.byType(DropdownButtonFormField<String>),
+          );
+          await tester.tap(find.byType(DropdownButtonFormField<String>));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(workspace.path).last);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.byType(TextField));
+          await tester.enterText(find.byType(TextField), 'Read proof.txt');
+          await tester.pump();
+          if (askFirst) {
+            await tester.ensureVisible(find.text('允许任务询问补充信息'));
+            await tester.tap(find.text('允许任务询问补充信息'));
+            await tester.pump();
+          }
+          await tester.ensureVisible(find.text('开始会话'));
+          await tester.tap(find.text('开始会话'));
+          await tester.pumpAndSettle();
+          expect(fixture.calls, 1);
+          expect(fixture.failures, isEmpty);
+          if (askFirst) {
+            expect(find.text('Which file should I read?'), findsOneWidget);
+            expect(find.text('批准这一次读取'), findsNothing);
+            await tester.ensureVisible(
+              find.widgetWithText(OutlinedButton, 'proof.txt'),
+            );
+            await tester.tap(find.widgetWithText(OutlinedButton, 'proof.txt'));
+            await tester.pumpAndSettle();
+            expect(
+              fixture.calls,
+              1,
+              reason: 'Selecting a suggestion must not submit',
+            );
+            await tester.ensureVisible(find.text('提交回答'));
+            await tester.tap(find.text('提交回答'));
+            await tester.pumpAndSettle();
+            expect(fixture.calls, 2);
+            expect(find.text('提交回答'), findsNothing);
+            expect(
+              find.textContaining('Native fixture observed:'),
+              findsNothing,
+            );
+          }
+          expect(find.text('批准这一次读取'), findsOneWidget);
+          expect(find.textContaining('Native fixture observed:'), findsNothing);
+          await tester.ensureVisible(find.text('批准这一次读取'));
+          await tester.tap(find.text('批准这一次读取'));
+          await tester.pumpAndSettle();
+          expect(fixture.failures, isEmpty);
+          expect(fixture.calls, askFirst ? 3 : 2);
+          expect(
+            find.text('Native fixture observed: $sentinel'),
+            findsOneWidget,
+          );
+          await source.delete();
+          await tester.ensureVisible(find.text('核对状态'));
+          await tester.tap(find.text('核对状态'));
+          await tester.pumpAndSettle();
+          expect(find.textContaining('Native fixture observed:'), findsNothing);
+          expect(find.textContaining('来源文件已改变'), findsOneWidget);
+          await tester.pumpWidget(const SizedBox.shrink());
+          await released.future.timeout(const Duration(seconds: 3));
+        } finally {
+          await tester.pumpWidget(const SizedBox.shrink());
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null);
+          if (handle != null) await closeHost(handle: handle);
+          await runningFixture?.close();
+          await workspace.delete(recursive: true);
+          await directory.delete(recursive: true);
+        }
+      },
+    );
+  }
   testWidgets(
     'real native Host, integer transport and stale handle rejection',
     (tester) async {
@@ -155,7 +192,7 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          '58471251d1adce139a31f78cd3f5b57f6cbf4a6f',
+          '53ed51508764a5f9cb9cc04383ecb0185941b351',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(

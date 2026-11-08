@@ -131,6 +131,7 @@ impl HostRegistry {
                 orange_agent_runtime::engine::Phase::Ready
                     | orange_agent_runtime::engine::Phase::ModelPending
                     | orange_agent_runtime::engine::Phase::ToolsPending
+                    | orange_agent_runtime::engine::Phase::AwaitingUser
             ) {
                 host.journal
                     .cancel_agent_run(LOCAL_OWNER, &run)

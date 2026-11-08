@@ -4,17 +4,25 @@ import 'dart:io';
 /// Explicit model-protocol substitute, confined to native integration tests.
 /// Flutter, FRB, Unix IPC, SQLite and filesystem tools are real in this test.
 class LocalModelFixture {
-  LocalModelFixture._(this.root, this.ipc, this.server, this.expected);
+  LocalModelFixture._(
+    this.root,
+    this.ipc,
+    this.server,
+    this.expected,
+    this.askFirst,
+  );
   final Directory root, ipc;
   final HttpServer server;
   final String expected;
+  final bool askFirst;
   int calls = 0;
   final failures = <String>[];
   static const key = 'fixtureonly0123456789fixtureonly0123456789';
   static Future<LocalModelFixture> start(
     Directory hostRoot,
-    String expected,
-  ) async {
+    String expected, {
+    bool askFirst = false,
+  }) async {
     final root = await Directory('${hostRoot.path}/m').create();
     final ipc = await Directory.systemTemp.createTemp('oi');
     final path = '${await ipc.resolveSymbolicLinks()}/engine.sock';
@@ -63,7 +71,7 @@ class LocalModelFixture {
       InternetAddress(path, type: InternetAddressType.unix),
       0,
     );
-    final fixture = LocalModelFixture._(root, ipc, server, expected);
+    final fixture = LocalModelFixture._(root, ipc, server, expected, askFirst);
     server.listen(
       fixture._handle,
       onError: (Object error) =>
@@ -95,7 +103,34 @@ class LocalModelFixture {
         calls++;
         final Map<String, dynamic> delta;
         String finish;
-        if (calls == 1) {
+        if (askFirst && calls == 1) {
+          delta = {
+            'tool_calls': [
+              {
+                'index': 0,
+                'id': 'native-question',
+                'type': 'function',
+                'function': {
+                  'name': 'ask_user',
+                  'arguments': '{"questions":[{"prompt":"Which file should I read?","choices":["proof.txt","other.txt"]}]}',
+                },
+              },
+            ],
+          };
+          finish = 'tool_calls';
+        } else if (calls == (askFirst ? 2 : 1)) {
+          if (askFirst) {
+            final messages = input['messages'] as List<dynamic>;
+            if (!messages.any(
+              (m) =>
+                  m['role'] == 'tool' &&
+                  m['tool_call_id'] == 'native-question' &&
+                  jsonEncode(jsonDecode(m['content'] as String)) ==
+                      '{"answers":["proof.txt"]}',
+            )) {
+              throw StateError('Actual committed user answer missing');
+            }
+          }
           delta = {
             'tool_calls': [
               {
@@ -110,7 +145,7 @@ class LocalModelFixture {
             ],
           };
           finish = 'tool_calls';
-        } else if (calls == 2) {
+        } else if (calls == (askFirst ? 3 : 2)) {
           final messages = input['messages'] as List<dynamic>;
           if (!messages.any(
             (m) =>

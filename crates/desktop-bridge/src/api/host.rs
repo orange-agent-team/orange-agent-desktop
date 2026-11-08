@@ -114,6 +114,17 @@ pub struct ToolApprovalView {
     pub argument_digest: String,
 }
 #[derive(Debug, Clone)]
+pub struct UserQuestionView {
+    pub prompt: String,
+    pub choices: Option<Vec<String>>,
+}
+#[derive(Debug, Clone)]
+pub struct UserQuestionGroupView {
+    pub question_id: String,
+    pub argument_digest: String,
+    pub questions: Vec<UserQuestionView>,
+}
+#[derive(Debug, Clone)]
 pub struct AgentRunView {
     pub run_id: String,
     pub workspace_id: String,
@@ -123,6 +134,7 @@ pub struct AgentRunView {
     pub steps: u32,
     pub invocations: u32,
     pub pending: Vec<ToolApprovalView>,
+    pub user_question: Option<UserQuestionGroupView>,
     pub final_text: Option<String>,
     pub failure: Option<String>,
 }
@@ -144,6 +156,25 @@ pub async fn start_run(
     prompt: String,
 ) -> Result<AgentRunView, BridgeError> {
     crate::host::start_run(handle, workspace_id, request_id, prompt).await
+}
+/// Explicit question-capable UI entry point; legacy start_run remains noninteractive.
+pub async fn start_interactive_run(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    prompt: String,
+) -> Result<AgentRunView, BridgeError> {
+    crate::host::start_interactive_run(handle, workspace_id, request_id, prompt).await
+}
+/// A reply supplies context only. It never approves or executes a filesystem tool.
+pub async fn answer_user_question(
+    handle: String,
+    run_id: String,
+    question_id: String,
+    expected_digest: String,
+    answers: Vec<String>,
+) -> Result<AgentRunView, BridgeError> {
+    crate::host::answer_user_question(handle, run_id, question_id, expected_digest, answers).await
 }
 pub async fn inspect_run(handle: String, run_id: String) -> Result<AgentRunView, BridgeError> {
     crate::host::inspect_run(handle, run_id).await

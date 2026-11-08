@@ -52,8 +52,9 @@ class FixtureCommands implements AgentCommands {
   Future<AgentRunView> start(
     String workspace,
     String request,
-    String prompt,
-  ) async {
+    String prompt, {
+    bool allowQuestions = false,
+  }) async {
     events.add('start');
     id = request;
     starts.add((id: request, prompt: prompt));
@@ -88,6 +89,16 @@ class FixtureCommands implements AgentCommands {
     }
     approved = true;
     return state('tools_pending', steps: 1);
+  }
+
+  @override
+  Future<AgentRunView> answer(
+    String request,
+    String question,
+    String digest,
+    List<String> answers,
+  ) async {
+    throw StateError('Question transport is not configured in this fixture');
   }
 
   @override

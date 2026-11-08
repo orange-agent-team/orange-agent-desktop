@@ -1,6 +1,6 @@
 # 本地 Agent 执行接口与验证边界
 
-2026-11-05。此切片实现 Rust Host、生成的 Flutter/FRB 接口和单次会话/工具批准界面。固定本地模型的导入与受管启动/停止已接入，完整模型管理与孤儿恢复尚未完成，不据此标记完整桌面 Agent 完成。当前界面连接已配置的本地服务；真实模型 API 验收与沙箱 UI 的模型协议替身验收分别记录。
+2026-11-08。此切片实现 Rust Host、生成的 Flutter/FRB 接口和单次会话/工具批准界面。固定本地模型的导入与受管启动/停止已接入，完整模型管理与孤儿恢复尚未完成，不据此标记完整桌面 Agent 完成。当前界面连接已配置的本地服务；真实模型 API 验收与沙箱 UI 的模型协议替身验收分别记录。
 
 ## 所有权与并发
 
@@ -41,12 +41,14 @@ UI 使用更早可知的系统选择编号：`suspendWorkspaceSelection(handle, 
 | `connectLocalModel` | 私有服务目录 → ModelConnectionView | 目录必须在 Host 私有存储内；验证 profile/process/api.key 的文件类型、权限、大小与一致性，检查私有 socket 健康及实例未变 |
 | `disconnectLocalModel` | handle → 空 | 清除连接，不声称停止外部模型服务 |
 | `startRun` | workspaceId/requestId/prompt → AgentRunView | 本次会话目录访问已恢复、已配置模型；相同请求幂等，改变提示词或工作区返回冲突 |
+| `startInteractiveRun` | workspaceId/requestId/prompt → AgentRunView | 创建时显式启用问答；其余约束同startRun；不能给已有普通Run追加能力 |
+| `answerUserQuestion` | runId/questionId/expectedDigest/answers → AgentRunView | 原问题/摘要绑定、答复字节与数量、当前权限和来源重验；同答复幂等、异参冲突；不批准工具、不调用模型 |
 | `inspectRun` | runId → AgentRunView | 所有者、当前 grant 及已读取源数据必须重新授权；源删除/变化不展示缓存最终答案 |
 | `approveTool` | runId/operationId/expectedDigest → AgentRunView | 比对不可变操作和参数摘要；批准期限至多 60 秒且不超过 Run 截止时间；不由 advance 自动批准 |
 | `advanceRun` | runId/expectedRevision → AgentRunView | 版本不匹配不执行；必须保持模型身份一致；执行后有内容时再次校验来源 |
 | `cancelRun` | runId → AgentRunView | 只需有效句柄及所属 Run，不依赖仍可访问源目录；保留已完成历史但隐藏最终内容 |
 
-AgentRunView 包含 run/workspace/model 身份、phase、revision、steps、invocations、待批准操作、finalText 和 failure。参数预览是 JSON 文本，不是授权请求的可修改副本。列表 `listRuns` 保持只含元数据，不能通过历史列表绕过来源校验。
+AgentRunView 包含 run/workspace/model 身份、phase、revision、steps、invocations、待批准操作、可空的 userQuestion、finalText 和 failure。参数预览是 JSON 文本，不是授权请求的可修改副本。列表 `listRuns` 保持只含元数据，不能通过历史列表绕过来源校验。
 
 当前每个 Host 会话最多保留 256 个 Run 上下文；单 Run 默认 30 步、20 次模型调用、每次最多 256 输出 token、15 分钟截止时间，提示词上限 64 KiB。这些是本地开发限额，不是计费认证。
 
@@ -64,7 +66,7 @@ macOS 声明网络客户端能力以连接本机服务，App Sandbox 和只读�
 
 ## 验证方式
 
-`python3 scripts/check-bridge.py --native`：4 项 Rust 测试（其中一项覆盖整个 actor 并发、响应丢失、排队授权与恢复流程）、Clippy、固定生成物、Dart 静态分析、6 项界面测试和真实 macOS Flutter/FRB/SQLite 集成。并发模型与界面单测的命令端均为明确替身。原生会话测试使用沙箱内的真实私有 Unix socket、真实 Rust/SQLite/文件工具与模型协议替身，实际点击批准后才向第二次模型请求提供文件内容；删除源文件后重新查看必须隐藏结果。原生选择器回调也是明确替身，不能替代人工 OS 选择或真实模型管理认证。
+`python3 scripts/check-bridge.py --native`：8 项 Rust 测试（其中一项覆盖整个 actor 并发、响应丢失、排队授权与恢复流程）、Clippy、固定生成物、Dart 静态分析、14 项界面测试和3项真实 macOS Flutter/FRB/SQLite 集成。并发模型与界面单测的命令端均为明确替身。原生会话测试使用沙箱内的真实私有 Unix socket、真实 Rust/SQLite/文件工具与模型协议替身，实际点击批准后才向第二次模型请求提供文件内容；删除源文件后重新查看必须隐藏结果。原生选择器回调也是明确替身，不能替代人工 OS 选择或真实模型管理认证。
 
 `scripts/check-real-run.py` 是单独的真实模型验收，需要显式给出 `--model-lock`、`--build-manifest`、`--model`、`--backend`、`--model-host`。普通构建不搜索相邻仓库。驱动校验已存在模型与 CPU 后端摘要，创建隔离目录和唯一内容，启动私有服务并持续保活，调用 `run-acceptance` 示例完成批准、真实读取、最终内容匹配、重开不重放、删除源后拒绝及取消。结束时关闭父控制通道并验证服务 stopped。仅测试驱动批准自身 fixture 的 `proof.txt` 读取或根目录列举，产品代码没有自动批准入口。
 
@@ -75,3 +77,9 @@ macOS 声明网络客户端能力以连接本机服务，App Sandbox 和只读�
 工作区 scope 拥有者与会话面板保持同时挂载，查看历史不释放权限。新建 Run 的原编号和原提示词在创建响应未知时被冻结；核对时只重发同一幂等请求。自动推进停在每个工具请求，展示不可编辑的参数和摘要；当前只支持明确的读取/列目录批准，未来未知工具不能继承只读批准按钮。停止按钮在模型等待期间可用；停止、撤权、重新查看和应用转入后台会清除现有结果/工具预览并丢弃晚到的旧响应；用户输入的任务草稿不在这项清理中。恢复查看不自动推进或重放 unknown。
 
 界面显示的是单次 Run 与最终结果，尚未实现完整多轮会话编辑、流式事件/分页、成果工作台、完整模型目录管理及作业级崩溃恢复。这些仍属于后继目标，不能用当前页面或替身测试替代。
+
+## 问答状态
+
+`UserQuestionGroupView`含questionId、argumentDigest和1—3个问题；每个`UserQuestionView`含prompt及可空choices。choices只提供建议，仍允许自行填写。每题回答最多4096 UTF-8字节；选择建议不会提交，所有问题均填写后才可提交。
+
+`awaiting_user`会停止UI自动推进。答复提交成功后，原模型可用时才继续；后续文件工具依然要求逐操作批准。断开模型连接不阻止提交合法答复。查询/恢复及答复重新验证来源；暂停工作区访问或停止受管模型也会关闭等待中的问题。界面隐藏、撤权、取消和更换问题会清除未提交草稿，迟到响应不能恢复旧内容。详见[问答能力](user-questions.md)。

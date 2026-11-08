@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -95,6 +95,34 @@ Future<AgentRunView> startRun({
   workspaceId: workspaceId,
   requestId: requestId,
   prompt: prompt,
+);
+
+/// Explicit question-capable UI entry point; legacy start_run remains noninteractive.
+Future<AgentRunView> startInteractiveRun({
+  required String handle,
+  required String workspaceId,
+  required String requestId,
+  required String prompt,
+}) => RustLib.instance.api.crateApiHostStartInteractiveRun(
+  handle: handle,
+  workspaceId: workspaceId,
+  requestId: requestId,
+  prompt: prompt,
+);
+
+/// A reply supplies context only. It never approves or executes a filesystem tool.
+Future<AgentRunView> answerUserQuestion({
+  required String handle,
+  required String runId,
+  required String questionId,
+  required String expectedDigest,
+  required List<String> answers,
+}) => RustLib.instance.api.crateApiHostAnswerUserQuestion(
+  handle: handle,
+  runId: runId,
+  questionId: questionId,
+  expectedDigest: expectedDigest,
+  answers: answers,
 );
 
 Future<AgentRunView> inspectRun({
@@ -232,6 +260,7 @@ class AgentRunView {
   final int steps;
   final int invocations;
   final List<ToolApprovalView> pending;
+  final UserQuestionGroupView? userQuestion;
   final String? finalText;
   final String? failure;
 
@@ -244,6 +273,7 @@ class AgentRunView {
     required this.steps,
     required this.invocations,
     required this.pending,
+    this.userQuestion,
     this.finalText,
     this.failure,
   });
@@ -258,6 +288,7 @@ class AgentRunView {
       steps.hashCode ^
       invocations.hashCode ^
       pending.hashCode ^
+      userQuestion.hashCode ^
       finalText.hashCode ^
       failure.hashCode;
 
@@ -274,6 +305,7 @@ class AgentRunView {
           steps == other.steps &&
           invocations == other.invocations &&
           pending == other.pending &&
+          userQuestion == other.userQuestion &&
           finalText == other.finalText &&
           failure == other.failure;
 }
@@ -487,6 +519,49 @@ class ToolApprovalView {
           toolName == other.toolName &&
           argumentsJson == other.argumentsJson &&
           argumentDigest == other.argumentDigest;
+}
+
+class UserQuestionGroupView {
+  final String questionId;
+  final String argumentDigest;
+  final List<UserQuestionView> questions;
+
+  const UserQuestionGroupView({
+    required this.questionId,
+    required this.argumentDigest,
+    required this.questions,
+  });
+
+  @override
+  int get hashCode =>
+      questionId.hashCode ^ argumentDigest.hashCode ^ questions.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserQuestionGroupView &&
+          runtimeType == other.runtimeType &&
+          questionId == other.questionId &&
+          argumentDigest == other.argumentDigest &&
+          questions == other.questions;
+}
+
+class UserQuestionView {
+  final String prompt;
+  final List<String>? choices;
+
+  const UserQuestionView({required this.prompt, this.choices});
+
+  @override
+  int get hashCode => prompt.hashCode ^ choices.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserQuestionView &&
+          runtimeType == other.runtimeType &&
+          prompt == other.prompt &&
+          choices == other.choices;
 }
 
 class WorkspaceView {

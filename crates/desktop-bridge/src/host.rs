@@ -16,8 +16,8 @@ pub(crate) use managed::{
     import_model, inspect_model_service, start_model_service, stop_model_service,
 };
 pub(crate) use runs::{
-    advance_run, approve_tool, cancel_run, connect_local_model, disconnect_local_model,
-    inspect_run, start_run,
+    advance_run, answer_user_question, approve_tool, cancel_run, connect_local_model,
+    disconnect_local_model, inspect_run, start_interactive_run, start_run,
 };
 
 pub(crate) fn failure(code: &str) -> BridgeError {
@@ -310,7 +310,7 @@ impl HostRegistry {
                 .map_err(|_| failure("RUN_STORAGE_UNAVAILABLE"))?;
             if matches!(
                 state.phase,
-                Phase::Ready | Phase::ModelPending | Phase::ToolsPending
+                Phase::Ready | Phase::ModelPending | Phase::ToolsPending | Phase::AwaitingUser
             ) {
                 host.journal
                     .cancel_agent_run(LOCAL_OWNER, run)
@@ -523,7 +523,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "58471251d1adce139a31f78cd3f5b57f6cbf4a6f"
+            "53ed51508764a5f9cb9cc04383ecb0185941b351"
         );
         assert_eq!(
             registry

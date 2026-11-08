@@ -6,7 +6,7 @@
 
 `apps/desktop` 是Flutter应用E06；`crates/desktop-bridge` 是Rust桥接E05。Flutter通过FRB 2.13.0的配对生成物调用经过审阅的DTO和命令，Native Assets hook编译/打包Rust库。当前没有额外业务工程、Node BFF或Cargokit拷贝。
 
-E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`58471251d1adce139a31f78cd3f5b57f6cbf4a6f`的源码发行包；`config/runtime.lock.json`绑定archive和release manifest摘要，`vendor/runtime-5847125`保存独立源码。供应方只从Git commit导出；接收方校验文件清单及Cargo实际依赖路径。vendor副本不改变核心工程所有权，也不按新增项目或自研代码量重复统计。
+E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`53ed51508764a5f9cb9cc04383ecb0185941b351`的源码发行包；`config/runtime.lock.json`绑定archive和release manifest摘要，`vendor/runtime-53ed515`保存独立源码。供应方只从Git commit导出；接收方校验文件清单及Cargo实际依赖路径。vendor副本不改变核心工程所有权，也不按新增项目或自研代码量重复统计。
 
 桌面虚拟Cargo workspace只有E05，明确排除vendor中的共享workspace，防止其继承桌面错误的依赖定义。依赖锁从已验证Runtime锁出发，增加固定FRB依赖；真实客户端锁记录在桌面根Cargo.lock。E04源码随固定包提供，当前E05并未启动任何模型引擎。
 
@@ -19,7 +19,7 @@ E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护
 | `validateAmount(handle,value)` | 用共享E01验证非负i64规范十进制字符串，原样无损返回 | 纯校验，不创建预算、不冻结余额、不收款 |
 | `closeHost(handle)` | 关闭当前本地存储句柄；再次打开生成新句柄 | 不表示GPU已释放，也不表示任何未来Job已取消 |
 
-可见DTO为`HostView`、`BridgeError`、`WorkspaceView`、`RunSummary`、`RunPage`，另有执行接口的`ModelConnectionView`、`ToolApprovalView`、`AgentRunView`。错误带稳定code和随机correlation ID，不透出底层路径或SQL错误。Host/HostRegistry及Default实现位于FRB输入命名空间之外；生成脚本核对允许的类和函数集合，避免内部对象意外导出。
+可见DTO为`HostView`、`BridgeError`、`WorkspaceView`、`RunSummary`、`RunPage`，另有执行接口的`ModelConnectionView`、`ToolApprovalView`、`UserQuestionView`、`UserQuestionGroupView`、`AgentRunView`。错误带稳定code和随机correlation ID，不透出底层路径或SQL错误。Host/HostRegistry及Default实现位于FRB输入命名空间之外；生成脚本核对允许的类和函数集合，避免内部对象意外导出。
 
 新增命令：`authorizeWorkspace`、`listWorkspaces`、`restoreWorkspaceAccess`、`revokeWorkspace`及`listRuns`。owner由Rust本机profile固定，不接受Dart伪造云owner。工作区DTO将持久`permissionActive`与当前Host的`sessionAccess`分开；旧Host句柄、旧授权请求和已撤销记录不能恢复访问。Run查询只传状态/计数，不传prompt或工具正文。
 
@@ -42,3 +42,5 @@ Run启动/推进/批准/取消及本地私有模型连接已实现并生成FRB�
 模型与GPU引擎由独立受管进程执行；桌面UI进程不加载GPU模型。接E08 Broker时必须区分本地存储关闭、Run取消、引擎退出和设备清理证据。云账户将接单独的原生授权流程，不能复用Admin cookie或把Web开发token复制到桌面。
 
 UI已连接真实Host接口，可创建单次Run、逐次批准只读工具、停止、核对状态和查看已授权结果。模型服务缺失时明确拒绝启动，没有产品内的假模型响应。界面测试的协议替身仅在integration_test/test目录。固定CPU模型的导入、常驻心跳和按实例停止已接入独立Rust服务所有者，见[受管模型服务](managed-model-service.md)；其他模型/OS、孤儿核对等继续按计划实现。
+
+显式问答入口、答复与批准的分离、恢复和草稿清理见[用户问答](user-questions.md)。普通startRun保持非交互；新Run只有选择“允许任务询问补充信息”才调用startInteractiveRun，不能通过重用创建编号改变已有能力。

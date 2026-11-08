@@ -31,6 +31,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  UserQuestionGroupView dco_decode_box_autoadd_user_question_group_view(
+    dynamic raw,
+  );
+
+  @protected
   BridgeError dco_decode_bridge_error(dynamic raw);
 
   @protected
@@ -49,6 +54,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ToolApprovalView> dco_decode_list_tool_approval_view(dynamic raw);
 
   @protected
+  List<UserQuestionView> dco_decode_list_user_question_view(dynamic raw);
+
+  @protected
   List<WorkspaceView> dco_decode_list_workspace_view(dynamic raw);
 
   @protected
@@ -59,6 +67,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  UserQuestionGroupView? dco_decode_opt_box_autoadd_user_question_group_view(
+    dynamic raw,
+  );
+
+  @protected
+  List<String>? dco_decode_opt_list_String(dynamic raw);
 
   @protected
   RunPage dco_decode_run_page(dynamic raw);
@@ -82,6 +98,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void dco_decode_unit(dynamic raw);
 
   @protected
+  UserQuestionGroupView dco_decode_user_question_group_view(dynamic raw);
+
+  @protected
+  UserQuestionView dco_decode_user_question_view(dynamic raw);
+
+  @protected
   WorkspaceView dco_decode_workspace_view(dynamic raw);
 
   @protected
@@ -92,6 +114,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
+
+  @protected
+  UserQuestionGroupView sse_decode_box_autoadd_user_question_group_view(
+    SseDeserializer deserializer,
+  );
 
   @protected
   BridgeError sse_decode_bridge_error(SseDeserializer deserializer);
@@ -114,6 +141,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<UserQuestionView> sse_decode_list_user_question_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<WorkspaceView> sse_decode_list_workspace_view(
     SseDeserializer deserializer,
   );
@@ -128,6 +160,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  UserQuestionGroupView? sse_decode_opt_box_autoadd_user_question_group_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<String>? sse_decode_opt_list_String(SseDeserializer deserializer);
 
   @protected
   RunPage sse_decode_run_page(SseDeserializer deserializer);
@@ -151,6 +191,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_decode_unit(SseDeserializer deserializer);
 
   @protected
+  UserQuestionGroupView sse_decode_user_question_group_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  UserQuestionView sse_decode_user_question_view(SseDeserializer deserializer);
+
+  @protected
   WorkspaceView sse_decode_workspace_view(SseDeserializer deserializer);
 
   @protected
@@ -164,6 +212,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_user_question_group_view(
+    UserQuestionGroupView self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_bridge_error(BridgeError self, SseSerializer serializer);
@@ -193,6 +247,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_user_question_view(
+    List<UserQuestionView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_workspace_view(
     List<WorkspaceView> self,
     SseSerializer serializer,
@@ -212,6 +272,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_user_question_group_view(
+    UserQuestionGroupView? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_list_String(List<String>? self, SseSerializer serializer);
 
   @protected
   void sse_encode_run_page(RunPage self, SseSerializer serializer);
@@ -236,6 +305,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_user_question_group_view(
+    UserQuestionGroupView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_user_question_view(
+    UserQuestionView self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_workspace_view(WorkspaceView self, SseSerializer serializer);

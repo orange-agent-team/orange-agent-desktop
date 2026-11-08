@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'agent_controller.dart';
+import 'question_panel.dart';
 import 'src/rust/api/host.dart';
 
 class AgentPanel extends StatefulWidget {
@@ -18,6 +19,7 @@ class AgentPanel extends StatefulWidget {
 class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
   final prompt = TextEditingController();
   String? selected;
+  bool allowQuestions = false;
   AgentController get controller => widget.controller;
   @override
   void initState() {
@@ -131,6 +133,17 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                   border: OutlineInputBorder(),
                 ),
               ),
+              CheckboxListTile(
+                title: const Text('允许任务询问补充信息'),
+                value: allowQuestions,
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                onChanged:
+                    busy || controller.active || controller.startUnconfirmed
+                    ? null
+                    : (value) =>
+                          setState(() => allowQuestions = value ?? false),
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 10,
@@ -145,7 +158,11 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                             selectedId == null ||
                             prompt.text.trim().isEmpty
                         ? null
-                        : () => controller.start(selectedId, prompt.text),
+                        : () => controller.start(
+                            selectedId,
+                            prompt.text,
+                            allowQuestions: allowQuestions,
+                          ),
                     child: const Text('开始会话'),
                   ),
                   if (controller.startUnconfirmed)
@@ -205,6 +222,15 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                 if (!controller.matchingModel)
                   const Text('继续执行需要连接此会话使用的原模型版本。'),
                 if (run.failure != null) const Text('本次执行已停止；请核对状态后处理恢复记录。'),
+                if (run.phase == 'awaiting_user' && run.userQuestion != null)
+                  QuestionPanel(
+                    key: ValueKey(
+                      '${run.runId}:${run.userQuestion!.questionId}:${run.userQuestion!.argumentDigest}',
+                    ),
+                    question: run.userQuestion!,
+                    busy: busy,
+                    onSubmit: controller.answerQuestion,
+                  ),
                 for (var i = 0; i < pending.length; i++)
                   Card(
                     child: Padding(
@@ -272,6 +298,7 @@ String phaseLabel(String phase) => switch (phase) {
   'ready' => '等待继续',
   'model_pending' => '模型处理中',
   'tools_pending' => '工具请求待处理',
+  'awaiting_user' => '等待你的回答',
   'completed' => '已完成',
   'cancelled' => '已停止',
   'limited' => '已达到限制',

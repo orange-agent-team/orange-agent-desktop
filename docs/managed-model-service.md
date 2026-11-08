@@ -1,6 +1,6 @@
 # 本地模型安装与受管生命周期
 
-当前升级记录（2026-11-08）：固定Runtime5847125提供read_file、list_directory、search_files和search_text，UI仍逐请求明确批准。Rust Bridge在查询/恢复前重验当前源，已覆盖搜索后删除及同长度隐藏行变化。真实沙箱模型UI定向验证通过连续read→search_text、精确输入/范围批准、结果和删除后清屏；完整套件及默认发行包以最新执行台账为准。开发0.5B模型的精确filename任务在服务端资格探测中失败3次并被拒绝批准，不宣称所有工具/模型质量均获认证。
+上一验证基线（2026-11-08）：固定Runtime5847125提供read_file、list_directory、search_files和search_text，UI仍逐请求明确批准。Rust Bridge在查询/恢复前重验当前源，已覆盖搜索后删除及同长度隐藏行变化。真实沙箱模型UI定向验证通过连续read→search_text、精确输入/范围批准、结果和删除后清屏；完整套件及默认发行包以最新执行台账为准。开发0.5B模型的精确filename任务在服务端资格探测中失败3次并被拒绝批准，不宣称所有工具/模型质量均获认证。
 
 `check-managed-model.py --ui-search-only --model PATH`仅运行实际UI搜索子用例，并要求search/deletion通过标记；它不包含35秒心跳与恢复案例。不加该参数运行完整套件。临时测试权重由finally恢复为原组件包，最终分发构建须再运行check-flutter.py。
 
@@ -52,3 +52,5 @@ ModelServiceView包含phase、模型名称、规范十进制文件字节数、�
 另有编译摘要绑定负例，证明重新计算可变manifest不能绕过构建时的摘要，模型清单也独立核对。完整应用仍不等于G0—G6交付：多轮会话、后台作业恢复、模型目录管理/卸载/下载、其他模型协议、云Host、真实GPU和长期稳定性等按原计划继续。
 
 独立QA副本`dev.orangeagent.qa.fa686dbe`另经真实NSOpenPanel选择公开权重和自建目录，观察到校验导入、服务就绪及只读工具批准请求。界面工具随后无法建立native pipe，手工批准未记为完成；只读运行元数据显示仍为tools_pending、一个intended操作。按实时核对的独立launchd作业身份结束QA应用后，模型停止收据与执行租约均确认，未按状态文件PID操作进程。观察元数据保存在`.local/ui-model-qa/fa686dbe/qa-observation.json`；不保存系统文件列表或任何密钥。此手工观察补充真实选择器，完整结果/批准/停止链路仍以原生自动化测试为依据。
+
+当前源码升级为固定Runtime53ed515，增加显式问答创建和独立答复接口。默认不开启问答；默认模型锁仍为0.5B。停止模型的Run收尾现在包含awaiting_user状态。新版本实际模型生命周期/打包检查以当前执行证据为准，不将旧版5847125结果视为新二进制认证。

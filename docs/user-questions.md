@@ -1,0 +1,13 @@
+# Desktop user questions
+
+The native UI offers an explicit “允许任务询问补充信息” creation option, off by default. When enabled, it starts the new conversation through `startInteractiveRun`; otherwise it uses `startRun`. The selected option is retained with an uncertain creation request, so retries cannot change the capability. The existing `startRun` API retains its noninteractive behavior. An existing Run cannot switch its immutable capability by reusing the creation ID; normal inspection and continuation preserve its original configuration.
+
+`AgentRunView.userQuestion` contains the exact question ID, argument digest, prompts and optional suggestions projected from the committed Runtime response. A waiting question is separate from `pending` tool approvals. The UI stops model progression at `awaiting_user`, renders prompts as plain text and supports a free answer for each prompt. Selecting a suggestion fills that field without submitting. The submit button requires every answer and checks the 4096 UTF-8 byte bound; Rust validates the entire request again.
+
+`answerUserQuestion` accepts the Run ID, original question ID, digest and answers. It runs on the existing Host actor, checks current workspace/session and source authority, and invokes the Runtime's durable answer transaction. It invokes no model and inserts no tool approval. The UI may then continue the model when the original model is connected; any resulting file tool remains paused for its own explicit approval. Answers can also be committed while the model is disconnected and continued later.
+
+A lost reply can be resolved by inspecting the Run. An identical answer replay is harmless; changed answers conflict. Drafts are held only in the visible question widget, keyed to Run/question/digest. Hiding content, losing current source authority, cancellation or replacing the question disposes those drafts. Late asynchronous answers cannot overwrite a newer cancelled/hidden view because the controller checks its operation epoch.
+
+Native scope suspension and managed-model stop include waiting questions in their cancellation paths. Reopening a journal restores durable question state only after restoring valid workspace access. Source files are revalidated before rendering questions and accepting answers; deleting a previously read file prevents cached question context from being displayed or answered.
+
+Verification must separately record Rust/SQLite tests, Flutter widget tests, native FFI/HTTP protocol fixtures, and real-model qualification. The native fixture is explicitly a substitute for model responses and OS selection callbacks. This document does not assert model intelligence, production signing, cloud RunStore or other operating-system certification.
