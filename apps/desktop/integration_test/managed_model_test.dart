@@ -86,12 +86,84 @@ Future<void> confirmedCleanup(
   );
 }
 
-Future<void> until(WidgetTester tester, bool Function() condition) async {
+Future<void> until(
+  WidgetTester tester,
+  bool Function() condition, {
+  String? handle,
+}) async {
   final deadline = DateTime.now().add(const Duration(seconds: 150));
+  var refreshes = 0;
+  var resumes = 0;
+  List<Object> counts(List<RunSummary> rows) =>
+      rows.map((r) => [r.runId, r.phase, r.steps, r.invocations]).toList();
   while (!condition() && DateTime.now().isBefore(deadline)) {
+    if (handle != null &&
+        refreshes < 3 &&
+        find.text('内容已隐藏，重新查看时会再次验证访问权限。').evaluate().isNotEmpty) {
+      final button = find.widgetWithText(OutlinedButton, '核对状态');
+      if (button.evaluate().isNotEmpty &&
+          tester.widget<OutlinedButton>(button).onPressed != null) {
+        final before = (await listRuns(
+          handle: handle,
+          limit: 100,
+        ).timeout(deadline.difference(DateTime.now()))).runs;
+        await tester.ensureVisible(button);
+        await tester.tap(button);
+        await tester.pump(const Duration(milliseconds: 100));
+        final after = (await listRuns(
+          handle: handle,
+          limit: 100,
+        ).timeout(deadline.difference(DateTime.now()))).runs;
+        expect(
+          counts(after),
+          counts(before),
+          reason: 'authorized state refresh must not dispatch a model or tool',
+        );
+        refreshes++;
+        debugPrint(
+          jsonEncode({
+            'managedVisibilityRecovery': true,
+            'refreshes': refreshes,
+            'noDispatchFromRefresh': true,
+          }),
+        );
+      }
+    }
+    if (handle != null && refreshes > 0 && resumes < 2 && !condition()) {
+      final resume = find.widgetWithText(OutlinedButton, '继续执行');
+      if (resume.evaluate().isNotEmpty &&
+          tester.widget<OutlinedButton>(resume).onPressed != null) {
+        // Resume only through the same visible product action available to the
+        // owner. No approval command is invoked, and unknown is not resumable.
+        await tester.ensureVisible(resume);
+        await tester.tap(resume);
+        resumes++;
+      }
+    }
     await tester.pump(const Duration(milliseconds: 100));
   }
   expect(condition(), isTrue, reason: 'bounded native model/UI transition');
+}
+
+Future<void> untilVisibleResult(
+  WidgetTester tester,
+  String handle,
+  String text,
+) async {
+  await until(
+    tester,
+    () => find.textContaining(text).evaluate().isNotEmpty,
+    handle: handle,
+  );
+  final rows = (await listRuns(handle: handle, limit: 100)).runs;
+  expect(rows, isNotEmpty);
+  expect(
+    rows.every(
+      (r) => r.phase == 'completed' && r.steps == 3 && r.invocations == 2,
+    ),
+    isTrue,
+    reason: 'Each fixture Run must have exactly model→one approved tool→model, including visibility recovery',
+  );
 }
 
 Future<void> enterEditablePrompt(WidgetTester tester, String value) async {
@@ -521,14 +593,16 @@ void main() {
         await tester.pump();
         await tester.ensureVisible(find.text('开始会话'));
         await tester.tap(find.text('开始会话'));
-        await until(tester, () => find.text('批准这一次读取').evaluate().isNotEmpty);
+        await until(
+          tester,
+          () => find.text('批准这一次读取').evaluate().isNotEmpty,
+          handle: host.handle,
+        );
         expect(find.textContaining(sentinel), findsNothing);
         await tester.ensureVisible(find.text('批准这一次读取'));
         await tester.tap(find.text('批准这一次读取'));
-        await until(
-          tester,
-          () => find.textContaining(sentinel).evaluate().isNotEmpty,
-        );
+        stage = 'await-read-result';
+        await untilVisibleResult(tester, host.handle, sentinel);
         stage = 'prepare-second-search';
         final searchSentinel =
             'ORANGE_EVIDENCE_${DateTime.now().microsecondsSinceEpoch}';
@@ -561,6 +635,7 @@ void main() {
                       )
                       .onPressed !=
                   null,
+          handle: host.handle,
         );
         expect(find.text('搜索文本'), findsOneWidget);
         expect(find.textContaining(searchSentinel), findsNothing);
@@ -583,10 +658,7 @@ void main() {
         await tester.ensureVisible(find.text('批准这一次搜索'));
         await tester.tap(find.text('批准这一次搜索'));
         stage = 'await-search-result';
-        await until(
-          tester,
-          () => find.textContaining(searchSentinel).evaluate().isNotEmpty,
-        );
+        await untilVisibleResult(tester, host.handle, searchSentinel);
         expect(
           (await inspectRun(
             handle: host.handle,
