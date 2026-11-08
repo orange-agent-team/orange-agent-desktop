@@ -11,10 +11,10 @@ publish = false
 
 [workspace.dependencies]
 flutter_rust_bridge = "=2.13.0"
-orange-agent-runtime = { path = "vendor/runtime-7e115c3/crates/agent-runtime", version = "=0.1.0" }
-orange-domain = { path = "vendor/runtime-7e115c3/crates/domain", version = "=0.1.0" }
-orange-protocol = { path = "vendor/runtime-7e115c3/crates/protocol", version = "=0.1.0" }
-orange-model-runtime = { path = "vendor/runtime-7e115c3/crates/model-runtime", version = "=0.1.0" }
+orange-agent-runtime = { path = "vendor/runtime-97fdddb/crates/agent-runtime", version = "=0.1.0" }
+orange-domain = { path = "vendor/runtime-97fdddb/crates/domain", version = "=0.1.0" }
+orange-protocol = { path = "vendor/runtime-97fdddb/crates/protocol", version = "=0.1.0" }
+orange-model-runtime = { path = "vendor/runtime-97fdddb/crates/model-runtime", version = "=0.1.0" }
 tokio = { version = "=1.54.1", features = ["rt", "sync", "time", "net"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 sha2 = "=0.11.1"
