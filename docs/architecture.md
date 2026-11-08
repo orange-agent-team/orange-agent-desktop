@@ -6,7 +6,7 @@
 
 `apps/desktop` 是Flutter应用E06；`crates/desktop-bridge` 是Rust桥接E05。Flutter通过FRB 2.13.0的配对生成物调用经过审阅的DTO和命令，Native Assets hook编译/打包Rust库。当前没有额外业务工程、Node BFF或Cargokit拷贝。
 
-E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`53ed51508764a5f9cb9cc04383ecb0185941b351`的源码发行包；`config/runtime.lock.json`绑定archive和release manifest摘要，`vendor/runtime-53ed515`保存独立源码。供应方只从Git commit导出；接收方校验文件清单及Cargo实际依赖路径。vendor副本不改变核心工程所有权，也不按新增项目或自研代码量重复统计。
+E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`6b6c08bd23a5f186508d360815dec50f30c502c9`的源码发行包；`config/runtime.lock.json`绑定archive和release manifest摘要，`vendor/runtime-6b6c08b`保存独立源码。供应方只从Git commit导出；接收方校验文件清单及Cargo实际依赖路径。vendor副本不改变核心工程所有权，也不按新增项目或自研代码量重复统计。
 
 桌面虚拟Cargo workspace只有E05，明确排除vendor中的共享workspace，防止其继承桌面错误的依赖定义。依赖锁从已验证Runtime锁出发，增加固定FRB依赖；真实客户端锁记录在桌面根Cargo.lock。E04源码随固定包提供，当前E05并未启动任何模型引擎。
 
