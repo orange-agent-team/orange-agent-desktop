@@ -9,9 +9,11 @@ class AgentPanel extends StatefulWidget {
     super.key,
     required this.controller,
     required this.workspaces,
+    this.creations = const [],
   });
   final AgentController controller;
   final List<WorkspaceView> workspaces;
+  final List<CreationAccessView> creations;
   @override
   State<AgentPanel> createState() => _AgentPanelState();
 }
@@ -19,12 +21,23 @@ class AgentPanel extends StatefulWidget {
 class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
   final prompt = TextEditingController();
   String? selected;
-  bool allowQuestions = false;
+  bool allowQuestions = false, allowCreation = false;
   AgentController get controller => widget.controller;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didUpdateWidget(covariant AgentPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    String key(List<CreationAccessView> rows) => rows
+        .map((c) => '${c.consentId}:${c.permissionVersion}:${c.sessionToken}')
+        .join('|');
+    if (key(oldWidget.creations) != key(widget.creations)) {
+      allowCreation = false;
+    }
   }
 
   @override
@@ -55,6 +68,14 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
       final selectedId = available.any((w) => w.workspaceId == selected)
           ? selected
           : null;
+      final creation = widget.creations
+          .where(
+            (c) =>
+                c.workspaceId == selectedId &&
+                c.permissionActive &&
+                c.sessionToken != null,
+          )
+          .firstOrNull;
       final run = controller.view;
       final busy = controller.busy || controller.cancelling;
       final pending = run?.pending ?? const <ToolApprovalView>[];
@@ -96,7 +117,7 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                 initialValue: selectedId,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  labelText: '本次会话的只读工作区',
+                  labelText: '本次会话的工作区',
                   border: OutlineInputBorder(),
                 ),
                 items: available
@@ -112,7 +133,10 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                     .toList(),
                 onChanged: busy || controller.active
                     ? null
-                    : (value) => setState(() => selected = value),
+                    : (value) => setState(() {
+                        selected = value;
+                        allowCreation = false;
+                      }),
               ),
               if (available.isEmpty)
                 const Padding(
@@ -144,6 +168,24 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                     : (value) =>
                           setState(() => allowQuestions = value ?? false),
               ),
+              CheckboxListTile(
+                title: const Text('允许提出新建文件请求'),
+                subtitle: Text(
+                  creation == null
+                      ? '请先在创建权限区域选择同一文件夹；每个文件仍需单独批准。'
+                      : '只允许创建新文件，不覆盖现有内容。每次创建前会显示完整路径和内容。',
+                ),
+                value: allowCreation && creation != null,
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                onChanged:
+                    creation == null ||
+                        busy ||
+                        controller.active ||
+                        controller.startUnconfirmed
+                    ? null
+                    : (value) => setState(() => allowCreation = value ?? false),
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 10,
@@ -162,6 +204,7 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                             selectedId,
                             prompt.text,
                             allowQuestions: allowQuestions,
+                            creation: allowCreation ? creation : null,
                           ),
                     child: const Text('开始会话'),
                   ),
@@ -244,7 +287,12 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                           ),
                           const SizedBox(height: 8),
                           Text(toolDisplayName(pending[i].toolName)),
-                          SelectableText(pending[i].argumentsJson),
+                          if (pending[i].toolName == 'write_file')
+                            const Text('将创建下面的新文件。内容来自模型，请完整核对；现有文件不会被替换。'),
+                          if (pending[i].toolName == 'write_file')
+                            CreationPreview(arguments: pending[i].argumentsJson)
+                          else
+                            SelectableText(pending[i].argumentsJson),
                           ExpansionTile(
                             title: const Text('操作标识与内容校验'),
                             children: [
@@ -306,3 +354,30 @@ String phaseLabel(String phase) => switch (phase) {
   'recovery_required' => '需要核对未确认的执行',
   _ => '未知状态，已停止推进',
 };
+
+class CreationPreview extends StatelessWidget {
+  const CreationPreview({super.key, required this.arguments});
+  final String arguments;
+  @override
+  Widget build(BuildContext context) {
+    final preview = parseCreationPreview(arguments);
+    if (preview == null) return const Text('无法完整显示文件提案，已禁止批准。');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('新文件路径'),
+        SelectableText(preview.path),
+        const SizedBox(height: 8),
+        const Text('完整文件内容'),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 320),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              preview.content.isEmpty ? '（空文件）' : preview.content,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

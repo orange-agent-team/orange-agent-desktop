@@ -1288,6 +1288,7 @@ dependencies = [
  "orange-protocol",
  "regex",
  "rusqlite",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",

@@ -69,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -2002418568;
+  int get rustContentHash => -240081032;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -95,11 +95,25 @@ abstract class RustLibApi extends BaseApi {
     required List<String> answers,
   });
 
+  Future<AgentRunView> crateApiHostApproveCreationTool({
+    required String handle,
+    required String runId,
+    required String operationId,
+    required String expectedDigest,
+  });
+
   Future<AgentRunView> crateApiHostApproveTool({
     required String handle,
     required String runId,
     required String operationId,
     required String expectedDigest,
+  });
+
+  Future<CreationAccessView> crateApiHostAuthorizeCreationAccess({
+    required String handle,
+    required String workspaceId,
+    required String requestId,
+    required String selectedDirectory,
   });
 
   Future<WorkspaceView> crateApiHostAuthorizeWorkspace({
@@ -166,6 +180,11 @@ abstract class RustLibApi extends BaseApi {
     required String runId,
   });
 
+  Future<List<CreationAccessView>> crateApiHostListCreationAccess({
+    required String handle,
+    required String workspaceId,
+  });
+
   Future<RunPage> crateApiHostListRuns({
     required String handle,
     String? workspaceId,
@@ -183,10 +202,26 @@ abstract class RustLibApi extends BaseApi {
     required String workspaceId,
   });
 
+  Future<void> crateApiHostRevokeCreationAccess({
+    required String handle,
+    required String consentId,
+    required String expectedVersion,
+  });
+
   Future<WorkspaceView> crateApiHostRevokeWorkspace({
     required String handle,
     required String workspaceId,
     required String expectedVersion,
+  });
+
+  Future<AgentRunView> crateApiHostStartCreationRun({
+    required String handle,
+    required String workspaceId,
+    required String requestId,
+    required String prompt,
+    required String consentId,
+    required String permissionVersion,
+    required bool userQuestions,
   });
 
   Future<AgentRunView> crateApiHostStartInteractiveRun({
@@ -211,6 +246,11 @@ abstract class RustLibApi extends BaseApi {
   Future<ModelServiceView> crateApiHostStopModelService({
     required String handle,
     required String instanceId,
+  });
+
+  Future<void> crateApiHostSuspendCreationSelection({
+    required String handle,
+    required String requestId,
   });
 
   Future<WorkspaceView> crateApiHostSuspendWorkspaceAccess({
@@ -322,7 +362,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<AgentRunView> crateApiHostApproveTool({
+  Future<AgentRunView> crateApiHostApproveCreationTool({
     required String handle,
     required String runId,
     required String operationId,
@@ -347,6 +387,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_agent_run_view,
           decodeErrorData: sse_decode_bridge_error,
         ),
+        constMeta: kCrateApiHostApproveCreationToolConstMeta,
+        argValues: [handle, runId, operationId, expectedDigest],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostApproveCreationToolConstMeta =>
+      const TaskConstMeta(
+        debugName: "approve_creation_tool",
+        argNames: ["handle", "runId", "operationId", "expectedDigest"],
+      );
+
+  @override
+  Future<AgentRunView> crateApiHostApproveTool({
+    required String handle,
+    required String runId,
+    required String operationId,
+    required String expectedDigest,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(runId, serializer);
+          sse_encode_String(operationId, serializer);
+          sse_encode_String(expectedDigest, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_agent_run_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
         constMeta: kCrateApiHostApproveToolConstMeta,
         argValues: [handle, runId, operationId, expectedDigest],
         apiImpl: this,
@@ -358,6 +437,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     debugName: "approve_tool",
     argNames: ["handle", "runId", "operationId", "expectedDigest"],
   );
+
+  @override
+  Future<CreationAccessView> crateApiHostAuthorizeCreationAccess({
+    required String handle,
+    required String workspaceId,
+    required String requestId,
+    required String selectedDirectory,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(workspaceId, serializer);
+          sse_encode_String(requestId, serializer);
+          sse_encode_String(selectedDirectory, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_creation_access_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostAuthorizeCreationAccessConstMeta,
+        argValues: [handle, workspaceId, requestId, selectedDirectory],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostAuthorizeCreationAccessConstMeta =>
+      const TaskConstMeta(
+        debugName: "authorize_creation_access",
+        argNames: ["handle", "workspaceId", "requestId", "selectedDirectory"],
+      );
 
   @override
   Future<WorkspaceView> crateApiHostAuthorizeWorkspace({
@@ -375,7 +493,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 6,
             port: port_,
           );
         },
@@ -410,7 +528,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 7,
             port: port_,
           );
         },
@@ -445,7 +563,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 8,
             port: port_,
           );
         },
@@ -475,7 +593,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 9,
             port: port_,
           );
         },
@@ -507,7 +625,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 10,
             port: port_,
           );
         },
@@ -546,7 +664,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 11,
             port: port_,
           );
         },
@@ -581,7 +699,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 12,
             port: port_,
           );
         },
@@ -614,7 +732,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 13,
             port: port_,
           );
         },
@@ -645,7 +763,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 14,
             port: port_,
           );
         },
@@ -682,7 +800,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 15,
             port: port_,
           );
         },
@@ -711,7 +829,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 16,
             port: port_,
           );
         },
@@ -741,7 +859,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 17,
             port: port_,
           );
         },
@@ -771,7 +889,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 18,
             port: port_,
           );
         },
@@ -801,7 +919,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 19,
             port: port_,
           );
         },
@@ -836,7 +954,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 20,
             port: port_,
           );
         },
@@ -857,6 +975,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<List<CreationAccessView>> crateApiHostListCreationAccess({
+    required String handle,
+    required String workspaceId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(workspaceId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_creation_access_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostListCreationAccessConstMeta,
+        argValues: [handle, workspaceId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostListCreationAccessConstMeta =>
+      const TaskConstMeta(
+        debugName: "list_creation_access",
+        argNames: ["handle", "workspaceId"],
+      );
+
+  @override
   Future<RunPage> crateApiHostListRuns({
     required String handle,
     String? workspaceId,
@@ -874,7 +1027,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 22,
             port: port_,
           );
         },
@@ -908,7 +1061,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 23,
             port: port_,
           );
         },
@@ -942,7 +1095,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 24,
             port: port_,
           );
         },
@@ -964,6 +1117,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiHostRevokeCreationAccess({
+    required String handle,
+    required String consentId,
+    required String expectedVersion,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(consentId, serializer);
+          sse_encode_String(expectedVersion, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostRevokeCreationAccessConstMeta,
+        argValues: [handle, consentId, expectedVersion],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostRevokeCreationAccessConstMeta =>
+      const TaskConstMeta(
+        debugName: "revoke_creation_access",
+        argNames: ["handle", "consentId", "expectedVersion"],
+      );
+
+  @override
   Future<WorkspaceView> crateApiHostRevokeWorkspace({
     required String handle,
     required String workspaceId,
@@ -979,7 +1169,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1001,6 +1191,67 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<AgentRunView> crateApiHostStartCreationRun({
+    required String handle,
+    required String workspaceId,
+    required String requestId,
+    required String prompt,
+    required String consentId,
+    required String permissionVersion,
+    required bool userQuestions,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(workspaceId, serializer);
+          sse_encode_String(requestId, serializer);
+          sse_encode_String(prompt, serializer);
+          sse_encode_String(consentId, serializer);
+          sse_encode_String(permissionVersion, serializer);
+          sse_encode_bool(userQuestions, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_agent_run_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostStartCreationRunConstMeta,
+        argValues: [
+          handle,
+          workspaceId,
+          requestId,
+          prompt,
+          consentId,
+          permissionVersion,
+          userQuestions,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostStartCreationRunConstMeta =>
+      const TaskConstMeta(
+        debugName: "start_creation_run",
+        argNames: [
+          "handle",
+          "workspaceId",
+          "requestId",
+          "prompt",
+          "consentId",
+          "permissionVersion",
+          "userQuestions",
+        ],
+      );
+
+  @override
   Future<AgentRunView> crateApiHostStartInteractiveRun({
     required String handle,
     required String workspaceId,
@@ -1018,7 +1269,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1053,7 +1304,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1092,7 +1343,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1126,7 +1377,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1148,6 +1399,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiHostSuspendCreationSelection({
+    required String handle,
+    required String requestId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(requestId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostSuspendCreationSelectionConstMeta,
+        argValues: [handle, requestId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostSuspendCreationSelectionConstMeta =>
+      const TaskConstMeta(
+        debugName: "suspend_creation_selection",
+        argNames: ["handle", "requestId"],
+      );
+
+  @override
   Future<WorkspaceView> crateApiHostSuspendWorkspaceAccess({
     required String handle,
     required String workspaceId,
@@ -1163,7 +1449,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1198,7 +1484,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1233,7 +1519,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1263,20 +1549,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AgentRunView dco_decode_agent_run_view(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 11)
-      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
     return AgentRunView(
-      runId: dco_decode_String(arr[0]),
-      workspaceId: dco_decode_String(arr[1]),
-      modelId: dco_decode_String(arr[2]),
-      phase: dco_decode_String(arr[3]),
-      revision: dco_decode_String(arr[4]),
-      steps: dco_decode_u_32(arr[5]),
-      invocations: dco_decode_u_32(arr[6]),
-      pending: dco_decode_list_tool_approval_view(arr[7]),
-      userQuestion: dco_decode_opt_box_autoadd_user_question_group_view(arr[8]),
-      finalText: dco_decode_opt_String(arr[9]),
-      failure: dco_decode_opt_String(arr[10]),
+      creationConsentId: dco_decode_opt_String(arr[0]),
+      runId: dco_decode_String(arr[1]),
+      workspaceId: dco_decode_String(arr[2]),
+      modelId: dco_decode_String(arr[3]),
+      phase: dco_decode_String(arr[4]),
+      revision: dco_decode_String(arr[5]),
+      steps: dco_decode_u_32(arr[6]),
+      invocations: dco_decode_u_32(arr[7]),
+      pending: dco_decode_list_tool_approval_view(arr[8]),
+      userQuestion: dco_decode_opt_box_autoadd_user_question_group_view(arr[9]),
+      finalText: dco_decode_opt_String(arr[10]),
+      failure: dco_decode_opt_String(arr[11]),
     );
   }
 
@@ -1307,6 +1594,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CreationAccessView dco_decode_creation_access_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return CreationAccessView(
+      consentId: dco_decode_String(arr[0]),
+      workspaceId: dco_decode_String(arr[1]),
+      displayPath: dco_decode_String(arr[2]),
+      permissionVersion: dco_decode_String(arr[3]),
+      permissionActive: dco_decode_bool(arr[4]),
+      sessionToken: dco_decode_opt_String(arr[5]),
+    );
+  }
+
+  @protected
   HostView dco_decode_host_view(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1325,6 +1628,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_String).toList();
+  }
+
+  @protected
+  List<CreationAccessView> dco_decode_list_creation_access_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_creation_access_view).toList();
   }
 
   @protected
@@ -1526,6 +1835,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   AgentRunView sse_decode_agent_run_view(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_creationConsentId = sse_decode_opt_String(deserializer);
     var var_runId = sse_decode_String(deserializer);
     var var_workspaceId = sse_decode_String(deserializer);
     var var_modelId = sse_decode_String(deserializer);
@@ -1540,6 +1850,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_finalText = sse_decode_opt_String(deserializer);
     var var_failure = sse_decode_opt_String(deserializer);
     return AgentRunView(
+      creationConsentId: var_creationConsentId,
       runId: var_runId,
       workspaceId: var_workspaceId,
       modelId: var_modelId,
@@ -1577,6 +1888,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CreationAccessView sse_decode_creation_access_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_consentId = sse_decode_String(deserializer);
+    var var_workspaceId = sse_decode_String(deserializer);
+    var var_displayPath = sse_decode_String(deserializer);
+    var var_permissionVersion = sse_decode_String(deserializer);
+    var var_permissionActive = sse_decode_bool(deserializer);
+    var var_sessionToken = sse_decode_opt_String(deserializer);
+    return CreationAccessView(
+      consentId: var_consentId,
+      workspaceId: var_workspaceId,
+      displayPath: var_displayPath,
+      permissionVersion: var_permissionVersion,
+      permissionActive: var_permissionActive,
+      sessionToken: var_sessionToken,
+    );
+  }
+
+  @protected
   HostView sse_decode_host_view(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_handle = sse_decode_String(deserializer);
@@ -1601,6 +1933,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <String>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_String(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<CreationAccessView> sse_decode_list_creation_access_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <CreationAccessView>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_creation_access_view(deserializer));
     }
     return ans_;
   }
@@ -1859,6 +2205,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   void sse_encode_agent_run_view(AgentRunView self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.creationConsentId, serializer);
     sse_encode_String(self.runId, serializer);
     sse_encode_String(self.workspaceId, serializer);
     sse_encode_String(self.modelId, serializer);
@@ -1898,6 +2245,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_creation_access_view(
+    CreationAccessView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.consentId, serializer);
+    sse_encode_String(self.workspaceId, serializer);
+    sse_encode_String(self.displayPath, serializer);
+    sse_encode_String(self.permissionVersion, serializer);
+    sse_encode_bool(self.permissionActive, serializer);
+    sse_encode_opt_String(self.sessionToken, serializer);
+  }
+
+  @protected
   void sse_encode_host_view(HostView self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.handle, serializer);
@@ -1913,6 +2274,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_String(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_creation_access_view(
+    List<CreationAccessView> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_creation_access_view(item, serializer);
     }
   }
 

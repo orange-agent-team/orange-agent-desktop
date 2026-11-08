@@ -632,6 +632,7 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
             .iter()
             .all(|g| !g.session_access)
     );
+    exercise_creation_actor(&reopened.handle, temporary.path()).await;
     api::close_host(reopened.handle).expect("fixture operation succeeds");
 }
 
@@ -1073,4 +1074,220 @@ async fn protected_unicode_aliases_never_reach_desktop_approval() {
         assert!(view.pending.is_empty() && view.final_text.is_none());
         assert_eq!(model.calls.load(Ordering::SeqCst), 1);
     }
+}
+
+async fn exercise_creation_actor(h: &str, base: &Path) {
+    let root = base.join("creation-workspace");
+    fs::create_dir(&root).expect("owned workspace");
+    fs::write(root.join("note.txt"), "actual fixture data").expect("owned source");
+    let workspace = api::authorize_workspace(
+        h.into(),
+        "creation-read-selection".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("readonly scope");
+    api::suspend_creation_selection(h.into(), "closed-create-selection".into())
+        .await
+        .expect("close before authorization");
+    assert_eq!(
+        api::authorize_creation_access(
+            h.into(),
+            workspace.workspace_id.clone(),
+            "closed-create-selection".into(),
+            root.display().to_string()
+        )
+        .await
+        .expect_err("closed token")
+        .code,
+        "CREATION_SELECTION_CLOSED"
+    );
+    assert!(
+        api::authorize_creation_access(
+            h.into(),
+            workspace.workspace_id.clone(),
+            "wrong-directory".into(),
+            base.display().to_string()
+        )
+        .await
+        .is_err()
+    );
+    let first = api::authorize_creation_access(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "write-selection-1".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("explicit create scope");
+    let creation = api::authorize_creation_access(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "write-selection-2".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("replacement scope");
+    assert_eq!(first.consent_id, creation.consent_id);
+    api::suspend_creation_selection(h.into(), "write-selection-1".into())
+        .await
+        .expect("late old selection cleanup");
+    assert_eq!(
+        api::list_creation_access(h.into(), workspace.workspace_id.clone())
+            .await
+            .expect("inventory")[0]
+            .session_token
+            .as_deref(),
+        Some("write-selection-2")
+    );
+    assert_eq!(
+        api::revoke_creation_access(h.into(), creation.consent_id.clone(), "999".into())
+            .await
+            .expect_err("stale revocation must not stop current scope")
+            .code,
+        "CREATION_PERMISSION_CHANGED"
+    );
+    let model = install_tool(
+        h,
+        false,
+        "write_file",
+        serde_json::json!({"path":"created.txt","content":"actual created bytes"}),
+        "write_file",
+    )
+    .await;
+    let readonly = api::start_run(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "independent-read-run".into(),
+        "Read note.txt".into(),
+    )
+    .await
+    .expect("ordinary Run");
+    let run = api::start_creation_run(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "explicit-create-run".into(),
+        "Create a file".into(),
+        creation.consent_id.clone(),
+        creation.permission_version.clone(),
+        false,
+    )
+    .await
+    .expect("explicit write-capable Run");
+    assert!(
+        api::start_creation_run(
+            h.into(),
+            workspace.workspace_id.clone(),
+            readonly.run_id.clone(),
+            "Read note.txt".into(),
+            creation.consent_id.clone(),
+            creation.permission_version.clone(),
+            false
+        )
+        .await
+        .is_err(),
+        "existing readonly Run cannot upgrade"
+    );
+    let pending = step(h, &run).await.expect("write proposal");
+    assert_eq!(pending.pending[0].tool_name, "write_file");
+    let proposal = &pending.pending[0];
+    assert!(
+        api::approve_tool(
+            h.into(),
+            run.run_id.clone(),
+            proposal.operation_id.clone(),
+            proposal.argument_digest.clone()
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        api::approve_creation_tool(
+            h.into(),
+            run.run_id.clone(),
+            proposal.operation_id.clone(),
+            "0".repeat(64)
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        step(h, &pending)
+            .await
+            .expect_err("no write without exact approval")
+            .code,
+        "TOOL_APPROVAL_REQUIRED"
+    );
+    assert!(!root.join("created.txt").exists());
+    api::approve_creation_tool(
+        h.into(),
+        run.run_id.clone(),
+        proposal.operation_id.clone(),
+        proposal.argument_digest.clone(),
+    )
+    .await
+    .expect("reviewed exact proposal");
+    let written = step(h, &pending).await.expect("create actual file");
+    assert_eq!(written.phase, "ready");
+    assert_eq!(
+        fs::read_to_string(root.join("created.txt")).expect("actual new file"),
+        "actual created bytes"
+    );
+    let done = step(h, &written).await.expect("final");
+    assert_eq!(done.phase, "completed");
+    assert_eq!(model.calls.load(Ordering::SeqCst), 2);
+    fs::remove_file(root.join("created.txt")).expect("delete owned result");
+    assert!(
+        api::inspect_run(h.into(), run.run_id.clone())
+            .await
+            .is_err()
+    );
+    let waiting = install(h, true).await;
+    let run = api::start_creation_run(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "waiting-create-run".into(),
+        "Wait".into(),
+        creation.consent_id.clone(),
+        creation.permission_version.clone(),
+        false,
+    )
+    .await
+    .expect("waiting Run");
+    let handle = h.to_owned();
+    let operation = tokio::spawn(async move { step(&handle, &run).await });
+    bounded(waiting.started.notified()).await;
+    bounded(api::revoke_creation_access(
+        h.into(),
+        creation.consent_id.clone(),
+        creation.permission_version.clone(),
+    ))
+    .await
+    .expect("signal before queue and durable revoke");
+    let stopped = bounded(operation)
+        .await
+        .expect("task")
+        .expect("cancelled view");
+    assert_eq!(stopped.phase, "cancelled");
+    let ordinary = api::inspect_run(h.into(), readonly.run_id.clone())
+        .await
+        .expect("readonly unaffected");
+    assert_eq!(ordinary.phase, "ready");
+    let read_model = install(h, false).await;
+    let read_pending = step(h, &ordinary).await.expect("readonly still dispatches");
+    assert_eq!(read_pending.pending[0].tool_name, "read_file");
+    assert_eq!(read_model.calls.load(Ordering::SeqCst), 1);
+    assert!(
+        api::list_creation_access(h.into(), workspace.workspace_id.clone())
+            .await
+            .expect("revoked inventory")
+            .iter()
+            .all(|c| !c.permission_active && c.session_token.is_none())
+    );
+    api::suspend_creation_selection(h.into(), "write-selection-2".into())
+        .await
+        .expect("idempotent native release");
+    api::cancel_run(h.into(), readonly.run_id)
+        .await
+        .expect("owned fixture cleanup");
 }
