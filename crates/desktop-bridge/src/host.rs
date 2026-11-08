@@ -553,7 +553,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "d1d93436d31c7d336b7540b460007a62ae139c9c"
+            "7e115c3aa197f307f43f0aa3aef5333fdb2d8479"
         );
         assert_eq!(
             registry
