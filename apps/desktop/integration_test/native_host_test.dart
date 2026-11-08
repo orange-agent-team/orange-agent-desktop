@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:orange_desktop/main.dart';
+import 'package:orange_desktop/agent_panel.dart';
 import 'package:orange_desktop/src/rust/api/host.dart';
 import 'package:orange_desktop/src/rust/frb_generated.dart';
 
@@ -24,6 +25,35 @@ Future<HostView> reopenHost(String directory) async {
       }
       await Future<void>.delayed(const Duration(milliseconds: 10));
     }
+  }
+}
+
+Future<void> settle(WidgetTester tester, String checkpoint) async {
+  debugPrint(jsonEncode({'nativeCheckpoint': checkpoint}));
+  try {
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 100),
+      EnginePhase.sendSemanticsUpdate,
+      const Duration(seconds: 30),
+    );
+  } catch (_) {
+    final panels = tester.widgetList<AgentPanel>(find.byType(AgentPanel));
+    for (final panel in panels) {
+      final c = panel.controller;
+      debugPrint(
+        jsonEncode({
+          'nativeWaitFailure': checkpoint,
+          'busy': c.busy,
+          'connecting': c.connecting,
+          'cancelling': c.cancelling,
+          'phase': c.view?.phase,
+          'notice': c.notice,
+          'error': c.error,
+          'pending': c.view?.pending.map((p) => p.toolName).toList(),
+        }),
+      );
+    }
+    rethrow;
   }
 }
 
@@ -109,26 +139,26 @@ void main() {
               modelServiceDirectory: () async => fixture.root.path,
             ),
           );
-          await tester.pumpAndSettle();
+          await settle(tester, 'checkpoint-01');
           await tester.ensureVisible(find.text('选择文件夹'));
           await tester.tap(find.text('选择文件夹'));
-          await tester.pumpAndSettle();
+          await settle(tester, 'checkpoint-02');
           if (createAfterRead) {
             await tester.ensureVisible(find.text('选择文件夹以允许新建'));
             await tester.tap(find.text('选择文件夹以允许新建'));
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-03');
           }
           await tester.ensureVisible(find.text('连接本地模型'));
           await tester.tap(find.text('连接本地模型'));
-          await tester.pumpAndSettle();
+          await settle(tester, 'checkpoint-04');
           expect(find.text('native-fixture-v1'), findsOneWidget);
           await tester.ensureVisible(
             find.byType(DropdownButtonFormField<String>),
           );
           await tester.tap(find.byType(DropdownButtonFormField<String>));
-          await tester.pumpAndSettle();
+          await settle(tester, 'checkpoint-05');
           await tester.tap(find.text(workspace.path).last);
-          await tester.pumpAndSettle();
+          await settle(tester, 'checkpoint-06');
           await tester.ensureVisible(find.byType(TextField));
           await tester.enterText(find.byType(TextField), 'Read proof.txt');
           await tester.pump();
@@ -152,7 +182,7 @@ void main() {
           }
           await tester.ensureVisible(find.text('开始会话'));
           await tester.tap(find.text('开始会话'));
-          await tester.pumpAndSettle();
+          await settle(tester, 'checkpoint-07');
           expect(fixture.calls, 1);
           expect(fixture.failures, isEmpty);
           if (askFirst) {
@@ -162,7 +192,7 @@ void main() {
               find.widgetWithText(OutlinedButton, 'proof.txt'),
             );
             await tester.tap(find.widgetWithText(OutlinedButton, 'proof.txt'));
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-08');
             expect(
               fixture.calls,
               1,
@@ -170,7 +200,7 @@ void main() {
             );
             await tester.ensureVisible(find.text('提交回答'));
             await tester.tap(find.text('提交回答'));
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-09');
             expect(fixture.calls, 2);
             expect(find.text('提交回答'), findsNothing);
             expect(
@@ -182,7 +212,7 @@ void main() {
           expect(find.textContaining('Native fixture observed:'), findsNothing);
           await tester.ensureVisible(find.text('批准这一次读取'));
           await tester.tap(find.text('批准这一次读取'));
-          await tester.pumpAndSettle();
+          await settle(tester, 'checkpoint-10');
           expect(fixture.failures, isEmpty);
           if (createAfterRead) {
             expect(fixture.calls, 2);
@@ -194,7 +224,7 @@ void main() {
             expect(find.text(sentinel), findsOneWidget);
             await tester.ensureVisible(find.text('批准新建这个文件'));
             await tester.tap(find.text('批准新建这个文件'));
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-11');
             expect(
               await File('${workspace.path}/created.txt').readAsString(),
               sentinel,
@@ -212,7 +242,7 @@ void main() {
           }
           await tester.ensureVisible(find.text('核对状态'));
           await tester.tap(find.text('核对状态'));
-          await tester.pumpAndSettle();
+          await settle(tester, 'checkpoint-12');
           expect(find.textContaining('Native fixture observed:'), findsNothing);
           expect(find.textContaining('来源文件已改变'), findsOneWidget);
           await tester.pumpWidget(const SizedBox.shrink());
@@ -389,7 +419,7 @@ void main() {
             connect: () async => inspectHost(handle: host.handle),
           ),
         );
-        await tester.pumpAndSettle();
+        await settle(tester, 'checkpoint-13');
         expect(find.text('本地记录已连接'), findsOneWidget);
         await closeHost(handle: host.handle);
         openHandle = null;
@@ -551,10 +581,10 @@ void main() {
                 connect: () => inspectHost(handle: third.handle),
               ),
             );
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-14');
             await tester.ensureVisible(find.text('选择文件夹'));
             await tester.tap(find.text('选择文件夹'));
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-15');
             expect(find.text('本次只读访问已授权'), findsOneWidget);
             await tester.pumpWidget(const SizedBox.shrink());
             await disposedScopeReleased.future.timeout(
@@ -573,11 +603,11 @@ void main() {
                 connect: () => inspectHost(handle: third.handle),
               ),
             );
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-16');
             expect(find.text('已记住目录，需重新选择以恢复访问'), findsOneWidget);
             await tester.ensureVisible(find.text('选择文件夹'));
             await tester.tap(find.text('选择文件夹'));
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-17');
             expect(find.text('本次只读访问已授权'), findsOneWidget);
             expect(
               (await listWorkspaces(
@@ -588,7 +618,7 @@ void main() {
             );
             await tester.ensureVisible(find.text('撤销访问'));
             await tester.tap(find.text('撤销访问'));
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-18');
             expect(find.text('尚未授权工作区'), findsOneWidget);
             expect(released, contains('ui-workspace-fixture-1'));
             expect(
@@ -598,7 +628,7 @@ void main() {
             choosePrivateRoot = true;
             await tester.ensureVisible(find.text('选择文件夹'));
             await tester.tap(find.text('选择文件夹'));
-            await tester.pumpAndSettle();
+            await settle(tester, 'checkpoint-19');
             expect(find.textContaining('受保护的应用数据'), findsOneWidget);
             expect(released, contains('ui-private-fixture'));
             expect(
