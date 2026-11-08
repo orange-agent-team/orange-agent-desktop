@@ -998,3 +998,79 @@ async fn suspended_workspace_closes_waiting_question() {
     );
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
+
+#[tokio::test]
+async fn protected_unicode_aliases_never_reach_desktop_approval() {
+    for (index, tool, args) in [
+        (
+            0,
+            "read_file",
+            serde_json::json!({"path":".Kube/proof.txt"}),
+        ),
+        (1, "list_directory", serde_json::json!({"path":".Kube"})),
+        (
+            2,
+            "search_files",
+            serde_json::json!({"path":".Kube","glob":"*"}),
+        ),
+        (
+            3,
+            "search_text",
+            serde_json::json!({"path":".Kube","query":"fixture"}),
+        ),
+    ] {
+        let root = tempfile::tempdir().expect("owned fixture");
+        let workspace = root.path().join("workspace");
+        fs::create_dir(&workspace).expect("workspace");
+        fs::create_dir(workspace.join(".kube")).expect("protected fixture");
+        fs::write(workspace.join(".kube/proof.txt"), "owned private fixture").expect("fixture");
+        let mut registry = HostRegistry::default();
+        let h = registry
+            .initialize(&root.path().join("private"))
+            .expect("host")
+            .handle;
+        let grant = registry
+            .authorize_workspace(&h, "unicode-consent", &workspace)
+            .expect("explicit fixture consent");
+        let model = Arc::new(ModelFixture {
+            calls: AtomicUsize::new(0),
+            waiting: false,
+            started: Notify::new(),
+            tool,
+            arguments: args,
+            expected_result: "must never read protected content",
+        });
+        registry.current(&h).expect("host").model = Some(ModelConnection {
+            view: ModelConnectionView {
+                model_id: "unicode-fixture".into(),
+                display_name: "explicit fixture".into(),
+                context_tokens: 4096,
+                verification: "test-substitute".into(),
+            },
+            gateway: Box::new(FixtureGateway(model.clone())),
+        });
+        let run = registry
+            .start_run(
+                &h,
+                &grant.workspace_id,
+                &format!("alias-{index}"),
+                "Reject protected aliases",
+                false,
+            )
+            .await
+            .expect("run");
+        assert!(
+            registry
+                .advance_run(&h, &run.run_id, &run.revision)
+                .await
+                .is_err()
+        );
+        let view = registry
+            .inspect_run(&h, &run.run_id)
+            .await
+            .expect("recovery metadata");
+        assert_eq!(view.phase, "recovery_required");
+        assert!(view.pending.is_empty() && view.final_text.is_none());
+        assert_eq!(model.calls.load(Ordering::SeqCst), 1);
+    }
+}

@@ -165,6 +165,81 @@ void main() {
     );
   }
   testWidgets(
+    'protected Unicode alias is refused through actual native IPC and FRB',
+    (tester) async {
+      final directory = await Directory.systemTemp.createTemp(
+        'orange-native-alias-host-',
+      );
+      final workspace = await Directory.systemTemp.createTemp(
+        'orange-native-alias-work-',
+      );
+      LocalModelFixture? fixture;
+      String? handle;
+      try {
+        await Directory('${workspace.path}/.kube').create();
+        final source = await File('${workspace.path}/.kube/proof.txt')
+            .writeAsString('OWNED_ALIAS_FIXTURE');
+        fixture = await LocalModelFixture.start(
+          directory,
+          'OWNED_ALIAS_FIXTURE',
+          readPath: '.Kube/proof.txt',
+        );
+        final host = await reopenHost(directory.path);
+        handle = host.handle;
+        final grant = await authorizeWorkspace(
+          handle: handle,
+          requestId: 'alias-test-consent',
+          selectedDirectory: workspace.path,
+        );
+        await connectLocalModel(
+          handle: handle,
+          selectedDirectory: fixture.root.path,
+        );
+        final run = await startRun(
+          handle: handle,
+          workspaceId: grant.workspaceId,
+          requestId: 'native-protected-alias',
+          prompt: 'Reject protected aliases',
+        );
+        BridgeError? rejected;
+        try {
+          await advanceRun(
+            handle: handle,
+            runId: run.runId,
+            expectedRevision: run.revision,
+          );
+        } on BridgeError catch (error) {
+          rejected = error;
+        }
+        expect(
+          fixture.failures,
+          isEmpty,
+          reason: 'The explicit SSE fixture must encode Unicode as UTF-8',
+        );
+        expect(
+          rejected,
+          isA<BridgeError>().having(
+            (e) => e.code,
+            'code',
+            'RUN_SOURCE_UNAVAILABLE',
+          ),
+        );
+        final view = await inspectRun(handle: handle, runId: run.runId);
+        expect(view.phase, 'recovery_required');
+        expect(view.pending, isEmpty);
+        expect(view.finalText, isNull);
+        expect(fixture.calls, 1);
+        expect(fixture.failures, isEmpty);
+        expect(await source.readAsString(), 'OWNED_ALIAS_FIXTURE');
+      } finally {
+        if (handle != null) await closeHost(handle: handle);
+        await fixture?.close();
+        await workspace.delete(recursive: true);
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+  testWidgets(
     'real native Host, integer transport and stale handle rejection',
     (tester) async {
       final directory = await Directory.systemTemp.createTemp(
@@ -192,7 +267,7 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          '53ed51508764a5f9cb9cc04383ecb0185941b351',
+          '6b6c08bd23a5f186508d360815dec50f30c502c9',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(

@@ -10,11 +10,13 @@ class LocalModelFixture {
     this.server,
     this.expected,
     this.askFirst,
+    this.readPath,
   );
   final Directory root, ipc;
   final HttpServer server;
   final String expected;
   final bool askFirst;
+  final String readPath;
   int calls = 0;
   final failures = <String>[];
   static const key = 'fixtureonly0123456789fixtureonly0123456789';
@@ -22,6 +24,7 @@ class LocalModelFixture {
     Directory hostRoot,
     String expected, {
     bool askFirst = false,
+    String readPath = 'proof.txt',
   }) async {
     final root = await Directory('${hostRoot.path}/m').create();
     final ipc = await Directory.systemTemp.createTemp('oi');
@@ -71,7 +74,14 @@ class LocalModelFixture {
       InternetAddress(path, type: InternetAddressType.unix),
       0,
     );
-    final fixture = LocalModelFixture._(root, ipc, server, expected, askFirst);
+    final fixture = LocalModelFixture._(
+      root,
+      ipc,
+      server,
+      expected,
+      askFirst,
+      readPath,
+    );
     server.listen(
       fixture._handle,
       onError: (Object error) =>
@@ -139,7 +149,7 @@ class LocalModelFixture {
                 'type': 'function',
                 'function': {
                   'name': 'read_file',
-                  'arguments': '{"path":"proof.txt"}',
+                  'arguments': jsonEncode({'path': readPath}),
                 },
               },
             ],
@@ -161,7 +171,7 @@ class LocalModelFixture {
         }
         request.response.headers.set(
           HttpHeaders.contentTypeHeader,
-          'text/event-stream',
+          'text/event-stream; charset=utf-8',
         );
         final id = 'native-response-$calls';
         request.response.write(
