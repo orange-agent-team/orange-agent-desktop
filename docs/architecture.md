@@ -6,7 +6,7 @@
 
 `apps/desktop` 是Flutter应用E06；`crates/desktop-bridge` 是Rust桥接E05。Flutter通过FRB 2.13.0的配对生成物调用经过审阅的DTO和命令，Native Assets hook编译/打包Rust库。当前没有额外业务工程、Node BFF或Cargokit拷贝。
 
-E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`6b6c08bd23a5f186508d360815dec50f30c502c9`的源码发行包；`config/runtime.lock.json`绑定archive和release manifest摘要，`vendor/runtime-6b6c08b`保存独立源码。供应方只从Git commit导出；接收方校验文件清单及Cargo实际依赖路径。vendor副本不改变核心工程所有权，也不按新增项目或自研代码量重复统计。
+E01领域、E02协议、E03 Runtime、E04模型适配仍由服务端仓库维护。桌面消费固定提交`d1d93436d31c7d336b7540b460007a62ae139c9c`的源码发行包；`config/runtime.lock.json`绑定archive和release manifest摘要，`vendor/runtime-d1d9343`保存独立源码。供应方只从Git commit导出；接收方校验文件清单及Cargo实际依赖路径。vendor副本不改变核心工程所有权，也不按新增项目或自研代码量重复统计。
 
 桌面虚拟Cargo workspace只有E05，明确排除vendor中的共享workspace，防止其继承桌面错误的依赖定义。依赖锁从已验证Runtime锁出发，增加固定FRB依赖；真实客户端锁记录在桌面根Cargo.lock。E04源码随固定包提供，当前E05并未启动任何模型引擎。
 
@@ -44,3 +44,5 @@ Run启动/推进/批准/取消及本地私有模型连接已实现并生成FRB�
 UI已连接真实Host接口，可创建单次Run、逐次批准只读工具、停止、核对状态和查看已授权结果。模型服务缺失时明确拒绝启动，没有产品内的假模型响应。界面测试的协议替身仅在integration_test/test目录。固定CPU模型的导入、常驻心跳和按实例停止已接入独立Rust服务所有者，见[受管模型服务](managed-model-service.md)；其他模型/OS、孤儿核对等继续按计划实现。
 
 显式问答入口、答复与批准的分离、恢复和草稿清理见[用户问答](user-questions.md)。普通startRun保持非交互；新Run只有选择“允许任务询问补充信息”才调用startInteractiveRun，不能通过重用创建编号改变已有能力。
+
+显式创建权限的宿主/FRB/原生作用域及执行批准与只读工具分离，详见[file-creation.md](file-creation.md)。应用的macOS用户所选资源权限为读写，Agent工具默认仍为只读；不能宣称整个应用进程始终具备OS级只读隔离。

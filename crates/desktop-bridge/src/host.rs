@@ -9,15 +9,21 @@ use std::{
     sync::{Arc, Mutex},
 };
 use uuid::Uuid;
+mod creation;
 mod managed;
+pub(crate) use creation::{
+    authorize_creation_access, list_creation_access, revoke_creation_access,
+    suspend_creation_selection,
+};
 mod runs;
 pub(crate) use managed::{
     cancel_model_start, close_model_import, configure_model_service, current_model_connection,
     import_model, inspect_model_service, start_model_service, stop_model_service,
 };
 pub(crate) use runs::{
-    advance_run, answer_user_question, approve_tool, cancel_run, connect_local_model,
-    disconnect_local_model, inspect_run, start_interactive_run, start_run,
+    advance_run, answer_user_question, approve_creation_tool, approve_tool, cancel_run,
+    connect_local_model, disconnect_local_model, inspect_run, start_creation_run,
+    start_interactive_run, start_run,
 };
 
 pub(crate) fn failure(code: &str) -> BridgeError {
@@ -32,6 +38,7 @@ struct Host {
     journal: Journal,
     grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
     access_tokens: std::collections::HashMap<String, String>,
+    creations: std::collections::HashMap<String, creation::CreationSession>,
     model: Option<runs::ModelConnection>,
     service: Option<crate::service::Client>,
     run_grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
@@ -104,6 +111,7 @@ impl HostRegistry {
             journal,
             grants: std::collections::HashMap::new(),
             access_tokens: std::collections::HashMap::new(),
+            creations: std::collections::HashMap::new(),
             model: None,
             service: None,
             run_grants: std::collections::HashMap::new(),
@@ -464,8 +472,15 @@ pub(crate) async fn suspend_workspace_access(
     session_token: String,
 ) -> Result<WorkspaceView, BridgeError> {
     crate::actor::signal_suspend(&handle, &workspace_id, &session_token)?;
-    crate::actor::call(handle.clone(), move |host, _| {
-        host.suspend_workspace(&handle, &workspace_id, &session_token)
+    crate::actor::call(handle.clone(), move |host, rt| {
+        let creation_leases = host.workspace_creation_leases(&handle, &workspace_id)?;
+        let view = host.suspend_workspace(&handle, &workspace_id, &session_token)?;
+        rt.block_on(async {
+            for grant in creation_leases {
+                grant.wait_drained().await;
+            }
+        });
+        Ok(view)
     })
     .await
 }
@@ -476,9 +491,17 @@ pub(crate) async fn suspend_workspace_selection(
     let Some(workspace) = crate::actor::signal_release_selection(&handle, &request_id)? else {
         return Ok(());
     };
-    crate::actor::call(handle.clone(), move |host, _| {
+    crate::actor::call(handle.clone(), move |host, rt| {
+        let creation_leases = host.workspace_creation_leases(&handle, &workspace)?;
         match host.suspend_workspace(&handle, &workspace, &request_id) {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                rt.block_on(async {
+                    for grant in creation_leases {
+                        grant.wait_drained().await;
+                    }
+                });
+                Ok(())
+            }
             Err(error) if error.code == "WORKSPACE_SESSION_CHANGED" => Ok(()),
             Err(error) => Err(error),
         }
@@ -491,8 +514,15 @@ pub(crate) async fn revoke_workspace(
     expected_version: String,
 ) -> Result<WorkspaceView, BridgeError> {
     crate::actor::signal_revoke(&handle, &workspace_id, &expected_version)?;
-    crate::actor::call(handle.clone(), move |host, _| {
-        host.revoke_workspace(&handle, &workspace_id, &expected_version)
+    crate::actor::call(handle.clone(), move |host, rt| {
+        let creation_leases = host.workspace_creation_leases(&handle, &workspace_id)?;
+        let view = host.revoke_workspace(&handle, &workspace_id, &expected_version)?;
+        rt.block_on(async {
+            for grant in creation_leases {
+                grant.wait_drained().await;
+            }
+        });
+        Ok(view)
     })
     .await
 }
@@ -523,7 +553,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "6b6c08bd23a5f186508d360815dec50f30c502c9"
+            "d1d93436d31c7d336b7540b460007a62ae139c9c"
         );
         assert_eq!(
             registry

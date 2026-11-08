@@ -126,6 +126,8 @@ pub struct UserQuestionGroupView {
 }
 #[derive(Debug, Clone)]
 pub struct AgentRunView {
+    /// Immutable Run capability; never inferred from a pending tool name.
+    pub creation_consent_id: Option<String>,
     pub run_id: String,
     pub workspace_id: String,
     pub model_id: String,
@@ -269,4 +271,76 @@ pub async fn list_runs(
 #[flutter_rust_bridge::frb(init)]
 pub fn init_app() {
     flutter_rust_bridge::setup_default_user_utils();
+}
+
+/// Independent create-only consent and its currently held OS selection.
+#[derive(Debug, Clone)]
+pub struct CreationAccessView {
+    pub consent_id: String,
+    pub workspace_id: String,
+    pub display_path: String,
+    pub permission_version: String,
+    pub permission_active: bool,
+    pub session_token: Option<String>,
+}
+/// Trusted UI calls only after a separate native write directory selection.
+pub async fn authorize_creation_access(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    selected_directory: String,
+) -> Result<CreationAccessView, BridgeError> {
+    crate::host::authorize_creation_access(handle, workspace_id, request_id, selected_directory)
+        .await
+}
+pub async fn list_creation_access(
+    handle: String,
+    workspace_id: String,
+) -> Result<Vec<CreationAccessView>, BridgeError> {
+    crate::host::list_creation_access(handle, workspace_id).await
+}
+/// Known before authorization dispatch; lost replies can still close OS access.
+pub async fn suspend_creation_selection(
+    handle: String,
+    request_id: String,
+) -> Result<(), BridgeError> {
+    crate::host::suspend_creation_selection(handle, request_id).await
+}
+pub async fn revoke_creation_access(
+    handle: String,
+    consent_id: String,
+    expected_version: String,
+) -> Result<(), BridgeError> {
+    crate::host::revoke_creation_access(handle, consent_id, expected_version).await
+}
+
+/// Explicit immutable Run opt-in; old start_run/start_interactive_run stay readonly.
+pub async fn start_creation_run(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    prompt: String,
+    consent_id: String,
+    permission_version: String,
+    user_questions: bool,
+) -> Result<AgentRunView, BridgeError> {
+    crate::host::start_creation_run(
+        handle,
+        workspace_id,
+        request_id,
+        prompt,
+        consent_id,
+        permission_version,
+        user_questions,
+    )
+    .await
+}
+/// Approval of the exact create proposal, separate from workspace consent.
+pub async fn approve_creation_tool(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    expected_digest: String,
+) -> Result<AgentRunView, BridgeError> {
+    crate::host::approve_creation_tool(handle, run_id, operation_id, expected_digest).await
 }

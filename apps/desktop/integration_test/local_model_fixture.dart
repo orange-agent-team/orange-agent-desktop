@@ -11,12 +11,14 @@ class LocalModelFixture {
     this.expected,
     this.askFirst,
     this.readPath,
+    this.createAfterRead,
   );
   final Directory root, ipc;
   final HttpServer server;
   final String expected;
   final bool askFirst;
   final String readPath;
+  final bool createAfterRead;
   int calls = 0;
   final failures = <String>[];
   static const key = 'fixtureonly0123456789fixtureonly0123456789';
@@ -25,6 +27,7 @@ class LocalModelFixture {
     String expected, {
     bool askFirst = false,
     String readPath = 'proof.txt',
+    bool createAfterRead = false,
   }) async {
     final root = await Directory('${hostRoot.path}/m').create();
     final ipc = await Directory.systemTemp.createTemp('oi');
@@ -81,6 +84,7 @@ class LocalModelFixture {
       expected,
       askFirst,
       readPath,
+      createAfterRead,
     );
     server.listen(
       fixture._handle,
@@ -155,7 +159,41 @@ class LocalModelFixture {
             ],
           };
           finish = 'tool_calls';
-        } else if (calls == (askFirst ? 3 : 2)) {
+        } else if (createAfterRead && calls == (askFirst ? 3 : 2)) {
+          final messages = input['messages'] as List<dynamic>;
+          if (!messages.any(
+            (m) =>
+                m['role'] == 'tool' &&
+                m['tool_call_id'] == 'native-fixture-call' &&
+                (m['content'] as String).contains(expected),
+          )) {
+            throw StateError('Actual source result missing before creation');
+          }
+          if (!(input['tools'] as List<dynamic>).any(
+            (t) => t['function']['name'] == 'write_file',
+          )) {
+            throw StateError(
+              'Creation capability was not explicitly negotiated',
+            );
+          }
+          delta = {
+            'tool_calls': [
+              {
+                'index': 0,
+                'id': 'native-create-call',
+                'type': 'function',
+                'function': {
+                  'name': 'write_file',
+                  'arguments': jsonEncode({
+                    'path': 'created.txt',
+                    'content': expected,
+                  }),
+                },
+              },
+            ],
+          };
+          finish = 'tool_calls';
+        } else if (calls == (askFirst ? 3 : 2) + (createAfterRead ? 1 : 0)) {
           final messages = input['messages'] as List<dynamic>;
           if (!messages.any(
             (m) =>
@@ -163,6 +201,23 @@ class LocalModelFixture {
                 (m['content'] as String).contains(expected),
           )) {
             throw StateError('real tool result missing');
+          }
+          if (createAfterRead) {
+            final receipts = messages
+                .where(
+                  (m) =>
+                      m['role'] == 'tool' &&
+                      m['tool_call_id'] == 'native-create-call',
+                )
+                .toList();
+            if (receipts.length != 1) {
+              throw StateError('Missing single committed creation receipt');
+            }
+            final receipt = jsonDecode(receipts.single['content'] as String);
+            if (receipt['kind'] != 'write_file' ||
+                receipt['data']['path'] != 'created.txt') {
+              throw StateError('Wrong creation receipt');
+            }
           }
           delta = {'content': 'Native fixture observed: $expected'};
           finish = 'stop';

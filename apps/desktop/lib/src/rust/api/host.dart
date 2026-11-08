@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -251,7 +251,81 @@ Future<RunPage> listRuns({
   limit: limit,
 );
 
+/// Trusted UI calls only after a separate native write directory selection.
+Future<CreationAccessView> authorizeCreationAccess({
+  required String handle,
+  required String workspaceId,
+  required String requestId,
+  required String selectedDirectory,
+}) => RustLib.instance.api.crateApiHostAuthorizeCreationAccess(
+  handle: handle,
+  workspaceId: workspaceId,
+  requestId: requestId,
+  selectedDirectory: selectedDirectory,
+);
+
+Future<List<CreationAccessView>> listCreationAccess({
+  required String handle,
+  required String workspaceId,
+}) => RustLib.instance.api.crateApiHostListCreationAccess(
+  handle: handle,
+  workspaceId: workspaceId,
+);
+
+/// Known before authorization dispatch; lost replies can still close OS access.
+Future<void> suspendCreationSelection({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostSuspendCreationSelection(
+  handle: handle,
+  requestId: requestId,
+);
+
+Future<void> revokeCreationAccess({
+  required String handle,
+  required String consentId,
+  required String expectedVersion,
+}) => RustLib.instance.api.crateApiHostRevokeCreationAccess(
+  handle: handle,
+  consentId: consentId,
+  expectedVersion: expectedVersion,
+);
+
+/// Explicit immutable Run opt-in; old start_run/start_interactive_run stay readonly.
+Future<AgentRunView> startCreationRun({
+  required String handle,
+  required String workspaceId,
+  required String requestId,
+  required String prompt,
+  required String consentId,
+  required String permissionVersion,
+  required bool userQuestions,
+}) => RustLib.instance.api.crateApiHostStartCreationRun(
+  handle: handle,
+  workspaceId: workspaceId,
+  requestId: requestId,
+  prompt: prompt,
+  consentId: consentId,
+  permissionVersion: permissionVersion,
+  userQuestions: userQuestions,
+);
+
+/// Approval of the exact create proposal, separate from workspace consent.
+Future<AgentRunView> approveCreationTool({
+  required String handle,
+  required String runId,
+  required String operationId,
+  required String expectedDigest,
+}) => RustLib.instance.api.crateApiHostApproveCreationTool(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+  expectedDigest: expectedDigest,
+);
+
 class AgentRunView {
+  /// Immutable Run capability; never inferred from a pending tool name.
+  final String? creationConsentId;
   final String runId;
   final String workspaceId;
   final String modelId;
@@ -265,6 +339,7 @@ class AgentRunView {
   final String? failure;
 
   const AgentRunView({
+    this.creationConsentId,
     required this.runId,
     required this.workspaceId,
     required this.modelId,
@@ -280,6 +355,7 @@ class AgentRunView {
 
   @override
   int get hashCode =>
+      creationConsentId.hashCode ^
       runId.hashCode ^
       workspaceId.hashCode ^
       modelId.hashCode ^
@@ -297,6 +373,7 @@ class AgentRunView {
       identical(this, other) ||
       other is AgentRunView &&
           runtimeType == other.runtimeType &&
+          creationConsentId == other.creationConsentId &&
           runId == other.runId &&
           workspaceId == other.workspaceId &&
           modelId == other.modelId &&
@@ -326,6 +403,46 @@ class BridgeError implements FrbException {
           runtimeType == other.runtimeType &&
           code == other.code &&
           correlationId == other.correlationId;
+}
+
+/// Independent create-only consent and its currently held OS selection.
+class CreationAccessView {
+  final String consentId;
+  final String workspaceId;
+  final String displayPath;
+  final String permissionVersion;
+  final bool permissionActive;
+  final String? sessionToken;
+
+  const CreationAccessView({
+    required this.consentId,
+    required this.workspaceId,
+    required this.displayPath,
+    required this.permissionVersion,
+    required this.permissionActive,
+    this.sessionToken,
+  });
+
+  @override
+  int get hashCode =>
+      consentId.hashCode ^
+      workspaceId.hashCode ^
+      displayPath.hashCode ^
+      permissionVersion.hashCode ^
+      permissionActive.hashCode ^
+      sessionToken.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CreationAccessView &&
+          runtimeType == other.runtimeType &&
+          consentId == other.consentId &&
+          workspaceId == other.workspaceId &&
+          displayPath == other.displayPath &&
+          permissionVersion == other.permissionVersion &&
+          permissionActive == other.permissionActive &&
+          sessionToken == other.sessionToken;
 }
 
 class HostView {

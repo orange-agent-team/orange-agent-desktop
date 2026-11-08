@@ -53,7 +53,7 @@ fn now() -> Result<i64, BridgeError> {
     )
     .map_err(|_| failure("CLOCK_UNAVAILABLE"))
 }
-fn engine_error(error: EngineError) -> BridgeError {
+pub(super) fn engine_error(error: EngineError) -> BridgeError {
     failure(match error {
         EngineError::Forbidden => "RUN_FORBIDDEN",
         EngineError::ApprovalRequired => "TOOL_APPROVAL_REQUIRED",
@@ -73,7 +73,12 @@ fn revision(view: &RunView) -> String {
         view.final_text.is_some()
     )
 }
-fn project(view: RunView, workspace: String, model: String) -> Result<AgentRunView, BridgeError> {
+fn project(
+    view: RunView,
+    workspace: String,
+    model: String,
+    creation_consent_id: Option<String>,
+) -> Result<AgentRunView, BridgeError> {
     let phase = serde_json::to_value(&view.phase)
         .map_err(|_| failure("RUN_INVALID_STATE"))?
         .as_str()
@@ -96,6 +101,7 @@ fn project(view: RunView, workspace: String, model: String) -> Result<AgentRunVi
         })
         .collect::<Result<Vec<_>, BridgeError>>()?;
     Ok(AgentRunView {
+        creation_consent_id,
         run_id: view.run_id,
         workspace_id: workspace,
         model_id: model,
@@ -207,12 +213,18 @@ impl HostRegistry {
             .get(run)
             .ok_or_else(|| failure("RUN_CONTEXT_UNAVAILABLE"))?
             .clone();
+        let creation_id = host
+            .journal
+            .agent_creation_requirement(LOCAL_OWNER, run)
+            .map_err(engine_error)?
+            .map(|r| r.consent_id);
         let mut signals = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
         let control = signals
             .runs
             .entry(run.into())
             .or_insert_with(|| crate::actor::RunSignal {
                 workspace: workspace.clone(),
+                creation_id,
                 cancel: watch::channel(false).0,
                 grant: grant.clone(),
             });
@@ -366,6 +378,18 @@ impl HostRegistry {
         prompt: &str,
         interactive: bool,
     ) -> Result<AgentRunView, BridgeError> {
+        self.start_run_mode(handle, workspace, id, prompt, interactive, None)
+            .await
+    }
+    async fn start_run_mode(
+        &mut self,
+        handle: &str,
+        workspace: &str,
+        id: &str,
+        prompt: &str,
+        interactive: bool,
+        creation: Option<(&str, &str)>,
+    ) -> Result<AgentRunView, BridgeError> {
         if !orange_protocol::valid_id(id) || prompt.trim().is_empty() || prompt.len() > 64 * 1024 {
             return Err(failure("INVALID_RUN_REQUEST"));
         }
@@ -419,7 +443,26 @@ impl HostRegistry {
             Err(error) => return Err(engine_error(error)),
         };
         let messages = vec![Message::plain(Role::User, prompt.into())];
-        if interactive {
+        if let Some((id, version)) = creation {
+            let current = host
+                .creations
+                .get(id)
+                .filter(|s| {
+                    s.workspace == workspace
+                        && s.available.load(std::sync::atomic::Ordering::Acquire)
+                })
+                .ok_or_else(|| failure("CREATION_SESSION_ACCESS_REQUIRED"))?;
+            if current.grant.consent_version() != version {
+                return Err(failure("CREATION_PERMISSION_CHANGED"));
+            }
+            host.journal.start_agent_creating(
+                &config,
+                messages,
+                &grant,
+                &current.grant,
+                interactive,
+            )
+        } else if interactive {
             host.journal
                 .start_agent_interactive(&config, messages, &grant)
         } else {
@@ -446,7 +489,15 @@ impl HostRegistry {
             .agent_view_authorized(LOCAL_OWNER, run, &grant)
             .await
             .map_err(engine_error)?;
-        project(view, workspace, config.model_version)
+        project(
+            view,
+            workspace,
+            config.model_version,
+            host.journal
+                .agent_creation_requirement(LOCAL_OWNER, run)
+                .map_err(engine_error)?
+                .map(|r| r.consent_id),
+        )
     }
     async fn approve_tool(
         &mut self,
@@ -480,6 +531,33 @@ impl HostRegistry {
             .map_err(engine_error)?;
         self.inspect_run(handle, run).await
     }
+    async fn approve_creation_tool(
+        &mut self,
+        handle: &str,
+        run: &str,
+        operation: &str,
+        digest: &str,
+    ) -> Result<AgentRunView, BridgeError> {
+        let (_, config, grant, _) = self.run_context(handle, run)?;
+        let host = self.current(handle)?;
+        let create = super::creation::run_creation(host, run)?
+            .ok_or_else(|| failure("CREATION_SESSION_ACCESS_REQUIRED"))?;
+        host.journal
+            .approve_agent_creation(
+                LOCAL_OWNER,
+                run,
+                orange_agent_runtime::engine::CreationApproval {
+                    operation_id: operation,
+                    argument_digest: digest,
+                    expires_at: (now()? + 60).min(config.deadline_unix),
+                },
+                &grant,
+                &create,
+            )
+            .await
+            .map_err(engine_error)?;
+        self.inspect_run(handle, run).await
+    }
     async fn answer_question(
         &mut self,
         handle: &str,
@@ -502,7 +580,15 @@ impl HostRegistry {
             .answer_agent_question(LOCAL_OWNER, run, &answer, &grant, cancel)
             .await
             .map_err(engine_error)?;
-        project(view, workspace, config.model_version)
+        project(
+            view,
+            workspace,
+            config.model_version,
+            host.journal
+                .agent_creation_requirement(LOCAL_OWNER, run)
+                .map_err(engine_error)?
+                .map(|r| r.consent_id),
+        )
     }
     async fn advance_run(
         &mut self,
@@ -526,6 +612,7 @@ impl HostRegistry {
         if revision(&view) != expected {
             return Err(failure("RUN_VERSION_CHANGED"));
         }
+        let create = super::creation::run_creation(host, run)?;
         let model = host
             .model
             .as_ref()
@@ -533,16 +620,17 @@ impl HostRegistry {
         if model.view.model_id != config.model_version {
             return Err(failure("MODEL_CONTEXT_CHANGED"));
         }
-        host.journal
-            .advance_agent(
-                LOCAL_OWNER,
-                run,
-                &grant,
-                &GatewayRef(model.gateway.as_ref()),
-                cancel,
-            )
-            .await
-            .map_err(engine_error)?;
+        let gateway = GatewayRef(model.gateway.as_ref());
+        if let Some(create) = create {
+            host.journal
+                .advance_agent_creating(LOCAL_OWNER, run, &grant, &create, &gateway, cancel)
+                .await
+        } else {
+            host.journal
+                .advance_agent(LOCAL_OWNER, run, &grant, &gateway, cancel)
+                .await
+        }
+        .map_err(engine_error)?;
         let view = host
             .journal
             .agent_view(LOCAL_OWNER, run)
@@ -558,7 +646,15 @@ impl HostRegistry {
         } else {
             view
         };
-        project(view, workspace, config.model_version)
+        project(
+            view,
+            workspace,
+            config.model_version,
+            host.journal
+                .agent_creation_requirement(LOCAL_OWNER, run)
+                .map_err(engine_error)?
+                .map(|r| r.consent_id),
+        )
     }
     fn cancel_run(&mut self, handle: &str, run: &str) -> Result<AgentRunView, BridgeError> {
         let host = self.current(handle)?;
@@ -580,6 +676,10 @@ impl HostRegistry {
                 .map_err(engine_error)?,
             workspace,
             config.model_version,
+            host.journal
+                .agent_creation_requirement(LOCAL_OWNER, run)
+                .map_err(engine_error)?
+                .map(|r| r.consent_id),
         )
     }
 }
@@ -676,6 +776,39 @@ pub(crate) async fn cancel_run(
     crate::actor::signal_cancel(&handle, &run_id)?;
     crate::actor::call(handle.clone(), move |host, _| {
         host.cancel_run(&handle, &run_id)
+    })
+    .await
+}
+
+pub(crate) async fn start_creation_run(
+    handle: String,
+    workspace: String,
+    request: String,
+    prompt: String,
+    consent: String,
+    version: String,
+    interactive: bool,
+) -> Result<AgentRunView, BridgeError> {
+    crate::actor::call(handle.clone(), move |host, rt| {
+        rt.block_on(host.start_run_mode(
+            &handle,
+            &workspace,
+            &request,
+            &prompt,
+            interactive,
+            Some((&consent, &version)),
+        ))
+    })
+    .await
+}
+pub(crate) async fn approve_creation_tool(
+    handle: String,
+    run: String,
+    operation: String,
+    digest: String,
+) -> Result<AgentRunView, BridgeError> {
+    crate::actor::call(handle.clone(), move |host, rt| {
+        rt.block_on(host.approve_creation_tool(&handle, &run, &operation, &digest))
     })
     .await
 }

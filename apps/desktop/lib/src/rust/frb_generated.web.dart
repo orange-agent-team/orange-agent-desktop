@@ -41,10 +41,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BridgeError dco_decode_bridge_error(dynamic raw);
 
   @protected
+  CreationAccessView dco_decode_creation_access_view(dynamic raw);
+
+  @protected
   HostView dco_decode_host_view(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<CreationAccessView> dco_decode_list_creation_access_view(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -126,10 +132,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BridgeError sse_decode_bridge_error(SseDeserializer deserializer);
 
   @protected
+  CreationAccessView sse_decode_creation_access_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   HostView sse_decode_host_view(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<CreationAccessView> sse_decode_list_creation_access_view(
+    SseDeserializer deserializer,
+  );
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -225,10 +241,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bridge_error(BridgeError self, SseSerializer serializer);
 
   @protected
+  void sse_encode_creation_access_view(
+    CreationAccessView self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_host_view(HostView self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_creation_access_view(
+    List<CreationAccessView> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_prim_u_8_strict(

@@ -11,6 +11,9 @@ class FixtureCommands implements AgentCommands {
   final events = <String>[];
   final starts = <({String id, String prompt})>[];
   String id = 'fixture-run';
+  CreationAccessView? creationAccess;
+  final creationStarts = <String?>[];
+  bool? approvedAsCreation;
   String toolName = 'read_file';
   String argumentsJson = '{"path":"proof.txt"}';
   int transition = 0;
@@ -22,6 +25,7 @@ class FixtureCommands implements AgentCommands {
     List<ToolApprovalView> pending = const [],
     String? text,
   }) => AgentRunView(
+    creationConsentId: creationAccess?.consentId,
     runId: id,
     workspaceId: 'fixture-workspace',
     modelId: 'fixture-model',
@@ -54,8 +58,15 @@ class FixtureCommands implements AgentCommands {
     String request,
     String prompt, {
     bool allowQuestions = false,
+    CreationAccessView? creation,
   }) async {
     events.add('start');
+    creationAccess = creation;
+    creationStarts.add(
+      creation == null
+          ? null
+          : '${creation.consentId}:${creation.permissionVersion}',
+    );
     id = request;
     starts.add((id: request, prompt: prompt));
     if (uncertainStart) {
@@ -76,9 +87,11 @@ class FixtureCommands implements AgentCommands {
   Future<AgentRunView> approve(
     String request,
     String operation,
-    String digest,
-  ) async {
+    String digest, {
+    bool create = false,
+  }) async {
     events.add('approve');
+    approvedAsCreation = create;
     expect(operation, 'fixture-operation');
     expect(digest, 'fixture-digest');
     if (rejectApproval) {
@@ -146,8 +159,9 @@ const workspace = WorkspaceView(
 );
 Future<AgentController> show(
   WidgetTester tester,
-  FixtureCommands commands,
-) async {
+  FixtureCommands commands, {
+  List<CreationAccessView> creations = const [],
+}) async {
   tester.view.resetPhysicalSize();
   tester.view.physicalSize = const Size(1100, 1500);
   tester.view.devicePixelRatio = 1;
@@ -166,6 +180,7 @@ Future<AgentController> show(
           child: AgentPanel(
             controller: controller,
             workspaces: const [workspace],
+            creations: creations,
           ),
         ),
       ),
@@ -192,7 +207,75 @@ Future<void> submit(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+const createAccess = CreationAccessView(
+  consentId: 'create-consent',
+  workspaceId: 'fixture-workspace',
+  displayPath: '/owned/fixture',
+  permissionVersion: '1',
+  permissionActive: true,
+  sessionToken: 'write-token',
+);
+
 void main() {
+  testWidgets(
+    'creation is default off and exact content uses separate approval',
+    (tester) async {
+      final commands = FixtureCommands()
+        ..toolName = 'write_file'
+        ..argumentsJson = '{"path":"new.txt","content":"line one\\nline two"}';
+      final controller = await show(
+        tester,
+        commands,
+        creations: const [createAccess],
+      );
+      final checkbox = find.widgetWithText(CheckboxListTile, '允许提出新建文件请求');
+      expect(tester.widget<CheckboxListTile>(checkbox).value, isFalse);
+      await controller.start(
+        workspace.workspaceId,
+        'Create new.txt',
+        creation: createAccess,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('new.txt'), findsOneWidget);
+      expect(find.text('line one\nline two'), findsOneWidget);
+      expect(commands.events.where((e) => e == 'approve'), isEmpty);
+      await tester.ensureVisible(find.text('批准新建这个文件'));
+      await tester.tap(find.text('批准新建这个文件'));
+      await tester.pumpAndSettle();
+      expect(commands.approvedAsCreation, isTrue);
+      expect(controller.view!.phase, 'completed');
+      controller.creationStopping('unrelated-consent');
+      expect(controller.view, isNotNull);
+      controller.creationStopping(createAccess.consentId);
+      expect(controller.view, isNull);
+    },
+  );
+  testWidgets(
+    'creation retry keeps exact consent and malformed preview cannot be approved',
+    (tester) async {
+      final commands = FixtureCommands()
+        ..uncertainStart = true
+        ..toolName = 'write_file'
+        ..argumentsJson = '{"path":"new.txt","content":false}';
+      final controller = await show(
+        tester,
+        commands,
+        creations: const [createAccess],
+      );
+      await controller.start(
+        workspace.workspaceId,
+        'Create',
+        creation: createAccess,
+      );
+      expect(controller.startUnconfirmed, isTrue);
+      await controller.retryStart();
+      await tester.pumpAndSettle();
+      expect(commands.creationStarts, ['create-consent:1', 'create-consent:1']);
+      expect(controller.supportedPreview, isFalse);
+      await controller.approveFirst();
+      expect(commands.events.where((e) => e == 'approve'), isEmpty);
+    },
+  );
   for (final entry in <String, String>{
     'search_files': '{"path":".","glob":"**/*.rs","limit":20}',
     'search_text':
@@ -244,21 +327,26 @@ void main() {
       },
     );
   }
-  testWidgets('unknown future tool cannot inherit a read-only approval UI', (
-    tester,
-  ) async {
-    final commands = FixtureCommands()..toolName = 'write_file';
-    final controller = await show(tester, commands);
-    await submit(tester);
-    expect(controller.supportedPreview, isFalse);
-    await controller.approveFirst();
-    expect(commands.events, ['connect', 'start', 'advance']);
-    final button = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, '批准这一次读取'),
-    );
-    expect(button.onPressed, isNull);
-    expect(find.textContaining('无法批准此工具权限'), findsOneWidget);
-  });
+  for (final unsupported in {
+    'write_file': '批准新建这个文件',
+    'future_tool': '批准这一次读取',
+  }.entries) {
+    testWidgets('${unsupported.key} cannot inherit a readonly approval UI', (
+      tester,
+    ) async {
+      final commands = FixtureCommands()..toolName = unsupported.key;
+      final controller = await show(tester, commands);
+      await submit(tester);
+      expect(controller.supportedPreview, isFalse);
+      await controller.approveFirst();
+      expect(commands.events, ['connect', 'start', 'advance']);
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, unsupported.value),
+      );
+      expect(button.onPressed, isNull);
+      expect(find.textContaining('无法批准此工具权限'), findsOneWidget);
+    });
+  }
   testWidgets(
     'proposal stops at an immutable preview until the actual approve button is pressed',
     (tester) async {

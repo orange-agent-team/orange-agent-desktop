@@ -17,7 +17,24 @@ use std::{
 };
 use tokio::sync::{oneshot, watch};
 
+mod creation;
+pub(crate) use creation::{signal_creation_release, signal_creation_revoke};
+pub(crate) struct CreationSignal {
+    pub workspace: String,
+    pub version: String,
+    pub token: String,
+    pub grant: orange_agent_runtime::workspace::creation::CreateFileGrant,
+    pub revoker: orange_agent_runtime::workspace::creation::CreationRevoker,
+    pub available: Arc<AtomicBool>,
+}
+impl CreationSignal {
+    fn suspend(&self) {
+        self.available.store(false, Ordering::Release);
+        self.grant.request_revoke();
+    }
+}
 pub(crate) struct RunSignal {
+    pub creation_id: Option<String>,
     pub workspace: String,
     pub cancel: watch::Sender<bool>,
     pub grant: WorkspaceGrant,
@@ -33,6 +50,8 @@ pub(crate) struct Signals {
     pub workspaces: HashMap<String, WorkspaceSignal>,
     pub runs: HashMap<String, RunSignal>,
     pub closed_selections: HashSet<String>,
+    pub creations: HashMap<String, CreationSignal>,
+    pub closed_creation_selections: HashSet<String>,
     pub service: Option<crate::service::Client>,
     pub imports: HashMap<String, (String, watch::Sender<bool>)>,
     pub closed_imports: HashSet<String>,
@@ -44,6 +63,9 @@ impl Signals {
         }
         for (_, cancel) in self.imports.values() {
             cancel.send_replace(true);
+        }
+        for creation in self.creations.values() {
+            creation.suspend();
         }
         for workspace in self.workspaces.values() {
             workspace.revoker.request_revoke();
@@ -346,6 +368,13 @@ pub(crate) fn signal_revoke(
             return Err(failure("WORKSPACE_CONFLICT"));
         }
         current.revoker.request_revoke();
+        for creation in signals
+            .creations
+            .values()
+            .filter(|c| c.workspace == workspace)
+        {
+            creation.suspend();
+        }
         for run in signals
             .runs
             .values()
@@ -375,6 +404,13 @@ pub(crate) fn signal_suspend(
             return Err(failure("WORKSPACE_SESSION_CHANGED"));
         }
         current.grant.request_revoke();
+        for creation in signals
+            .creations
+            .values()
+            .filter(|c| c.workspace == workspace)
+        {
+            creation.suspend();
+        }
         for run in signals
             .runs
             .values()
@@ -418,6 +454,9 @@ pub(crate) fn signal_release_selection(
     if let Some(id) = &workspace {
         if let Some(current) = signals.workspaces.get(id) {
             current.grant.request_revoke();
+        }
+        for creation in signals.creations.values().filter(|c| &c.workspace == id) {
+            creation.suspend();
         }
         for run in signals.runs.values().filter(|run| &run.workspace == id) {
             run.grant.request_revoke();

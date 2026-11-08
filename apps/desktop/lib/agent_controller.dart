@@ -15,9 +15,15 @@ abstract interface class AgentCommands {
     String id,
     String prompt, {
     bool allowQuestions = false,
+    api.CreationAccessView? creation,
   });
   Future<api.AgentRunView> inspect(String id);
-  Future<api.AgentRunView> approve(String id, String operation, String digest);
+  Future<api.AgentRunView> approve(
+    String id,
+    String operation,
+    String digest, {
+    bool create = false,
+  });
   Future<api.AgentRunView> answer(
     String id,
     String question,
@@ -42,7 +48,18 @@ class NativeAgentCommands implements AgentCommands {
     String id,
     String prompt, {
     bool allowQuestions = false,
-  }) => allowQuestions
+    api.CreationAccessView? creation,
+  }) => creation != null
+      ? api.startCreationRun(
+          handle: handle,
+          workspaceId: workspace,
+          requestId: id,
+          prompt: prompt,
+          consentId: creation.consentId,
+          permissionVersion: creation.permissionVersion,
+          userQuestions: allowQuestions,
+        )
+      : allowQuestions
       ? api.startInteractiveRun(
           handle: handle,
           workspaceId: workspace,
@@ -62,13 +79,21 @@ class NativeAgentCommands implements AgentCommands {
   Future<api.AgentRunView> approve(
     String id,
     String operation,
-    String digest,
-  ) => api.approveTool(
-    handle: handle,
-    runId: id,
-    operationId: operation,
-    expectedDigest: digest,
-  );
+    String digest, {
+    bool create = false,
+  }) => create
+      ? api.approveCreationTool(
+          handle: handle,
+          runId: id,
+          operationId: operation,
+          expectedDigest: digest,
+        )
+      : api.approveTool(
+          handle: handle,
+          runId: id,
+          operationId: operation,
+          expectedDigest: digest,
+        );
   @override
   Future<api.AgentRunView> answer(
     String id,
@@ -97,7 +122,30 @@ const supportedReadTools = <String, String>{
   'search_text': '搜索文本',
 };
 
-String toolDisplayName(String name) => supportedReadTools[name] ?? name;
+String toolDisplayName(String name) =>
+    name == 'write_file' ? '新建文件' : supportedReadTools[name] ?? name;
+
+({String path, String content})? parseCreationPreview(String arguments) {
+  try {
+    final value = jsonDecode(arguments);
+    if (value is! Map<String, dynamic> ||
+        value.length != 2 ||
+        value['path'] is! String ||
+        value['content'] is! String) {
+      return null;
+    }
+    final path = value['path'] as String, content = value['content'] as String;
+    if (path.isEmpty ||
+        utf8.encode(path).length > 4096 ||
+        utf8.encode(content).length > 65536 ||
+        content.contains('\u0000')) {
+      return null;
+    }
+    return (path: path, content: content);
+  } catch (_) {
+    return null;
+  }
+}
 
 class AgentController extends ChangeNotifier {
   AgentController(this.commands, {required this.serviceDirectory});
@@ -109,7 +157,13 @@ class AgentController extends ChangeNotifier {
   bool busy = false, connecting = false, cancelling = false;
   bool _alive = true;
   int _epoch = 0;
-  ({String workspace, String id, String prompt, bool allowQuestions})?
+  ({
+    String workspace,
+    String id,
+    String prompt,
+    bool allowQuestions,
+    api.CreationAccessView? creation,
+  })?
   _submission;
   bool get startUnconfirmed => _submission != null;
   bool get active =>
@@ -130,13 +184,28 @@ class AgentController extends ChangeNotifier {
   bool get supportedPreview =>
       view != null &&
       view!.pending.isNotEmpty &&
-      supportedReadTools.containsKey(view!.pending.first.toolName);
+      (supportedReadTools.containsKey(view!.pending.first.toolName) ||
+          (view!.pending.first.toolName == 'write_file' &&
+              view!.creationConsentId != null &&
+              parseCreationPreview(view!.pending.first.argumentsJson) != null));
   String get approvalLabel =>
-      view != null &&
-          view!.pending.isNotEmpty &&
-          {'search_files', 'search_text'}.contains(view!.pending.first.toolName)
+      view?.pending.firstOrNull?.toolName == 'write_file'
+      ? '批准新建这个文件'
+      : view != null &&
+            view!.pending.isNotEmpty &&
+            {
+              'search_files',
+              'search_text',
+            }.contains(view!.pending.first.toolName)
       ? '批准这一次搜索'
       : '批准这一次读取';
+  void creationStopping(String consentId) {
+    if (view?.creationConsentId == consentId ||
+        _submission?.creation?.consentId == consentId) {
+      hideContent(stoppingWorkspace: workspaceId);
+    }
+  }
+
   bool _current(int epoch) => _alive && epoch == _epoch;
   void _changed() {
     if (_alive) notifyListeners();
@@ -172,6 +241,7 @@ class AgentController extends ChangeNotifier {
     String workspace,
     String prompt, {
     bool allowQuestions = false,
+    api.CreationAccessView? creation,
   }) async {
     if (busy ||
         cancelling ||
@@ -188,6 +258,7 @@ class AgentController extends ChangeNotifier {
       id: id,
       prompt: prompt,
       allowQuestions: allowQuestions,
+      creation: creation,
     );
     workspaceId = workspace;
     runId = id;
@@ -209,6 +280,7 @@ class AgentController extends ChangeNotifier {
         submission.id,
         submission.prompt,
         allowQuestions: submission.allowQuestions,
+        creation: submission.creation,
       );
       if (!_current(epoch)) return;
       _submission = null;
@@ -323,6 +395,7 @@ class AgentController extends ChangeNotifier {
         current.runId,
         preview.operationId,
         preview.argumentDigest,
+        create: preview.toolName == 'write_file',
       );
       if (!_current(epoch)) return;
       // One explicit approval permits one requested transition, never a batch

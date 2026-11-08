@@ -36,6 +36,7 @@ class QuestionCommands extends base.FixtureCommands {
     String request,
     String prompt, {
     bool allowQuestions = false,
+    CreationAccessView? creation,
   }) async {
     expect(
       allowQuestions,
@@ -47,6 +48,7 @@ class QuestionCommands extends base.FixtureCommands {
       request,
       prompt,
       allowQuestions: allowQuestions,
+      creation: creation,
     );
   }
 

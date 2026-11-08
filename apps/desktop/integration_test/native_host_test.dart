@@ -30,9 +30,10 @@ Future<HostView> reopenHost(String directory) async {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async => RustLib.init());
-  for (final askFirst in [false, true]) {
+  for (final scenario in [(false, false), (true, false), (false, true)]) {
+    final (askFirst, createAfterRead) = scenario;
     testWidgets(
-      'native UI approval and questions=$askFirst use real private IPC and filesystem with explicit model fixture',
+      'native UI approval questions=$askFirst creation=$createAfterRead use real private IPC and filesystem with explicit model fixture',
       (tester) async {
         final directory = await Directory.systemTemp.createTemp(
           'orange-agent-ui-',
@@ -47,11 +48,13 @@ void main() {
         String? handle;
         const channel = MethodChannel('orange_agent/platform');
         final released = Completer<void>();
+        final creationReleased = Completer<void>();
         try {
           final fixture = await LocalModelFixture.start(
             directory,
             sentinel,
             askFirst: askFirst,
+            createAfterRead: createAfterRead,
           );
           runningFixture = fixture;
           final host = await reopenHost(directory.path);
@@ -63,6 +66,30 @@ void main() {
                     'selectionId': 'native-run-scope',
                     'path': workspace.path,
                   };
+                }
+                if (call.method == 'chooseCreationWorkspace' &&
+                    createAfterRead) {
+                  return <String, String>{
+                    'selectionId': 'native-create-scope',
+                    'path': workspace.path,
+                  };
+                }
+                if (call.method == 'releaseCreationSelection' &&
+                    createAfterRead) {
+                  final workspaces = await listWorkspaces(
+                    handle: host.handle,
+                    includeRevoked: false,
+                  );
+                  final rows = await listCreationAccess(
+                    handle: host.handle,
+                    workspaceId: workspaces.single.workspaceId,
+                  );
+                  expect(rows.single.permissionActive, isTrue);
+                  expect(rows.single.sessionToken, isNull);
+                  if (!creationReleased.isCompleted) {
+                    creationReleased.complete();
+                  }
+                  return null;
                 }
                 if (call.method == 'releaseWorkspaceSelection') {
                   final rows = await listWorkspaces(
@@ -86,6 +113,11 @@ void main() {
           await tester.ensureVisible(find.text('选择文件夹'));
           await tester.tap(find.text('选择文件夹'));
           await tester.pumpAndSettle();
+          if (createAfterRead) {
+            await tester.ensureVisible(find.text('选择文件夹以允许新建'));
+            await tester.tap(find.text('选择文件夹以允许新建'));
+            await tester.pumpAndSettle();
+          }
           await tester.ensureVisible(find.text('连接本地模型'));
           await tester.tap(find.text('连接本地模型'));
           await tester.pumpAndSettle();
@@ -103,6 +135,19 @@ void main() {
           if (askFirst) {
             await tester.ensureVisible(find.text('允许任务询问补充信息'));
             await tester.tap(find.text('允许任务询问补充信息'));
+            await tester.pump();
+          }
+          if (createAfterRead) {
+            expect(
+              tester
+                  .widget<CheckboxListTile>(
+                    find.widgetWithText(CheckboxListTile, '允许提出新建文件请求'),
+                  )
+                  .value,
+              isFalse,
+            );
+            await tester.ensureVisible(find.text('允许提出新建文件请求'));
+            await tester.tap(find.text('允许提出新建文件请求'));
             await tester.pump();
           }
           await tester.ensureVisible(find.text('开始会话'));
@@ -139,12 +184,32 @@ void main() {
           await tester.tap(find.text('批准这一次读取'));
           await tester.pumpAndSettle();
           expect(fixture.failures, isEmpty);
-          expect(fixture.calls, askFirst ? 3 : 2);
+          if (createAfterRead) {
+            expect(fixture.calls, 2);
+            expect(
+              await File('${workspace.path}/created.txt').exists(),
+              isFalse,
+            );
+            expect(find.text('created.txt'), findsOneWidget);
+            expect(find.text(sentinel), findsOneWidget);
+            await tester.ensureVisible(find.text('批准新建这个文件'));
+            await tester.tap(find.text('批准新建这个文件'));
+            await tester.pumpAndSettle();
+            expect(
+              await File('${workspace.path}/created.txt').readAsString(),
+              sentinel,
+            );
+          }
+          expect(fixture.calls, (askFirst ? 3 : 2) + (createAfterRead ? 1 : 0));
           expect(
             find.text('Native fixture observed: $sentinel'),
             findsOneWidget,
           );
-          await source.delete();
+          if (createAfterRead) {
+            await File('${workspace.path}/created.txt').delete();
+          } else {
+            await source.delete();
+          }
           await tester.ensureVisible(find.text('核对状态'));
           await tester.tap(find.text('核对状态'));
           await tester.pumpAndSettle();
@@ -152,6 +217,9 @@ void main() {
           expect(find.textContaining('来源文件已改变'), findsOneWidget);
           await tester.pumpWidget(const SizedBox.shrink());
           await released.future.timeout(const Duration(seconds: 3));
+          if (createAfterRead) {
+            await creationReleased.future.timeout(const Duration(seconds: 3));
+          }
         } finally {
           await tester.pumpWidget(const SizedBox.shrink());
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

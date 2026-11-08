@@ -28,17 +28,18 @@ class MainFlutterWindow: NSWindow {
         ])
         return
       }
-      if call.method == "chooseWorkspace" || call.method == "chooseModelFile" {
+      if call.method == "chooseWorkspace" || call.method == "chooseModelFile" || call.method == "chooseCreationWorkspace" {
         guard !self.pickerActive else { result(FlutterError(code: "PICKER_BUSY", message: nil, details: nil)); return }
         self.pickerActive = true
         let panel = NSOpenPanel()
         let modelSelection = call.method == "chooseModelFile"
+        let createSelection = call.method == "chooseCreationWorkspace"
         panel.canChooseDirectories = !modelSelection
         panel.canChooseFiles = modelSelection
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        panel.prompt = modelSelection ? "导入模型" : "允许只读访问"
-        panel.message = modelSelection ? "请选择清单对应的 GGUF 文件。仅在大小与摘要校验通过后复制到应用缓存，不修改原文件。" : "请选择 Orange Agent 可读取的工作区。不会授予写入或执行程序的权限。"
+        panel.prompt = modelSelection ? "导入模型" : (createSelection ? "允许提出新建请求" : "允许 Agent 读取")
+        panel.message = modelSelection ? "请选择清单对应的 GGUF 文件。仅在大小与摘要校验通过后复制到应用缓存，不修改原文件。" : (createSelection ? "请选择与工作区相同的文件夹。Agent 只能在单独批准后创建新文件，不会覆盖现有文件。" : "请选择 Agent 可读取的工作区。本次仅开启 Agent 只读工具；文件创建需要另行授权，执行程序不在此权限内。")
         if modelSelection { panel.allowedContentTypes = [UTType(filenameExtension: "gguf") ?? .data] }
         panel.beginSheetModal(for: self) { response in
           self.pickerActive = false
@@ -51,7 +52,7 @@ class MainFlutterWindow: NSWindow {
         }
         return
       }
-      if call.method == "releaseWorkspaceSelection" || call.method == "releaseModelSelection" {
+      if call.method == "releaseWorkspaceSelection" || call.method == "releaseModelSelection" || call.method == "releaseCreationSelection" {
         guard let arguments = call.arguments as? [String: Any], let id = arguments["selectionId"] as? String else {
           result(FlutterError(code: "INVALID_SELECTION", message: nil, details: nil)); return
         }
