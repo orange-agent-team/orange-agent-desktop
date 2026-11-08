@@ -307,8 +307,15 @@
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = ();
-			inputPaths = ();
-			outputPaths = ();
+			inputPaths = (
+				"$(DERIVED_FILE_DIR)/orange-flutter-embedded.stamp",
+				"$(SRCROOT)/../../../scripts/embed-model-service.py",
+				"$(SRCROOT)/../../../scripts/model_bundle.py",
+				"$(SRCROOT)/../../../config/runtime.lock.json",
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/orange-model-embed.json",
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "python3 \"$SRCROOT/../../../scripts/embed-model-service.py\" \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH\" \"$CONFIGURATION\"\n";
@@ -326,10 +333,11 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(DERIVED_FILE_DIR)/orange-flutter-embedded.stamp",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"$PRODUCT_NAME.app\" > \"$PROJECT_DIR\"/Flutter/ephemeral/.app_filename && \"$FLUTTER_ROOT\"/packages/flutter_tools/bin/macos_assemble.sh embed\n";
+			shellScript = "set -e\nprintf '%s\\n' \"$PRODUCT_NAME.app\" > \"$PROJECT_DIR\"/Flutter/ephemeral/.app_filename\n\"$FLUTTER_ROOT\"/packages/flutter_tools/bin/macos_assemble.sh embed\nmkdir -p \"$DERIVED_FILE_DIR\"\ntouch \"$DERIVED_FILE_DIR/orange-flutter-embedded.stamp\"\n";
 		};
 		33CC111E2044C6BF0003C045 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;

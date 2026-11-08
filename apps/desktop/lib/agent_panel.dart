@@ -217,13 +217,7 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            pending[i].toolName == 'read_file'
-                                ? '读取文件'
-                                : pending[i].toolName == 'list_directory'
-                                ? '列出目录'
-                                : pending[i].toolName,
-                          ),
+                          Text(toolDisplayName(pending[i].toolName)),
                           SelectableText(pending[i].argumentsJson),
                           ExpansionTile(
                             title: const Text('操作标识与内容校验'),
@@ -244,7 +238,7 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                                           !controller.supportedPreview
                                       ? null
                                       : controller.approveFirst,
-                                  child: const Text('批准这一次读取'),
+                                  child: Text(controller.approvalLabel),
                                 ),
                                 TextButton(
                                   onPressed: controller.cancelling

@@ -155,12 +155,17 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          '376f8832dc5ccb14f393717fd9c4cfbb1310f196',
+          '58471251d1adce139a31f78cd3f5b57f6cbf4a6f',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(
           host.availableReadTools,
-          unorderedEquals(['read_file', 'list_directory']),
+          unorderedEquals([
+            'read_file',
+            'list_directory',
+            'search_files',
+            'search_text',
+          ]),
         );
         final duplicate = await initializeHost(
           applicationDataDirectory: directory.path,

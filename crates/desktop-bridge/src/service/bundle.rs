@@ -22,7 +22,7 @@ pub(crate) struct Bundle {
 pub(super) fn catalog() -> Result<Value, BridgeError> {
     serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../vendor/runtime-376f883/config/local-model.lock.json"
+        "/../../vendor/runtime-5847125/config/local-model.lock.json"
     )))
     .map_err(|_| failure("MODEL_CATALOG_INVALID"))
 }

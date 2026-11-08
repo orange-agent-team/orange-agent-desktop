@@ -25,6 +25,7 @@ Future<void> confirmedCleanup(
   String? handle,
   List<Directory> directories, {
   bool noHandleStopped = true,
+  bool retainFixtures = false,
 }) async {
   var confirmed = handle == null && noHandleStopped;
   try {
@@ -61,10 +62,17 @@ Future<void> confirmedCleanup(
     }
   } finally {
     if (handle != null) await closeHost(handle: handle);
-    if (confirmed) {
+    if (confirmed && !retainFixtures) {
       for (final directory in directories) {
         await directory.delete(recursive: true);
       }
+    } else if (confirmed) {
+      debugPrint(
+        jsonEncode({
+          'managedFailureFixtures': directories.map((d) => d.path).toList(),
+          'modelStopped': true,
+        }),
+      );
     } else {
       debugPrint(
         'Managed fixture retained because model cleanup was not confirmed',
@@ -84,6 +92,38 @@ Future<void> until(WidgetTester tester, bool Function() condition) async {
     await tester.pump(const Duration(milliseconds: 100));
   }
   expect(condition(), isTrue, reason: 'bounded native model/UI transition');
+}
+
+Future<void> enterEditablePrompt(WidgetTester tester, String value) async {
+  await until(
+    tester,
+    () => !tester.widget<TextField>(find.byType(TextField)).readOnly,
+  );
+  await tester.ensureVisible(find.byType(TextField));
+  // A readonly transition closes native text input while the test binding can
+  // retain the same focusedEditable. Reopen through the real tap gesture.
+  await tester.tap(find.byType(TextField));
+  await tester.pump();
+  expect(
+    tester
+        .widget<EditableText>(
+          find.descendant(
+            of: find.byType(TextField),
+            matching: find.byType(EditableText),
+          ),
+        )
+        .focusNode
+        .hasFocus,
+    isTrue,
+    reason: 'typing requires focus on the actual editable field',
+  );
+  await tester.enterText(find.byType(TextField), value);
+  await tester.pump();
+  expect(
+    tester.widget<TextField>(find.byType(TextField)).controller!.text,
+    value,
+    reason: 'the exact new prompt must be visible before starting a run',
+  );
 }
 
 void main() {
@@ -397,6 +437,8 @@ void main() {
       final sentinel = 'MANAGED_UI_${DateTime.now().microsecondsSinceEpoch}';
       await File('${workspace.path}/proof.txt').writeAsString(sentinel);
       String? handle;
+      var uiCompleted = false;
+      var stage = 'setup';
       try {
         final host = await reopen(data.path);
         handle = host.handle;
@@ -472,8 +514,8 @@ void main() {
         await tester.tap(find.text(workspace.path).last);
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.byType(TextField));
-        await tester.enterText(
-          find.byType(TextField),
+        await enterEditablePrompt(
+          tester,
           'Use read_file to read proof.txt with relative path proof.txt. After the tool result, answer with the exact file text.',
         );
         await tester.pump();
@@ -487,6 +529,80 @@ void main() {
           tester,
           () => find.textContaining(sentinel).evaluate().isNotEmpty,
         );
+        stage = 'prepare-second-search';
+        final searchSentinel =
+            'ORANGE_EVIDENCE_${DateTime.now().microsecondsSinceEpoch}';
+        await File('${workspace.path}/proof.txt')
+            .writeAsString('$searchSentinel\n');
+        await tester.ensureVisible(find.byType(TextField));
+        await enterEditablePrompt(
+          tester,
+          'Call search_text with exactly these arguments: {"path":".","query":"ORANGE_EVIDENCE_"}. Do not add optional fields. Do not call read_file. Wait for the search result. Then answer with the exact complete matching line text from its excerpt. Do not invent or shorten the content.',
+        );
+        await tester.pump();
+        await tester.ensureVisible(find.text('开始会话'));
+        stage = 'start-second-search';
+        expect(
+          tester
+              .widget<FilledButton>(find.widgetWithText(FilledButton, '开始会话'))
+              .onPressed,
+          isNotNull,
+          reason: 'a completed first run must allow a new search',
+        );
+        await tester.tap(find.text('开始会话'));
+        stage = 'await-search-approval';
+        await until(
+          tester,
+          () =>
+              find.text('批准这一次搜索').evaluate().isNotEmpty &&
+              tester
+                      .widget<FilledButton>(
+                        find.widgetWithText(FilledButton, '批准这一次搜索'),
+                      )
+                      .onPressed !=
+                  null,
+        );
+        expect(find.text('搜索文本'), findsOneWidget);
+        expect(find.textContaining(searchSentinel), findsNothing);
+        final searchRun = (await listRuns(
+          handle: host.handle,
+          limit: 100,
+        )).runs.where((run) => run.phase == 'tools_pending').single;
+        final searchPreview = await inspectRun(
+          handle: host.handle,
+          runId: searchRun.runId,
+        );
+        expect(searchPreview.pending.length, 1);
+        expect(searchPreview.pending.single.toolName, 'search_text');
+        final searchArguments = jsonDecode(
+          searchPreview.pending.single.argumentsJson,
+        ) as Map<String, dynamic>;
+        expect(searchArguments['path'], '.');
+        expect(searchArguments['query'], 'ORANGE_EVIDENCE_');
+        expect(searchArguments['regular_expression'] == true, isFalse);
+        await tester.ensureVisible(find.text('批准这一次搜索'));
+        await tester.tap(find.text('批准这一次搜索'));
+        stage = 'await-search-result';
+        await until(
+          tester,
+          () => find.textContaining(searchSentinel).evaluate().isNotEmpty,
+        );
+        expect(
+          (await inspectRun(
+            handle: host.handle,
+            runId: searchRun.runId,
+          )).finalText,
+          contains(searchSentinel),
+        );
+        stage = 'source-deletion-refresh';
+        await File('${workspace.path}/proof.txt').delete();
+        await tester.ensureVisible(find.text('核对状态'));
+        await tester.tap(find.text('核对状态'));
+        await until(
+          tester,
+          () => find.textContaining('来源文件已改变').evaluate().isNotEmpty,
+        );
+        expect(find.textContaining(searchSentinel), findsNothing);
         await tester.ensureVisible(find.text('停止本地模型'));
         await tester.tap(find.text('停止本地模型'));
         await until(tester, () => find.text('服务已停止').evaluate().isNotEmpty);
@@ -503,16 +619,79 @@ void main() {
             'actualModel': true,
             'explicitToolApproval': true,
             'resultMatched': true,
+            'actualTextSearch': true,
+            'exactSearchScopeApproved': true,
+            'deletedSearchSourceCleared': true,
             'modelStopped': true,
             'nativeSelectorCallbacks':
                 'explicit test-owned file/directory fixtures',
           }),
         );
+        uiCompleted = true;
+      } catch (error) {
+        try {
+          final runs = handle == null
+              ? <RunSummary>[]
+              : (await listRuns(
+                  handle: handle,
+                  limit: 20,
+                ).timeout(const Duration(seconds: 2))).runs;
+          final details = <Map<String, Object?>>[];
+          for (final row in runs) {
+            final detail = <String, Object?>{
+              'run': row.runId,
+              'phase': row.phase,
+              'steps': row.steps,
+              'invocations': row.invocations,
+            };
+            try {
+              final view = await inspectRun(
+                handle: handle!,
+                runId: row.runId,
+              ).timeout(const Duration(seconds: 2));
+              detail['failure'] = view.failure;
+              detail['pending'] = view.pending
+                  .map(
+                    (p) => {'tool': p.toolName, 'arguments': p.argumentsJson},
+                  )
+                  .toList();
+            } on BridgeError catch (failure) {
+              detail['viewError'] = failure.code;
+            }
+            details.add(detail);
+          }
+          final labels = tester
+              .widgetList<Text>(find.byType(Text))
+              .map((w) => w.data)
+              .whereType<String>()
+              .where(
+                (text) => RegExp('操作|来源|授权|隐藏|停止|已完成|需要|未知|没有').hasMatch(text),
+              )
+              .take(30)
+              .toList();
+          debugPrint(
+            jsonEncode({
+              'managedUiFailureStage': stage,
+              'exceptionType': error.runtimeType.toString(),
+              'runs': details,
+              'statusLabels': labels,
+            }),
+          );
+        } catch (diagnosticError) {
+          debugPrint(
+            'Managed UI diagnostics unavailable at $stage: ${diagnosticError.runtimeType}',
+          );
+        }
+        rethrow;
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(platform, null);
-        await confirmedCleanup(handle, [data, ipc, workspace]);
+        await confirmedCleanup(handle, [
+          data,
+          ipc,
+          workspace,
+        ], retainFixtures: !uiCompleted);
       }
     },
   );

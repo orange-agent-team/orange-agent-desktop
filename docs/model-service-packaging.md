@@ -18,6 +18,14 @@
 
 ## 应用包布局
 
+### 嵌入依赖与增量签名
+
+Flutter嵌入步骤输出DerivedSources中的完成标记，模型嵌入步骤显式依赖该标记，并输出`Contents/Resources/orange-model-embed.json`。后者记录当前Runtime、模型清单及已嵌入框架的二进制/资源封装摘要，让测试权重、Dart目标或Native Assets变化进入构建依赖分析。无模型组件时也生成明确的空组件标记。
+
+这是构建依赖记录，不是执行授权或签名替代品。仍由Xcode完成外层签名，`check-flutter.py`保留`codesign --verify --deep --strict`，不对失配资源临时重新签名来制造通过。测试包恢复为普通包的切换须单独验收。依据：[Apple构建脚本的输入输出声明](https://developer.apple.com/documentation/xcode/running-custom-scripts-during-a-build)、[构建阶段的依赖顺序](https://developer.apple.com/documentation/xcode/customizing-the-build-phases-of-a-target)。
+
+2026-11-08：上述完整切换已实际通过，默认组件清单摘要为020bdf69cd802ade78c557fbb464db130f338ec9a738cce9157d9978907e1dc4；无测试权重，资源标记与当前框架/组件一致，严格签名和原沙箱只读权限检查通过。这仍是开发制品，不是生产签名或公证。
+
 | 路径 | 内容 |
 | --- | --- |
 | `Contents/Helpers/orange-model-host` | Rust模型宿主，父控制认证、心跳、退出与监督 |

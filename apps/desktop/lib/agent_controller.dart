@@ -54,6 +54,15 @@ class NativeAgentCommands implements AgentCommands {
       api.cancelRun(handle: handle, runId: id);
 }
 
+const supportedReadTools = <String, String>{
+  'read_file': '读取文件',
+  'list_directory': '列出目录',
+  'search_files': '搜索文件',
+  'search_text': '搜索文本',
+};
+
+String toolDisplayName(String name) => supportedReadTools[name] ?? name;
+
 class AgentController extends ChangeNotifier {
   AgentController(this.commands, {required this.serviceDirectory});
   final AgentCommands commands;
@@ -84,7 +93,13 @@ class AgentController extends ChangeNotifier {
   bool get supportedPreview =>
       view != null &&
       view!.pending.isNotEmpty &&
-      {'read_file', 'list_directory'}.contains(view!.pending.first.toolName);
+      supportedReadTools.containsKey(view!.pending.first.toolName);
+  String get approvalLabel =>
+      view != null &&
+          view!.pending.isNotEmpty &&
+          {'search_files', 'search_text'}.contains(view!.pending.first.toolName)
+      ? '批准这一次搜索'
+      : '批准这一次读取';
   bool _current(int epoch) => _alive && epoch == _epoch;
   void _changed() {
     if (_alive) notifyListeners();

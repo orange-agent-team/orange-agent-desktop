@@ -1,5 +1,9 @@
 # 本地模型安装与受管生命周期
 
+当前升级记录（2026-11-08）：固定Runtime5847125提供read_file、list_directory、search_files和search_text，UI仍逐请求明确批准。Rust Bridge在查询/恢复前重验当前源，已覆盖搜索后删除及同长度隐藏行变化。真实沙箱模型UI定向验证通过连续read→search_text、精确输入/范围批准、结果和删除后清屏；完整套件及默认发行包以最新执行台账为准。开发0.5B模型的精确filename任务在服务端资格探测中失败3次并被拒绝批准，不宣称所有工具/模型质量均获认证。
+
+`check-managed-model.py --ui-search-only --model PATH`仅运行实际UI搜索子用例，并要求search/deletion通过标记；它不包含35秒心跳与恢复案例。不加该参数运行完整套件。临时测试权重由finally恢复为原组件包，最终分发构建须再运行check-flutter.py。
+
 2026-11-05。当前实现面向固定Qwen GGUF与macOS ARM64 CPU后端，是可验证的开发功能切片。真实沙箱应用已完成安装、启动、空闲心跳、Agent工具批准与停止；下载/卸载、孤儿进程核对、其他后端/OS/GPU和生产签名仍未完成。
 
 ## 构建与信任边界

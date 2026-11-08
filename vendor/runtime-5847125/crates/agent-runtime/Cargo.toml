@@ -1,0 +1,30 @@
+[package]
+name = "orange-agent-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+orange-domain.workspace = true
+orange-protocol.workspace = true
+rusqlite.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+libc.workspace = true
+cap-std.workspace = true
+cap-fs-ext.workspace = true
+base64.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+orange-model-runtime = { path = "../model-runtime", version = "=0.1.0" }
+
+[lints]
+workspace = true

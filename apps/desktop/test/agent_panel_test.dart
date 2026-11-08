@@ -12,6 +12,7 @@ class FixtureCommands implements AgentCommands {
   final starts = <({String id, String prompt})>[];
   String id = 'fixture-run';
   String toolName = 'read_file';
+  String argumentsJson = '{"path":"proof.txt"}';
   int transition = 0;
   bool approved = false, rejectApproval = false, uncertainStart = false;
   Completer<AgentRunView>? advanceGate, inspectGate;
@@ -102,7 +103,7 @@ class FixtureCommands implements AgentCommands {
           ToolApprovalView(
             operationId: 'fixture-operation',
             toolName: toolName,
-            argumentsJson: '{"path":"proof.txt"}',
+            argumentsJson: argumentsJson,
             argumentDigest: 'fixture-digest',
           ),
         ],
@@ -181,6 +182,57 @@ Future<void> submit(WidgetTester tester) async {
 }
 
 void main() {
+  for (final entry in <String, String>{
+    'search_files': '{"path":".","glob":"**/*.rs","limit":20}',
+    'search_text':
+        '{"path":"src","query":"token","regular_expression":false,"limit":10}',
+  }.entries) {
+    testWidgets(
+      '${entry.key} displays the exact search preview and requires one explicit approval',
+      (tester) async {
+        final commands = FixtureCommands()
+          ..toolName = entry.key
+          ..argumentsJson = entry.value;
+        final controller = await show(tester, commands);
+        await submit(tester);
+        expect(controller.supportedPreview, isTrue);
+        expect(find.text(toolDisplayName(entry.key)), findsOneWidget);
+        expect(find.text(entry.value), findsOneWidget);
+        expect(commands.events, ['connect', 'start', 'advance']);
+        await tester.ensureVisible(find.text('批准这一次搜索'));
+        await tester.tap(find.text('批准这一次搜索'));
+        await tester.pumpAndSettle();
+        expect(commands.events, [
+          'connect',
+          'start',
+          'advance',
+          'approve',
+          'advance',
+          'advance',
+        ]);
+        expect(commands.events.where((event) => event == 'approve').length, 1);
+        expect(find.text('fixture result'), findsOneWidget);
+      },
+    );
+    testWidgets(
+      '${entry.key} cannot advance after its approved preview was rejected',
+      (tester) async {
+        final commands = FixtureCommands()
+          ..toolName = entry.key
+          ..argumentsJson = entry.value
+          ..rejectApproval = true;
+        final controller = await show(tester, commands);
+        await submit(tester);
+        await tester.ensureVisible(find.text('批准这一次搜索'));
+        await tester.tap(find.text('批准这一次搜索'));
+        await tester.pumpAndSettle();
+        expect(controller.view, isNull);
+        expect(commands.events.where((event) => event == 'advance').length, 1);
+        expect(find.text(entry.value), findsNothing);
+        expect(find.text('fixture result'), findsNothing);
+      },
+    );
+  }
   testWidgets('unknown future tool cannot inherit a read-only approval UI', (
     tester,
   ) async {

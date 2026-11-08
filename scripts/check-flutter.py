@@ -26,7 +26,7 @@ if not native.is_file():raise SystemExit('Native bridge framework was not bundle
 model_bundle=None
 if STAGED.exists():
     model_bundle=verify_embedded(app/'Contents')
-subprocess.run(['codesign','--verify','--deep','--strict',str(app)],check=True,capture_output=True)
+subprocess.run(['codesign','--verify','--deep','--strict','--verbose=2',str(app)],check=True)
 architectures=subprocess.check_output(['xcrun','lipo','-archs',str(binary)],text=True).strip().split()
 if 'arm64' not in architectures:raise SystemExit('Built app does not include the tested host architecture')
 report={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'flutter':lock['version'],'dart':lock['dart_version'],'framework_revision':lock['framework_revision'],'rust':json.loads((ROOT/'config/bridge-tools.lock.json').read_text())['rust'],'platform':'macos-arm64','app':str(app.relative_to(ROOT)),'architectures':architectures,'executable_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'native_bridge_sha256':hashlib.sha256(native.read_bytes()).hexdigest(),'certification':'local development build only; no production signing/notarization, Windows/Linux or Agent feature certification'}

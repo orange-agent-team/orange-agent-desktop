@@ -21,7 +21,9 @@ def invalidate_hook():
     if cache.exists():shutil.rmtree(cache)
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--model',type=Path,required=True);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--model',type=Path,required=True)
+    parser.add_argument('--ui-search-only',action='store_true',help='Target only the real UI search case; does not certify the separate lifecycle case')
+    args=parser.parse_args()
     original=verify_bundle(STAGED);regular(args.model)
     if args.model.stat().st_size!=original['model']['bytes'] or digest(args.model)!=original['model']['sha256']:
         raise RuntimeError('Explicit fixed test model differs from catalog')
@@ -37,14 +39,25 @@ def main():
     os.replace(STAGED,backup);os.replace(fixture,STAGED);invalidate_hook()
     try:
         environment,tools=tool_environment()
-        subprocess.run([str(tools['flutter']),'--suppress-analytics','test','integration_test/managed_model_test.dart','-d','macos','--no-pub'],cwd=APP,env=environment,check=True,timeout=900)
+        command=[str(tools['flutter']),'--suppress-analytics','test','integration_test/managed_model_test.dart','-d','macos','--no-pub']
+        if args.ui_search_only:
+            command+=['--plain-name','production model buttons import and start a real packaged model before explicit Agent tool approval']
+            result=subprocess.run(command,cwd=APP,env=environment,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=900)
+            print(result.stdout,end='',flush=True);result.check_returncode()
+            if '"actualTextSearch":true' not in result.stdout or '"deletedSearchSourceCleared":true' not in result.stdout or 'All tests passed!' not in result.stdout:
+                raise RuntimeError('Actual UI search/deletion acceptance did not run to completion')
+        else:
+            subprocess.run(command,cwd=APP,env=environment,check=True,timeout=900)
     finally:
         # Preserve both sides if unexpected concurrent edits occurred, rather
         # than erasing unknown changes or claiming a successful restoration.
         verify_bundle(STAGED)
         if digest(STAGED/'manifest.json')!=expected:raise RuntimeError('Test bundle changed unexpectedly; original retained at '+str(backup))
         shutil.rmtree(STAGED);os.replace(backup,STAGED);invalidate_hook();shutil.rmtree(temporary)
-    print('PASS actual packaged sandbox model import/start/35-second idle heartbeat and product UI approved file flow, instance fencing, Host-close cleanup, durable replay/cancel and unowned-process refusal. Native picker selections are explicit fixtures; no production signing, orphan reconciliation or broad hardware certificate')
+    if args.ui_search_only:
+        print('PASS actual packaged model UI read/text-search approval and source-deletion clearing; explicit owned selector fixtures. Separate lifecycle/35-second heartbeat case was not run by this targeted invocation')
+    else:
+        print('PASS actual packaged sandbox model import/start/35-second idle heartbeat and product UI approved file/text search with deleted-source clearing, instance fencing, Host-close cleanup, durable replay/cancel and unowned-process refusal. Native picker selections are explicit fixtures; no production signing, orphan reconciliation or broad hardware certificate')
 
 if __name__=='__main__':
     path=ROOT/'.local/model-bundle.lock'

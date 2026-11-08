@@ -11,6 +11,9 @@ struct ModelFixture {
     calls: AtomicUsize,
     waiting: bool,
     started: Notify,
+    tool: &'static str,
+    arguments: serde_json::Value,
+    expected_result: &'static str,
 }
 struct FixtureGateway(Arc<ModelFixture>);
 impl ModelGateway for FixtureGateway {
@@ -36,8 +39,8 @@ impl ModelGateway for FixtureGateway {
                     text: String::new(),
                     tool_calls: vec![ToolCall {
                         id: "fixture-read".into(),
-                        name: "read_file".into(),
-                        arguments: serde_json::json!({"path":"note.txt"}),
+                        name: self.0.tool.into(),
+                        arguments: self.0.arguments.clone(),
                     }],
                     native_usage: None,
                     finish_reason: "tool_calls".into(),
@@ -48,7 +51,7 @@ impl ModelGateway for FixtureGateway {
                     request
                         .messages
                         .iter()
-                        .any(|m| m.role == Role::Tool && m.content.contains("actual fixture data"))
+                        .any(|m| m.role == Role::Tool && m.content.contains(self.0.expected_result))
                 );
                 Ok(ResponseCandidate {
                     response_id: "fixture-final".into(),
@@ -62,10 +65,29 @@ impl ModelGateway for FixtureGateway {
     }
 }
 async fn install(handle: &str, waiting: bool) -> Arc<ModelFixture> {
+    install_tool(
+        handle,
+        waiting,
+        "read_file",
+        serde_json::json!({"path":"note.txt"}),
+        "actual fixture data",
+    )
+    .await
+}
+async fn install_tool(
+    handle: &str,
+    waiting: bool,
+    tool: &'static str,
+    arguments: serde_json::Value,
+    expected_result: &'static str,
+) -> Arc<ModelFixture> {
     let fixture = Arc::new(ModelFixture {
         calls: AtomicUsize::new(0),
         waiting,
         started: Notify::new(),
+        tool,
+        arguments,
+        expected_result,
     });
     let model = fixture.clone();
     let handle = handle.to_owned();
@@ -277,6 +299,105 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
     assert_eq!(cancelled.phase, "completed", "preserve completed history");
     assert!(cancelled.final_text.is_none());
     fs::write(&source, "actual fixture data").expect("fixture operation succeeds");
+
+    // The newly imported Runtime must not expose cached search results after
+    // a source is removed or its full version changes. Keep one owner of the
+    // process-global actor; these are real Bridge/SQLite/filesystem transitions.
+    for (id, name, arguments, expected, change_footer) in [
+        (
+            "filename-delete",
+            "search_files",
+            serde_json::json!({"path":".","glob":"note.txt"}),
+            "note.txt",
+            false,
+        ),
+        (
+            "text-delete",
+            "search_text",
+            serde_json::json!({"path":".","query":"actual"}),
+            "actual fixture data",
+            false,
+        ),
+        (
+            "text-version",
+            "search_text",
+            serde_json::json!({"path":".","query":"actual"}),
+            "actual fixture data",
+            true,
+        ),
+    ] {
+        fs::write(&source, "actual fixture data\nfooter-a").expect("search fixture");
+        let model = install_tool(h, false, name, arguments, expected).await;
+        let started = api::start_run(
+            h.clone(),
+            grant.workspace_id.clone(),
+            id.into(),
+            "Search the owned fixture".into(),
+        )
+        .await
+        .expect("start search");
+        let pending = step(h, &started).await.expect("committed search intent");
+        assert_eq!(pending.pending.len(), 1);
+        assert_eq!(pending.pending[0].tool_name, name);
+        assert_eq!(
+            step(h, &pending)
+                .await
+                .expect_err("search needs approval")
+                .code,
+            "TOOL_APPROVAL_REQUIRED"
+        );
+        let preview = &pending.pending[0];
+        let approved = api::approve_tool(
+            h.clone(),
+            pending.run_id.clone(),
+            preview.operation_id.clone(),
+            preview.argument_digest.clone(),
+        )
+        .await
+        .expect("approve exact search");
+        let searched = step(h, &approved).await.expect("actual filesystem search");
+        let completed = step(h, &searched).await.expect("complete search run");
+        assert_eq!(completed.phase, "completed");
+        assert_eq!(
+            api::inspect_run(h.clone(), completed.run_id.clone())
+                .await
+                .expect("current source")
+                .final_text
+                .as_deref(),
+            Some("fixture final")
+        );
+        if change_footer {
+            // Same length, same matching line/excerpt, different full-file SHA.
+            fs::write(&source, "actual fixture data\nfooter-b").expect("change hidden footer");
+        } else {
+            fs::remove_file(&source).expect("delete exact fixture");
+        }
+        assert_eq!(
+            api::inspect_run(h.clone(), completed.run_id.clone())
+                .await
+                .expect_err("cached search content unavailable")
+                .code,
+            "RUN_SOURCE_UNAVAILABLE"
+        );
+        assert_eq!(
+            step(h, &completed)
+                .await
+                .expect_err("no reuse of stale search context")
+                .code,
+            "RUN_SOURCE_UNAVAILABLE"
+        );
+        let redacted = api::cancel_run(h.clone(), completed.run_id.clone())
+            .await
+            .expect("stop without restoring deleted data");
+        assert_eq!(redacted.phase, "completed");
+        assert!(redacted.final_text.is_none());
+        assert_eq!(
+            model.calls.load(Ordering::SeqCst),
+            2,
+            "no replayed model effect"
+        );
+    }
+    fs::write(&source, "actual fixture data").expect("restore own fixture for later cases");
 
     let lost = temporary.path().join("lost-authorization-reply");
     fs::create_dir(&lost).expect("lost reply fixture");
