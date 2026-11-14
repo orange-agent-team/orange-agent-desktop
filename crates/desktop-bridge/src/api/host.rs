@@ -19,6 +19,7 @@ pub struct HostView {
     pub runtime_version: String,
     pub runtime_source_commit: String,
     pub available_read_tools: Vec<String>,
+    pub available_edit_tools: Vec<String>,
 }
 #[derive(Debug, Clone)]
 pub struct WorkspaceView {
@@ -128,6 +129,7 @@ pub struct UserQuestionGroupView {
 pub struct AgentRunView {
     /// Immutable Run capability; never inferred from a pending tool name.
     pub creation_consent_id: Option<String>,
+    pub editing_consent_id: Option<String>,
     pub run_id: String,
     pub workspace_id: String,
     pub model_id: String,
@@ -343,4 +345,163 @@ pub async fn approve_creation_tool(
     expected_digest: String,
 ) -> Result<AgentRunView, BridgeError> {
     crate::host::approve_creation_tool(handle, run_id, operation_id, expected_digest).await
+}
+
+#[derive(Debug, Clone)]
+pub struct EditingAccessView {
+    pub consent_id: String,
+    pub workspace_id: String,
+    pub display_path: String,
+    pub permission_version: String,
+    pub permission_active: bool,
+    pub session_token: Option<String>,
+}
+#[derive(Debug, Clone)]
+pub struct RunPermissionSelection {
+    pub consent_id: String,
+    pub permission_version: String,
+}
+#[derive(Debug, Clone)]
+pub struct EditPreviewView {
+    pub run_id: String,
+    pub operation_id: String,
+    pub argument_digest: String,
+    pub preview_digest: String,
+    pub path: String,
+    pub diff: String,
+    pub original_sha256: String,
+    pub result_sha256: String,
+    pub original_bytes: String,
+    pub result_bytes: String,
+    pub added_lines: u32,
+    pub removed_lines: u32,
+}
+/// Independent OS directory scope and explicit edit consent; never a read upgrade.
+pub async fn authorize_editing_access(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    selected_directory: String,
+) -> Result<EditingAccessView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::authorize_editing_access(handle, workspace_id, request_id, selected_directory)
+            .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, workspace_id, request_id, selected_directory);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn list_editing_access(
+    handle: String,
+    workspace_id: String,
+) -> Result<Vec<EditingAccessView>, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::list_editing_access(handle, workspace_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, workspace_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn suspend_editing_selection(
+    handle: String,
+    request_id: String,
+) -> Result<(), BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::suspend_editing_selection(handle, request_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, request_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn revoke_editing_access(
+    handle: String,
+    consent_id: String,
+    expected_version: String,
+) -> Result<(), BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::revoke_editing_access(handle, consent_id, expected_version).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, consent_id, expected_version);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn start_editing_run(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    prompt: String,
+    editing: RunPermissionSelection,
+    creation: Option<RunPermissionSelection>,
+    user_questions: bool,
+) -> Result<AgentRunView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::start_editing_run(
+            handle,
+            workspace_id,
+            request_id,
+            prompt,
+            editing,
+            creation,
+            user_questions,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (
+            handle,
+            workspace_id,
+            request_id,
+            prompt,
+            editing,
+            creation,
+            user_questions,
+        );
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+/// The trusted Runtime, not Dart/model arguments, builds this actual source diff.
+pub async fn preview_editing_tool(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+) -> Result<EditPreviewView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::preview_editing_tool(handle, run_id, operation_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, run_id, operation_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn approve_editing_tool(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    preview_digest: String,
+) -> Result<AgentRunView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::approve_editing_tool(handle, run_id, operation_id, preview_digest).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, run_id, operation_id, preview_digest);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
 }

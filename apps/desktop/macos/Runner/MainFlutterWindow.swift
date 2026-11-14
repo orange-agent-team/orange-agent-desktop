@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 class MainFlutterWindow: NSWindow {
   private var platformChannel: FlutterMethodChannel?
-  private var selections: [String: (URL, Bool)] = [:]
+  private var selections: [String: (URL, Bool, String)] = [:]
   private var pickerActive = false
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -28,18 +28,23 @@ class MainFlutterWindow: NSWindow {
         ])
         return
       }
-      if call.method == "chooseWorkspace" || call.method == "chooseModelFile" || call.method == "chooseCreationWorkspace" {
+      if call.method == "chooseWorkspace" || call.method == "chooseModelFile" || call.method == "chooseCreationWorkspace" || call.method == "chooseEditingWorkspace" {
         guard !self.pickerActive else { result(FlutterError(code: "PICKER_BUSY", message: nil, details: nil)); return }
         self.pickerActive = true
         let panel = NSOpenPanel()
         let modelSelection = call.method == "chooseModelFile"
         let createSelection = call.method == "chooseCreationWorkspace"
+        let editSelection = call.method == "chooseEditingWorkspace"
         panel.canChooseDirectories = !modelSelection
         panel.canChooseFiles = modelSelection
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
         panel.prompt = modelSelection ? "导入模型" : (createSelection ? "允许提出新建请求" : "允许 Agent 读取")
-        panel.message = modelSelection ? "请选择清单对应的 GGUF 文件。仅在大小与摘要校验通过后复制到应用缓存，不修改原文件。" : (createSelection ? "请选择与工作区相同的文件夹。Agent 只能在单独批准后创建新文件，不会覆盖现有文件。" : "请选择 Agent 可读取的工作区。本次仅开启 Agent 只读工具；文件创建需要另行授权，执行程序不在此权限内。")
+        panel.message = modelSelection ? "请选择清单对应的 GGUF 文件。仅在大小与摘要校验通过后复制到应用缓存，不修改原文件。" : (createSelection ? "请选择与工作区相同的文件夹。Agent 只能在单独批准后创建新文件，不会覆盖现有文件。" : "请选择 Agent 可读取的工作区。本次仅开启 Agent 只读工具；文件创建和编辑需要另行授权，执行程序不在此权限内。")
+        if editSelection {
+          panel.prompt = "允许提出编辑请求"
+          panel.message = "请选择与工作区相同的文件夹。每次修改现有文件都必须核对实际差异后单独批准；此授权不包含删除文件或执行程序。"
+        }
         if modelSelection { panel.allowedContentTypes = [UTType(filenameExtension: "gguf") ?? .data] }
         panel.beginSheetModal(for: self) { response in
           self.pickerActive = false
@@ -47,16 +52,21 @@ class MainFlutterWindow: NSWindow {
           let normalized = url.resolvingSymlinksInPath().standardizedFileURL
           let selection = UUID().uuidString
           let scoped = normalized.startAccessingSecurityScopedResource()
-          self.selections[selection] = (normalized, scoped)
+          let purpose = modelSelection ? "model" : (createSelection ? "creation" : (editSelection ? "editing" : "workspace"))
+          self.selections[selection] = (normalized, scoped, purpose)
           result(["selectionId": selection, "path": normalized.path])
         }
         return
       }
-      if call.method == "releaseWorkspaceSelection" || call.method == "releaseModelSelection" || call.method == "releaseCreationSelection" {
+      if call.method == "releaseWorkspaceSelection" || call.method == "releaseModelSelection" || call.method == "releaseCreationSelection" || call.method == "releaseEditingSelection" {
         guard let arguments = call.arguments as? [String: Any], let id = arguments["selectionId"] as? String else {
           result(FlutterError(code: "INVALID_SELECTION", message: nil, details: nil)); return
         }
-        if let (url, scoped) = self.selections.removeValue(forKey: id), scoped { url.stopAccessingSecurityScopedResource() }
+        let purpose = call.method == "releaseModelSelection" ? "model" : (call.method == "releaseCreationSelection" ? "creation" : (call.method == "releaseEditingSelection" ? "editing" : "workspace"))
+        if let (_, _, actual) = self.selections[id], actual != purpose {
+          result(FlutterError(code: "SELECTION_PURPOSE_MISMATCH", message: nil, details: nil)); return
+        }
+        if let (url, scoped, _) = self.selections.removeValue(forKey: id), scoped { url.stopAccessingSecurityScopedResource() }
         result(nil)
         return
       }
@@ -73,6 +83,6 @@ class MainFlutterWindow: NSWindow {
   }
 
   deinit {
-    for (_, (url, scoped)) in selections where scoped { url.stopAccessingSecurityScopedResource() }
+    for (_, (url, scoped, _)) in selections where scoped { url.stopAccessingSecurityScopedResource() }
   }
 }

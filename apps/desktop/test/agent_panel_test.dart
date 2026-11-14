@@ -161,6 +161,7 @@ Future<AgentController> show(
   WidgetTester tester,
   FixtureCommands commands, {
   List<CreationAccessView> creations = const [],
+  List<EditingAccessView> editings = const [],
 }) async {
   tester.view.resetPhysicalSize();
   tester.view.physicalSize = const Size(1100, 1500);
@@ -181,6 +182,7 @@ Future<AgentController> show(
             controller: controller,
             workspaces: const [workspace],
             creations: creations,
+            editings: editings,
           ),
         ),
       ),
@@ -216,7 +218,223 @@ const createAccess = CreationAccessView(
   sessionToken: 'write-token',
 );
 
+const editAccess = EditingAccessView(
+  consentId: 'edit-consent',
+  workspaceId: 'fixture-workspace',
+  displayPath: '/owned/fixture',
+  permissionVersion: '1',
+  permissionActive: true,
+  sessionToken: 'edit-token',
+);
+
+class EditingFixtureCommands extends FixtureCommands
+    implements EditingAgentCommands {
+  EditingAccessView? editAccess;
+  Completer<EditPreviewView>? previewGate;
+  bool wrongPreview = false;
+  String? approvedPreview;
+  @override
+  AgentRunView state(
+    String phase, {
+    int steps = 0,
+    List<ToolApprovalView> pending = const [],
+    String? text,
+  }) {
+    final base = super.state(phase, steps: steps, pending: pending, text: text);
+    return AgentRunView(
+      runId: base.runId,
+      workspaceId: base.workspaceId,
+      modelId: base.modelId,
+      phase: base.phase,
+      revision: base.revision,
+      steps: base.steps,
+      invocations: base.invocations,
+      pending: base.pending,
+      finalText: base.finalText,
+      creationConsentId: base.creationConsentId,
+      editingConsentId: editAccess?.consentId,
+    );
+  }
+
+  EditPreviewView actual() => EditPreviewView(
+    runId: id,
+    operationId: wrongPreview ? 'wrong-operation' : 'fixture-operation',
+    argumentDigest: 'fixture-digest',
+    previewDigest: 'actual-server-preview-digest',
+    path: 'proof.txt',
+    diff: 'ACTUAL REVIEW\n-old\n+new\n',
+    originalSha256: 'old-source-sha',
+    resultSha256: 'new-source-sha',
+    originalBytes: '4',
+    resultBytes: '4',
+    addedLines: 1,
+    removedLines: 1,
+  );
+  @override
+  Future<AgentRunView> startEditing(
+    String workspace,
+    String id,
+    String prompt, {
+    required EditingAccessView editing,
+    CreationAccessView? creation,
+    bool allowQuestions = false,
+  }) {
+    editAccess = editing;
+    events.add('start-editing');
+    return super.start(
+      workspace,
+      id,
+      prompt,
+      creation: creation,
+      allowQuestions: allowQuestions,
+    );
+  }
+
+  @override
+  Future<EditPreviewView> previewEditing(String run, String operation) async {
+    events.add('preview-edit');
+    return previewGate?.future ?? actual();
+  }
+
+  @override
+  Future<AgentRunView> approveEditing(
+    String run,
+    String operation,
+    String previewDigest,
+  ) async {
+    expect(previewDigest, 'actual-server-preview-digest');
+    approvedPreview = previewDigest;
+    events.add('approve-edit');
+    approved = true;
+    return state('tools_pending', steps: 1);
+  }
+}
+
 void main() {
+  testWidgets('replacing editing scope invalidates an in-flight preview', (
+    tester,
+  ) async {
+    final commands = EditingFixtureCommands()..toolName = 'apply_patch';
+    final controller = await show(
+      tester,
+      commands,
+      editings: const [editAccess],
+    );
+    await controller.start(workspace.workspaceId, 'Edit', editing: editAccess);
+    await tester.pumpAndSettle();
+    commands.previewGate = Completer<EditPreviewView>();
+    final pending = controller.previewFirstEdit();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: AgentPanel(
+              controller: controller,
+              workspaces: const [workspace],
+              editings: const [
+                EditingAccessView(
+                  consentId: 'edit-consent',
+                  workspaceId: 'fixture-workspace',
+                  displayPath: '/owned/fixture',
+                  permissionVersion: '1',
+                  permissionActive: true,
+                  sessionToken: 'replacement-edit-token',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    commands.previewGate!.complete(commands.actual());
+    await pending;
+    await tester.pumpAndSettle();
+    expect(controller.editPreview, isNull);
+    expect(controller.supportedPreview, isFalse);
+    expect(find.textContaining('ACTUAL REVIEW'), findsNothing);
+    expect(commands.events, isNot(contains('approve-edit')));
+  });
+  testWidgets(
+    'editing stays off and model arguments never replace an actual preview',
+    (tester) async {
+      final commands = EditingFixtureCommands()
+        ..toolName = 'apply_patch'
+        ..argumentsJson = '{"path":"proof.txt","patch":"MODEL INVENTED DIFF"}';
+      final controller = await show(
+        tester,
+        commands,
+        editings: const [editAccess],
+      );
+      expect(
+        tester
+            .widget<CheckboxListTile>(
+              find.widgetWithText(CheckboxListTile, '允许提出修改现有文件请求'),
+            )
+            .value,
+        isFalse,
+      );
+      await controller.start(
+        workspace.workspaceId,
+        'Edit',
+        editing: editAccess,
+      );
+      await tester.pumpAndSettle();
+      final approve = find.widgetWithText(FilledButton, '批准这次精确修改');
+      expect(tester.widget<FilledButton>(approve).onPressed, isNull);
+      expect(find.textContaining('MODEL INVENTED DIFF'), findsNothing);
+      await tester.tap(find.text('读取实际差异'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('ACTUAL REVIEW'), findsOneWidget);
+      expect(tester.widget<FilledButton>(approve).onPressed, isNotNull);
+      await tester.tap(approve);
+      await tester.pumpAndSettle();
+      expect(commands.events, contains('approve-edit'));
+      expect(commands.events, isNot(contains('approve')));
+      expect(commands.approvedPreview, 'actual-server-preview-digest');
+      expect(controller.editPreview, isNull);
+      expect(find.textContaining('ACTUAL REVIEW'), findsNothing);
+    },
+  );
+  testWidgets('late or mismatched edit preview cannot enable approval', (
+    tester,
+  ) async {
+    final commands = EditingFixtureCommands()..toolName = 'apply_patch';
+    final controller = await show(
+      tester,
+      commands,
+      editings: const [editAccess],
+    );
+    await controller.start(workspace.workspaceId, 'Edit', editing: editAccess);
+    await tester.pumpAndSettle();
+    commands.previewGate = Completer<EditPreviewView>();
+    final pending = controller.previewFirstEdit();
+    controller.editingStopping(editAccess.consentId);
+    commands.previewGate!.complete(commands.actual());
+    await pending;
+    await tester.pumpAndSettle();
+    expect(controller.editPreview, isNull);
+    expect(controller.supportedPreview, isFalse);
+    expect(commands.events, isNot(contains('approve-edit')));
+    expect(find.textContaining('ACTUAL REVIEW'), findsNothing);
+  });
+  testWidgets('wrong operation preview is rejected without advancing', (
+    tester,
+  ) async {
+    final commands = EditingFixtureCommands()
+      ..toolName = 'apply_patch'
+      ..wrongPreview = true;
+    final controller = await show(
+      tester,
+      commands,
+      editings: const [editAccess],
+    );
+    await controller.start(workspace.workspaceId, 'Edit', editing: editAccess);
+    await controller.previewFirstEdit();
+    await tester.pumpAndSettle();
+    expect(controller.editPreview, isNull);
+    expect(controller.supportedPreview, isFalse);
+    expect(commands.events.where((e) => e == 'advance').length, 1);
+  });
   testWidgets(
     'creation is default off and exact content uses separate approval',
     (tester) async {

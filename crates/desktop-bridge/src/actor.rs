@@ -18,6 +18,27 @@ use std::{
 use tokio::sync::{oneshot, watch};
 
 mod creation;
+#[cfg(target_vendor = "apple")]
+mod editing;
+#[cfg(target_vendor = "apple")]
+pub(crate) use editing::{signal_editing_release, signal_editing_revoke};
+#[cfg(target_vendor = "apple")]
+pub(crate) struct EditingSignal {
+    pub workspace: String,
+    pub version: String,
+    pub token: String,
+    pub grant: orange_agent_runtime::workspace::patch::authority::EditFileGrant,
+    pub revoker: orange_agent_runtime::workspace::patch::authority::EditRevoker,
+    pub available: Arc<AtomicBool>,
+}
+#[cfg(target_vendor = "apple")]
+impl EditingSignal {
+    fn suspend(&self) {
+        self.available.store(false, Ordering::Release);
+        self.grant.request_revoke();
+    }
+}
+
 pub(crate) use creation::{signal_creation_release, signal_creation_revoke};
 pub(crate) struct CreationSignal {
     pub workspace: String,
@@ -35,6 +56,9 @@ impl CreationSignal {
 }
 pub(crate) struct RunSignal {
     pub creation_id: Option<String>,
+    pub editing_id: Option<String>,
+    #[cfg(target_vendor = "apple")]
+    pub editing_grant: Option<orange_agent_runtime::workspace::patch::authority::EditFileGrant>,
     pub workspace: String,
     pub cancel: watch::Sender<bool>,
     pub grant: WorkspaceGrant,
@@ -52,6 +76,10 @@ pub(crate) struct Signals {
     pub closed_selections: HashSet<String>,
     pub creations: HashMap<String, CreationSignal>,
     pub closed_creation_selections: HashSet<String>,
+    #[cfg(target_vendor = "apple")]
+    pub editings: HashMap<String, EditingSignal>,
+    #[cfg(target_vendor = "apple")]
+    pub closed_editing_selections: HashSet<String>,
     pub service: Option<crate::service::Client>,
     pub imports: HashMap<String, (String, watch::Sender<bool>)>,
     pub closed_imports: HashSet<String>,
@@ -64,6 +92,10 @@ impl Signals {
         for (_, cancel) in self.imports.values() {
             cancel.send_replace(true);
         }
+        #[cfg(target_vendor = "apple")]
+        for edit in self.editings.values() {
+            edit.suspend();
+        }
         for creation in self.creations.values() {
             creation.suspend();
         }
@@ -71,6 +103,10 @@ impl Signals {
             workspace.revoker.request_revoke();
         }
         for run in self.runs.values() {
+            #[cfg(target_vendor = "apple")]
+            if let Some(edit) = &run.editing_grant {
+                edit.request_revoke();
+            }
             run.cancel.send_replace(true);
         }
     }
@@ -349,6 +385,10 @@ pub(crate) fn signal_cancel(handle: &str, run: &str) -> Result<(), BridgeError> 
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
     if let Some(run) = signals.runs.get(run) {
+        #[cfg(target_vendor = "apple")]
+        if let Some(edit) = &run.editing_grant {
+            edit.request_revoke();
+        }
         run.cancel.send_replace(true);
     }
     Ok(())
@@ -372,6 +412,14 @@ pub(crate) fn signal_revoke(
             return Err(failure("WORKSPACE_CONFLICT"));
         }
         current.revoker.request_revoke();
+        #[cfg(target_vendor = "apple")]
+        for edit in signals
+            .editings
+            .values()
+            .filter(|e| e.workspace == workspace)
+        {
+            edit.suspend();
+        }
         for creation in signals
             .creations
             .values()
@@ -384,6 +432,10 @@ pub(crate) fn signal_revoke(
             .values()
             .filter(|run| run.workspace == workspace)
         {
+            #[cfg(target_vendor = "apple")]
+            if let Some(edit) = &run.editing_grant {
+                edit.request_revoke();
+            }
             run.cancel.send_replace(true);
         }
     }
@@ -408,6 +460,14 @@ pub(crate) fn signal_suspend(
             return Err(failure("WORKSPACE_SESSION_CHANGED"));
         }
         current.grant.request_revoke();
+        #[cfg(target_vendor = "apple")]
+        for edit in signals
+            .editings
+            .values()
+            .filter(|e| e.workspace == workspace)
+        {
+            edit.suspend();
+        }
         for creation in signals
             .creations
             .values()
@@ -421,6 +481,10 @@ pub(crate) fn signal_suspend(
             .filter(|run| run.workspace == workspace)
         {
             run.grant.request_revoke();
+            #[cfg(target_vendor = "apple")]
+            if let Some(edit) = &run.editing_grant {
+                edit.request_revoke();
+            }
             run.cancel.send_replace(true);
         }
         signals.closed_selections.insert(session_token.into());
@@ -459,11 +523,19 @@ pub(crate) fn signal_release_selection(
         if let Some(current) = signals.workspaces.get(id) {
             current.grant.request_revoke();
         }
+        #[cfg(target_vendor = "apple")]
+        for edit in signals.editings.values().filter(|e| &e.workspace == id) {
+            edit.suspend();
+        }
         for creation in signals.creations.values().filter(|c| &c.workspace == id) {
             creation.suspend();
         }
         for run in signals.runs.values().filter(|run| &run.workspace == id) {
             run.grant.request_revoke();
+            #[cfg(target_vendor = "apple")]
+            if let Some(edit) = &run.editing_grant {
+                edit.request_revoke();
+            }
             run.cancel.send_replace(true);
         }
     }

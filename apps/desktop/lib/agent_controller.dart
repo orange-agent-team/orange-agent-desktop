@@ -34,9 +34,69 @@ abstract interface class AgentCommands {
   Future<api.AgentRunView> cancel(String id);
 }
 
-class NativeAgentCommands implements AgentCommands {
+abstract interface class EditingAgentCommands {
+  Future<api.AgentRunView> startEditing(
+    String workspace,
+    String id,
+    String prompt, {
+    required api.EditingAccessView editing,
+    api.CreationAccessView? creation,
+    bool allowQuestions = false,
+  });
+  Future<api.EditPreviewView> previewEditing(String run, String operation);
+  Future<api.AgentRunView> approveEditing(
+    String run,
+    String operation,
+    String previewDigest,
+  );
+}
+
+class NativeAgentCommands implements AgentCommands, EditingAgentCommands {
   NativeAgentCommands(this.handle);
   final String handle;
+  @override
+  Future<api.AgentRunView> startEditing(
+    String workspace,
+    String id,
+    String prompt, {
+    required api.EditingAccessView editing,
+    api.CreationAccessView? creation,
+    bool allowQuestions = false,
+  }) => api.startEditingRun(
+    handle: handle,
+    workspaceId: workspace,
+    requestId: id,
+    prompt: prompt,
+    editing: api.RunPermissionSelection(
+      consentId: editing.consentId,
+      permissionVersion: editing.permissionVersion,
+    ),
+    creation: creation == null
+        ? null
+        : api.RunPermissionSelection(
+            consentId: creation.consentId,
+            permissionVersion: creation.permissionVersion,
+          ),
+    userQuestions: allowQuestions,
+  );
+  @override
+  Future<api.EditPreviewView> previewEditing(String run, String operation) =>
+      api.previewEditingTool(
+        handle: handle,
+        runId: run,
+        operationId: operation,
+      );
+  @override
+  Future<api.AgentRunView> approveEditing(
+    String run,
+    String operation,
+    String previewDigest,
+  ) => api.approveEditingTool(
+    handle: handle,
+    runId: run,
+    operationId: operation,
+    previewDigest: previewDigest,
+  );
   @override
   Future<api.ModelConnectionView> connect(String directory) =>
       api.connectLocalModel(handle: handle, selectedDirectory: directory);
@@ -122,8 +182,11 @@ const supportedReadTools = <String, String>{
   'search_text': '搜索文本',
 };
 
-String toolDisplayName(String name) =>
-    name == 'write_file' ? '新建文件' : supportedReadTools[name] ?? name;
+String toolDisplayName(String name) => name == 'apply_patch'
+    ? '修改现有文件'
+    : name == 'write_file'
+    ? '新建文件'
+    : supportedReadTools[name] ?? name;
 
 ({String path, String content})? parseCreationPreview(String arguments) {
   try {
@@ -153,6 +216,7 @@ class AgentController extends ChangeNotifier {
   final Future<String> Function() serviceDirectory;
   api.ModelConnectionView? model;
   api.AgentRunView? view;
+  api.EditPreviewView? editPreview;
   String? runId, workspaceId, error, notice;
   bool busy = false, connecting = false, cancelling = false;
   bool _alive = true;
@@ -163,6 +227,7 @@ class AgentController extends ChangeNotifier {
     String prompt,
     bool allowQuestions,
     api.CreationAccessView? creation,
+    api.EditingAccessView? editing,
   })?
   _submission;
   bool get startUnconfirmed => _submission != null;
@@ -184,12 +249,23 @@ class AgentController extends ChangeNotifier {
   bool get supportedPreview =>
       view != null &&
       view!.pending.isNotEmpty &&
-      (supportedReadTools.containsKey(view!.pending.first.toolName) ||
+      (editPreviewMatches ||
+          supportedReadTools.containsKey(view!.pending.first.toolName) ||
           (view!.pending.first.toolName == 'write_file' &&
               view!.creationConsentId != null &&
               parseCreationPreview(view!.pending.first.argumentsJson) != null));
+  bool get editPreviewMatches =>
+      view?.editingConsentId != null &&
+      editPreview != null &&
+      view!.phase == 'tools_pending' &&
+      view!.pending.firstOrNull?.toolName == 'apply_patch' &&
+      editPreview!.runId == view!.runId &&
+      editPreview!.operationId == view!.pending.first.operationId &&
+      editPreview!.argumentDigest == view!.pending.first.argumentDigest;
   String get approvalLabel =>
-      view?.pending.firstOrNull?.toolName == 'write_file'
+      view?.pending.firstOrNull?.toolName == 'apply_patch'
+      ? '批准这次精确修改'
+      : view?.pending.firstOrNull?.toolName == 'write_file'
       ? '批准新建这个文件'
       : view != null &&
             view!.pending.isNotEmpty &&
@@ -206,8 +282,55 @@ class AgentController extends ChangeNotifier {
     }
   }
 
+  void editingStopping(String consentId) {
+    if (view?.editingConsentId == consentId ||
+        _submission?.editing?.consentId == consentId) {
+      hideContent(stoppingWorkspace: workspaceId);
+    }
+  }
+
+  Future<void> previewFirstEdit() async {
+    final current = view;
+    final op = current?.pending.firstOrNull;
+    final editing = commands;
+    if (busy ||
+        cancelling ||
+        current == null ||
+        current.editingConsentId == null ||
+        op?.toolName != 'apply_patch' ||
+        editing is! EditingAgentCommands) {
+      return;
+    }
+    final epoch = ++_epoch;
+    busy = true;
+    error = null;
+    editPreview = null;
+    _changed();
+    try {
+      final result = await (editing as EditingAgentCommands).previewEditing(
+        current.runId,
+        op!.operationId,
+      );
+      if (!_current(epoch)) return;
+      if (result.runId != current.runId ||
+          result.operationId != op.operationId ||
+          result.argumentDigest != op.argumentDigest) {
+        throw const FormatException('Preview identity mismatch');
+      }
+      editPreview = result;
+    } catch (failure) {
+      if (_current(epoch)) _failed(failure);
+    } finally {
+      if (_current(epoch)) {
+        busy = false;
+        _changed();
+      }
+    }
+  }
+
   bool _current(int epoch) => _alive && epoch == _epoch;
   void _changed() {
+    if (!editPreviewMatches) editPreview = null;
     if (_alive) notifyListeners();
   }
 
@@ -242,6 +365,7 @@ class AgentController extends ChangeNotifier {
     String prompt, {
     bool allowQuestions = false,
     api.CreationAccessView? creation,
+    api.EditingAccessView? editing,
   }) async {
     if (busy ||
         cancelling ||
@@ -259,6 +383,7 @@ class AgentController extends ChangeNotifier {
       prompt: prompt,
       allowQuestions: allowQuestions,
       creation: creation,
+      editing: editing,
     );
     workspaceId = workspace;
     runId = id;
@@ -275,13 +400,29 @@ class AgentController extends ChangeNotifier {
     notice = null;
     _changed();
     try {
-      final created = await commands.start(
-        submission.workspace,
-        submission.id,
-        submission.prompt,
-        allowQuestions: submission.allowQuestions,
-        creation: submission.creation,
-      );
+      final api.AgentRunView created;
+      if (submission.editing != null) {
+        final editing = commands;
+        if (editing is! EditingAgentCommands) {
+          throw UnsupportedError('Editing transport unavailable');
+        }
+        created = await (editing as EditingAgentCommands).startEditing(
+          submission.workspace,
+          submission.id,
+          submission.prompt,
+          editing: submission.editing!,
+          creation: submission.creation,
+          allowQuestions: submission.allowQuestions,
+        );
+      } else {
+        created = await commands.start(
+          submission.workspace,
+          submission.id,
+          submission.prompt,
+          creation: submission.creation,
+          allowQuestions: submission.allowQuestions,
+        );
+      }
       if (!_current(epoch)) return;
       _submission = null;
       view = created;
@@ -391,12 +532,26 @@ class AgentController extends ChangeNotifier {
     notice = null;
     _changed();
     try {
-      final approved = await commands.approve(
-        current.runId,
-        preview.operationId,
-        preview.argumentDigest,
-        create: preview.toolName == 'write_file',
-      );
+      final api.AgentRunView approved;
+      if (preview.toolName == 'apply_patch') {
+        final editing = commands;
+        final exact = editPreview;
+        if (editing is! EditingAgentCommands || exact == null) {
+          throw StateError('Actual edit preview required');
+        }
+        approved = await (editing as EditingAgentCommands).approveEditing(
+          current.runId,
+          preview.operationId,
+          exact.previewDigest,
+        );
+      } else {
+        approved = await commands.approve(
+          current.runId,
+          preview.operationId,
+          preview.argumentDigest,
+          create: preview.toolName == 'write_file',
+        );
+      }
       if (!_current(epoch)) return;
       // One explicit approval permits one requested transition, never a batch
       // approval of future model intents. The backend may reject expired rights.

@@ -60,10 +60,15 @@ Future<void> settle(WidgetTester tester, String checkpoint) async {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async => RustLib.init());
-  for (final scenario in [(false, false), (true, false), (false, true)]) {
-    final (askFirst, createAfterRead) = scenario;
+  for (final scenario in [
+    (false, false, false),
+    (true, false, false),
+    (false, true, false),
+    (false, false, true),
+  ]) {
+    final (askFirst, createAfterRead, editAfterRead) = scenario;
     testWidgets(
-      'native UI approval questions=$askFirst creation=$createAfterRead use real private IPC and filesystem with explicit model fixture',
+      'native UI approval questions=$askFirst creation=$createAfterRead editing=$editAfterRead use real private IPC and filesystem with explicit model fixture',
       (tester) async {
         final directory = await Directory.systemTemp.createTemp(
           'orange-agent-ui-',
@@ -79,12 +84,14 @@ void main() {
         const channel = MethodChannel('orange_agent/platform');
         final released = Completer<void>();
         final creationReleased = Completer<void>();
+        final editingReleased = Completer<void>();
         try {
           final fixture = await LocalModelFixture.start(
             directory,
             sentinel,
             askFirst: askFirst,
             createAfterRead: createAfterRead,
+            editAfterRead: editAfterRead,
           );
           runningFixture = fixture;
           final host = await reopenHost(directory.path);
@@ -121,6 +128,26 @@ void main() {
                   }
                   return null;
                 }
+                if (call.method == 'chooseEditingWorkspace' && editAfterRead) {
+                  return <String, String>{
+                    'selectionId': 'native-edit-scope',
+                    'path': workspace.path,
+                  };
+                }
+                if (call.method == 'releaseEditingSelection' && editAfterRead) {
+                  final workspaces = await listWorkspaces(
+                    handle: host.handle,
+                    includeRevoked: false,
+                  );
+                  final grants = await listEditingAccess(
+                    handle: host.handle,
+                    workspaceId: workspaces.single.workspaceId,
+                  );
+                  expect(grants.single.permissionActive, isTrue);
+                  expect(grants.single.sessionToken, isNull);
+                  if (!editingReleased.isCompleted) editingReleased.complete();
+                  return null;
+                }
                 if (call.method == 'releaseWorkspaceSelection') {
                   final rows = await listWorkspaces(
                     handle: host.handle,
@@ -147,6 +174,11 @@ void main() {
             await tester.ensureVisible(find.text('选择文件夹以允许新建'));
             await tester.tap(find.text('选择文件夹以允许新建'));
             await settle(tester, 'checkpoint-03');
+          }
+          if (editAfterRead) {
+            await tester.ensureVisible(find.text('选择文件夹以允许编辑'));
+            await tester.tap(find.text('选择文件夹以允许编辑'));
+            await settle(tester, 'editing-scope');
           }
           await tester.ensureVisible(find.text('连接本地模型'));
           await tester.tap(find.text('连接本地模型'));
@@ -178,6 +210,16 @@ void main() {
             );
             await tester.ensureVisible(find.text('允许提出新建文件请求'));
             await tester.tap(find.text('允许提出新建文件请求'));
+            await tester.pump();
+          }
+          if (editAfterRead) {
+            final editing = find.widgetWithText(
+              CheckboxListTile,
+              '允许提出修改现有文件请求',
+            );
+            expect(tester.widget<CheckboxListTile>(editing).value, isFalse);
+            await tester.ensureVisible(editing);
+            await tester.tap(editing);
             await tester.pump();
           }
           await tester.ensureVisible(find.text('开始会话'));
@@ -230,7 +272,72 @@ void main() {
               sentinel,
             );
           }
-          expect(fixture.calls, (askFirst ? 3 : 2) + (createAfterRead ? 1 : 0));
+          if (editAfterRead) {
+            expect(fixture.calls, 2);
+            expect(await source.readAsString(), sentinel);
+            final approval = find.widgetWithText(FilledButton, '批准这次精确修改');
+            expect(tester.widget<FilledButton>(approval).onPressed, isNull);
+            await tester.ensureVisible(find.text('读取实际差异'));
+            await tester.tap(find.text('读取实际差异'));
+            await settle(tester, 'editing-actual-preview');
+            expect(find.textContaining('-$sentinel'), findsOneWidget);
+            expect(tester.widget<FilledButton>(approval).onPressed, isNotNull);
+            await tester.ensureVisible(approval);
+            await tester.tap(approval);
+            await settle(tester, 'editing-approved-effect');
+            if (await source.readAsString() != '${sentinel}_EDITED') {
+              final c = tester
+                  .widget<AgentPanel>(find.byType(AgentPanel))
+                  .controller;
+              debugPrint(
+                jsonEncode({
+                  'nativeEditFailure': true,
+                  'phase': c.view?.phase,
+                  'error': c.error,
+                  'notice': c.notice,
+                  'pending': c.view?.pending.map((p) => p.toolName).toList(),
+                  'entries': await workspace
+                      .list()
+                      .map(
+                        (e) =>
+                            e.uri.pathSegments.where((s) => s.isNotEmpty).last,
+                      )
+                      .toList(),
+                }),
+              );
+              // Preserve only this test's owned data; no model credentials.
+              final snapshot = await Directory.systemTemp.createTemp(
+                'orange-edit-failure-',
+              );
+              for (final entry in await directory.list().toList()) {
+                if (entry is File && entry.path.contains('host.sqlite')) {
+                  await entry.copy(
+                    '${snapshot.path}/${entry.uri.pathSegments.last}',
+                  );
+                }
+              }
+              final files = await Directory('${snapshot.path}/workspace')
+                  .create();
+              for (final entry in await workspace.list().toList()) {
+                if (entry is File) {
+                  await entry.copy(
+                    '${files.path}/${entry.uri.pathSegments.last}',
+                  );
+                }
+              }
+              debugPrint(
+                jsonEncode({
+                  'ownedNativeEditSnapshot': snapshot.path,
+                  'snapshotConsistency': 'diagnostic copy while Host may be open; not a certified backup',
+                }),
+              );
+            }
+            expect(await source.readAsString(), '${sentinel}_EDITED');
+          }
+          expect(
+            fixture.calls,
+            (askFirst ? 3 : 2) + ((createAfterRead || editAfterRead) ? 1 : 0),
+          );
           expect(
             find.text('Native fixture observed: $sentinel'),
             findsOneWidget,
@@ -249,6 +356,9 @@ void main() {
           await released.future.timeout(const Duration(seconds: 3));
           if (createAfterRead) {
             await creationReleased.future.timeout(const Duration(seconds: 3));
+          }
+          if (editAfterRead) {
+            await editingReleased.future.timeout(const Duration(seconds: 3));
           }
         } finally {
           await tester.pumpWidget(const SizedBox.shrink());
@@ -365,7 +475,7 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          '216ca3d77ec2e77389fa85713b787e16b2a0e6f9',
+          '81bf2d9d6b85b07efb80f7a66528d911621cadca',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(

@@ -10,10 +10,12 @@ class AgentPanel extends StatefulWidget {
     required this.controller,
     required this.workspaces,
     this.creations = const [],
+    this.editings = const [],
   });
   final AgentController controller;
   final List<WorkspaceView> workspaces;
   final List<CreationAccessView> creations;
+  final List<EditingAccessView> editings;
   @override
   State<AgentPanel> createState() => _AgentPanelState();
 }
@@ -21,7 +23,7 @@ class AgentPanel extends StatefulWidget {
 class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
   final prompt = TextEditingController();
   String? selected;
-  bool allowQuestions = false, allowCreation = false;
+  bool allowQuestions = false, allowCreation = false, allowEditing = false;
   AgentController get controller => widget.controller;
   @override
   void initState() {
@@ -32,6 +34,23 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(covariant AgentPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    String editingKey(List<EditingAccessView> rows) => rows
+        .map((e) => '${e.consentId}:${e.permissionVersion}:${e.sessionToken}')
+        .join('|');
+    if (editingKey(oldWidget.editings) != editingKey(widget.editings)) {
+      allowEditing = false;
+      controller.editPreview = null;
+      for (final old in oldWidget.editings) {
+        if (!widget.editings.any(
+          (current) =>
+              current.consentId == old.consentId &&
+              current.permissionVersion == old.permissionVersion &&
+              current.sessionToken == old.sessionToken,
+        )) {
+          controller.editingStopping(old.consentId);
+        }
+      }
+    }
     String key(List<CreationAccessView> rows) => rows
         .map((c) => '${c.consentId}:${c.permissionVersion}:${c.sessionToken}')
         .join('|');
@@ -74,6 +93,14 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                 c.workspaceId == selectedId &&
                 c.permissionActive &&
                 c.sessionToken != null,
+          )
+          .firstOrNull;
+      final editing = widget.editings
+          .where(
+            (e) =>
+                e.workspaceId == selectedId &&
+                e.permissionActive &&
+                e.sessionToken != null,
           )
           .firstOrNull;
       final run = controller.view;
@@ -136,6 +163,7 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                     : (value) => setState(() {
                         selected = value;
                         allowCreation = false;
+                        allowEditing = false;
                       }),
               ),
               if (available.isEmpty)
@@ -186,6 +214,24 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                     ? null
                     : (value) => setState(() => allowCreation = value ?? false),
               ),
+              CheckboxListTile(
+                title: const Text('允许提出修改现有文件请求'),
+                subtitle: Text(
+                  editing == null
+                      ? '请先单独选择同一文件夹的编辑权限；每次修改仍须批准。'
+                      : '每次先读取实际差异，不会因打开此选项自动执行。',
+                ),
+                value: allowEditing && editing != null,
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                onChanged:
+                    editing == null ||
+                        busy ||
+                        controller.active ||
+                        controller.startUnconfirmed
+                    ? null
+                    : (value) => setState(() => allowEditing = value ?? false),
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 10,
@@ -205,6 +251,7 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                             prompt.text,
                             allowQuestions: allowQuestions,
                             creation: allowCreation ? creation : null,
+                            editing: allowEditing ? editing : null,
                           ),
                     child: const Text('开始会话'),
                   ),
@@ -289,7 +336,22 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                           Text(toolDisplayName(pending[i].toolName)),
                           if (pending[i].toolName == 'write_file')
                             const Text('将创建下面的新文件。内容来自模型，请完整核对；现有文件不会被替换。'),
-                          if (pending[i].toolName == 'write_file')
+                          if (pending[i].toolName == 'apply_patch') ...[
+                            const Text('修改现有文件。先获取并核对实际差异；批准只适用于这一次内容和版本。'),
+                            OutlinedButton(
+                              onPressed: busy || i != 0
+                                  ? null
+                                  : controller.previewFirstEdit,
+                              child: const Text('读取实际差异'),
+                            ),
+                            if (i == 0 && controller.editPreviewMatches) ...[
+                              SelectableText(controller.editPreview!.path),
+                              SelectableText(controller.editPreview!.diff),
+                              SelectableText(
+                                '原摘要：${controller.editPreview!.originalSha256}\n新摘要：${controller.editPreview!.resultSha256}',
+                              ),
+                            ],
+                          ] else if (pending[i].toolName == 'write_file')
                             CreationPreview(arguments: pending[i].argumentsJson)
                           else
                             SelectableText(pending[i].argumentsJson),

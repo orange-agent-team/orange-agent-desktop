@@ -107,6 +107,11 @@ impl HostRegistry {
         if let Some(previous) = host.creations.get(&id)
             && previous.token != request
         {
+            signals
+                .lock()
+                .map_err(|_| failure("HOST_INTERNAL"))?
+                .closed_creation_selections
+                .insert(previous.token.clone());
             previous.available.store(false, Ordering::Release);
             previous.grant.request_revoke();
             previous.grant.wait_drained().await;

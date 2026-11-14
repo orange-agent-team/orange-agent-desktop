@@ -16,6 +16,46 @@ use std::{
 };
 use tokio::sync::watch;
 
+#[derive(Default)]
+pub(super) struct WriteSelection<'a> {
+    pub creation: Option<(&'a str, &'a str)>,
+    pub editing: Option<(&'a str, &'a str)>,
+}
+fn start_base(
+    j: &mut Journal,
+    c: &RunConfig,
+    m: Vec<Message>,
+    r: &workspace::WorkspaceGrant,
+    create: Option<&orange_agent_runtime::workspace::creation::CreateFileGrant>,
+    interactive: bool,
+) -> Result<(), BridgeError> {
+    if let Some(create) = create {
+        j.start_agent_creating(c, m, r, create, interactive)
+    } else if interactive {
+        j.start_agent_interactive(c, m, r)
+    } else {
+        j.start_agent(c, m, r)
+    }
+    .map_err(engine_error)?;
+    Ok(())
+}
+async fn advance_base(
+    j: &mut Journal,
+    run: &str,
+    r: &workspace::WorkspaceGrant,
+    create: Option<&orange_agent_runtime::workspace::creation::CreateFileGrant>,
+    model: &impl ModelGateway,
+    cancel: watch::Receiver<bool>,
+) -> Result<(), BridgeError> {
+    if let Some(create) = create {
+        j.advance_agent_creating(LOCAL_OWNER, run, r, create, model, cancel)
+            .await
+    } else {
+        j.advance_agent(LOCAL_OWNER, run, r, model, cancel).await
+    }
+    .map_err(engine_error)?;
+    Ok(())
+}
 pub(super) struct ModelConnection {
     pub view: ModelConnectionView,
     pub gateway: Box<dyn ModelGateway>,
@@ -44,7 +84,7 @@ impl ModelGateway for LocalGateway {
         })
     }
 }
-fn now() -> Result<i64, BridgeError> {
+pub(super) fn now() -> Result<i64, BridgeError> {
     i64::try_from(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -56,6 +96,7 @@ fn now() -> Result<i64, BridgeError> {
 pub(super) fn engine_error(error: EngineError) -> BridgeError {
     failure(match error {
         EngineError::Forbidden => "RUN_FORBIDDEN",
+        EngineError::ExecutionEnvironmentUnavailable => "HOST_EXECUTION_ENVIRONMENT_UNAVAILABLE",
         EngineError::ApprovalRequired => "TOOL_APPROVAL_REQUIRED",
         EngineError::RecoveryRequired => "RUN_RECOVERY_REQUIRED",
         EngineError::Invalid => "INVALID_RUN_REQUEST",
@@ -78,6 +119,7 @@ fn project(
     workspace: String,
     model: String,
     creation_consent_id: Option<String>,
+    editing_consent_id: Option<String>,
 ) -> Result<AgentRunView, BridgeError> {
     let phase = serde_json::to_value(&view.phase)
         .map_err(|_| failure("RUN_INVALID_STATE"))?
@@ -102,6 +144,7 @@ fn project(
         .collect::<Result<Vec<_>, BridgeError>>()?;
     Ok(AgentRunView {
         creation_consent_id,
+        editing_consent_id,
         run_id: view.run_id,
         workspace_id: workspace,
         model_id: model,
@@ -171,7 +214,7 @@ fn private_read(path: &Path, limit: u64) -> Result<Vec<u8>, BridgeError> {
     Ok(bytes)
 }
 impl HostRegistry {
-    fn run_context(
+    pub(super) fn run_context(
         &mut self,
         handle: &str,
         run: &str,
@@ -218,6 +261,11 @@ impl HostRegistry {
             .agent_creation_requirement(LOCAL_OWNER, run)
             .map_err(engine_error)?
             .map(|r| r.consent_id);
+        let editing_id = host
+            .journal
+            .agent_edit_requirement(LOCAL_OWNER, run)
+            .map_err(engine_error)?
+            .map(|r| r.consent_id);
         let mut signals = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
         let control = signals
             .runs
@@ -225,6 +273,9 @@ impl HostRegistry {
             .or_insert_with(|| crate::actor::RunSignal {
                 workspace: workspace.clone(),
                 creation_id,
+                editing_id,
+                #[cfg(target_vendor = "apple")]
+                editing_grant: None,
                 cancel: watch::channel(false).0,
                 grant: grant.clone(),
             });
@@ -378,17 +429,24 @@ impl HostRegistry {
         prompt: &str,
         interactive: bool,
     ) -> Result<AgentRunView, BridgeError> {
-        self.start_run_mode(handle, workspace, id, prompt, interactive, None)
-            .await
+        self.start_run_mode(
+            handle,
+            workspace,
+            id,
+            prompt,
+            interactive,
+            WriteSelection::default(),
+        )
+        .await
     }
-    async fn start_run_mode(
+    pub(super) async fn start_run_mode(
         &mut self,
         handle: &str,
         workspace: &str,
         id: &str,
         prompt: &str,
         interactive: bool,
-        creation: Option<(&str, &str)>,
+        selection: WriteSelection<'_>,
     ) -> Result<AgentRunView, BridgeError> {
         if !orange_protocol::valid_id(id) || prompt.trim().is_empty() || prompt.len() > 64 * 1024 {
             return Err(failure("INVALID_RUN_REQUEST"));
@@ -443,7 +501,7 @@ impl HostRegistry {
             Err(error) => return Err(engine_error(error)),
         };
         let messages = vec![Message::plain(Role::User, prompt.into())];
-        if let Some((id, version)) = creation {
+        let create = if let Some((id, version)) = selection.creation {
             let current = host
                 .creations
                 .get(id)
@@ -455,20 +513,64 @@ impl HostRegistry {
             if current.grant.consent_version() != version {
                 return Err(failure("CREATION_PERMISSION_CHANGED"));
             }
-            host.journal.start_agent_creating(
+            Some(current.grant.clone())
+        } else {
+            None
+        };
+        #[cfg(target_vendor = "apple")]
+        let editing = if let Some((id, version)) = selection.editing {
+            let current = host
+                .editings
+                .get(id)
+                .filter(|s| {
+                    s.workspace == workspace
+                        && s.available.load(std::sync::atomic::Ordering::Acquire)
+                })
+                .ok_or_else(|| failure("EDITING_SESSION_ACCESS_REQUIRED"))?;
+            if current.grant.consent_version().as_deref() != Some(version) {
+                return Err(failure("EDITING_PERMISSION_CHANGED"));
+            }
+            Some(current.grant.clone())
+        } else {
+            None
+        };
+        #[cfg(not(target_vendor = "apple"))]
+        if selection.editing.is_some() {
+            return Err(failure("EDITING_UNAVAILABLE_ON_TARGET"));
+        }
+        #[cfg(target_vendor = "apple")]
+        if let Some(edit) = &editing {
+            host.journal
+                .start_agent_editing(
+                    &config,
+                    messages,
+                    orange_agent_runtime::engine::EditingAuthority {
+                        read: &grant,
+                        create: create.as_ref(),
+                        edit,
+                    },
+                    interactive,
+                )
+                .map_err(engine_error)?;
+        } else {
+            start_base(
+                &mut host.journal,
                 &config,
                 messages,
                 &grant,
-                &current.grant,
+                create.as_ref(),
                 interactive,
-            )
-        } else if interactive {
-            host.journal
-                .start_agent_interactive(&config, messages, &grant)
-        } else {
-            host.journal.start_agent(&config, messages, &grant)
+            )?;
         }
-        .map_err(engine_error)?;
+        #[cfg(not(target_vendor = "apple"))]
+        start_base(
+            &mut host.journal,
+            &config,
+            messages,
+            &grant,
+            create.as_ref(),
+            interactive,
+        )?;
         if host
             .service
             .as_ref()
@@ -481,7 +583,11 @@ impl HostRegistry {
         }
         self.inspect_run(handle, id).await
     }
-    async fn inspect_run(&mut self, handle: &str, run: &str) -> Result<AgentRunView, BridgeError> {
+    pub(super) async fn inspect_run(
+        &mut self,
+        handle: &str,
+        run: &str,
+    ) -> Result<AgentRunView, BridgeError> {
         let (workspace, config, grant, _) = self.run_context(handle, run)?;
         let host = self.current(handle)?;
         let view = host
@@ -495,6 +601,10 @@ impl HostRegistry {
             config.model_version,
             host.journal
                 .agent_creation_requirement(LOCAL_OWNER, run)
+                .map_err(engine_error)?
+                .map(|r| r.consent_id),
+            host.journal
+                .agent_edit_requirement(LOCAL_OWNER, run)
                 .map_err(engine_error)?
                 .map(|r| r.consent_id),
         )
@@ -588,6 +698,10 @@ impl HostRegistry {
                 .agent_creation_requirement(LOCAL_OWNER, run)
                 .map_err(engine_error)?
                 .map(|r| r.consent_id),
+            host.journal
+                .agent_edit_requirement(LOCAL_OWNER, run)
+                .map_err(engine_error)?
+                .map(|r| r.consent_id),
         )
     }
     async fn advance_run(
@@ -597,6 +711,8 @@ impl HostRegistry {
         expected: &str,
     ) -> Result<AgentRunView, BridgeError> {
         let (workspace, config, grant, cancel) = self.run_context(handle, run)?;
+        #[cfg(target_vendor = "apple")]
+        let signals = self.signals.clone();
         let host = self.current(handle)?;
         if host
             .service
@@ -613,6 +729,8 @@ impl HostRegistry {
             return Err(failure("RUN_VERSION_CHANGED"));
         }
         let create = super::creation::run_creation(host, run)?;
+        #[cfg(target_vendor = "apple")]
+        let editing = super::editing::run_editing(host, run, &signals)?;
         let model = host
             .model
             .as_ref()
@@ -621,16 +739,43 @@ impl HostRegistry {
             return Err(failure("MODEL_CONTEXT_CHANGED"));
         }
         let gateway = GatewayRef(model.gateway.as_ref());
-        if let Some(create) = create {
+        #[cfg(target_vendor = "apple")]
+        if let Some(edit) = &editing {
             host.journal
-                .advance_agent_creating(LOCAL_OWNER, run, &grant, &create, &gateway, cancel)
+                .advance_agent_editing(
+                    LOCAL_OWNER,
+                    run,
+                    orange_agent_runtime::engine::EditingAuthority {
+                        read: &grant,
+                        create: create.as_ref(),
+                        edit,
+                    },
+                    &gateway,
+                    cancel,
+                )
                 .await
+                .map_err(engine_error)?;
         } else {
-            host.journal
-                .advance_agent(LOCAL_OWNER, run, &grant, &gateway, cancel)
-                .await
+            advance_base(
+                &mut host.journal,
+                run,
+                &grant,
+                create.as_ref(),
+                &gateway,
+                cancel,
+            )
+            .await?;
         }
-        .map_err(engine_error)?;
+        #[cfg(not(target_vendor = "apple"))]
+        advance_base(
+            &mut host.journal,
+            run,
+            &grant,
+            create.as_ref(),
+            &gateway,
+            cancel,
+        )
+        .await?;
         let view = host
             .journal
             .agent_view(LOCAL_OWNER, run)
@@ -652,6 +797,10 @@ impl HostRegistry {
             config.model_version,
             host.journal
                 .agent_creation_requirement(LOCAL_OWNER, run)
+                .map_err(engine_error)?
+                .map(|r| r.consent_id),
+            host.journal
+                .agent_edit_requirement(LOCAL_OWNER, run)
                 .map_err(engine_error)?
                 .map(|r| r.consent_id),
         )
@@ -678,6 +827,10 @@ impl HostRegistry {
             config.model_version,
             host.journal
                 .agent_creation_requirement(LOCAL_OWNER, run)
+                .map_err(engine_error)?
+                .map(|r| r.consent_id),
+            host.journal
+                .agent_edit_requirement(LOCAL_OWNER, run)
                 .map_err(engine_error)?
                 .map(|r| r.consent_id),
         )
@@ -796,7 +949,10 @@ pub(crate) async fn start_creation_run(
             &request,
             &prompt,
             interactive,
-            Some((&consent, &version)),
+            WriteSelection {
+                creation: Some((&consent, &version)),
+                editing: None,
+            },
         ))
     })
     .await

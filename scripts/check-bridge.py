@@ -16,14 +16,14 @@ for group in ['source_sha256','generated_sha256']:
 environment,tools=tool_environment()
 metadata=json.loads(subprocess.check_output([str(tools['cargo']),'metadata','--locked','--offline','--format-version','1'],cwd=ROOT,env=environment,text=True))
 runtime=json.loads((ROOT/'config/runtime.lock.json').read_text())
-expected={'orange-domain':'domain','orange-protocol':'protocol','orange-agent-runtime':'agent-runtime','orange-model-runtime':'model-runtime'}
+expected={'orange-domain':'domain','orange-protocol':'protocol','orange-agent-runtime':'agent-runtime','orange-model-runtime':'model-runtime','orange-platform-files':'platform-files'}
 seen=set()
 for package in metadata['packages']:
     if package['name'] in expected:
         wanted=(ROOT/runtime['vendor_directory']/'crates'/expected[package['name']]/'Cargo.toml').resolve()
         if Path(package['manifest_path']).resolve()!=wanted:raise SystemExit('Shared core escaped fixed local artifact')
         seen.add(package['name'])
-if not {'orange-domain','orange-protocol','orange-agent-runtime'}<=seen:raise SystemExit('Required shared Runtime dependencies missing')
+if not set(expected)<=seen:raise SystemExit('Required shared Runtime dependencies missing')
 for arguments in [ ['fmt','-p','orange-desktop-bridge','--check'],['test','-p','orange-desktop-bridge','--locked','--offline'],['clippy','-p','orange-desktop-bridge','--all-targets','--locked','--offline','--','-D','warnings'] ]:
     subprocess.run([str(tools['cargo']),*arguments],cwd=ROOT,env=environment,check=True)
 subprocess.run([str(tools['flutter']),'--suppress-analytics','pub','get','--offline','--enforce-lockfile'],cwd=APP,env=environment,check=True)

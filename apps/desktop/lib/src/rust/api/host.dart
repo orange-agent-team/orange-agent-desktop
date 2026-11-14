@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -323,9 +323,90 @@ Future<AgentRunView> approveCreationTool({
   expectedDigest: expectedDigest,
 );
 
+/// Independent OS directory scope and explicit edit consent; never a read upgrade.
+Future<EditingAccessView> authorizeEditingAccess({
+  required String handle,
+  required String workspaceId,
+  required String requestId,
+  required String selectedDirectory,
+}) => RustLib.instance.api.crateApiHostAuthorizeEditingAccess(
+  handle: handle,
+  workspaceId: workspaceId,
+  requestId: requestId,
+  selectedDirectory: selectedDirectory,
+);
+
+Future<List<EditingAccessView>> listEditingAccess({
+  required String handle,
+  required String workspaceId,
+}) => RustLib.instance.api.crateApiHostListEditingAccess(
+  handle: handle,
+  workspaceId: workspaceId,
+);
+
+Future<void> suspendEditingSelection({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostSuspendEditingSelection(
+  handle: handle,
+  requestId: requestId,
+);
+
+Future<void> revokeEditingAccess({
+  required String handle,
+  required String consentId,
+  required String expectedVersion,
+}) => RustLib.instance.api.crateApiHostRevokeEditingAccess(
+  handle: handle,
+  consentId: consentId,
+  expectedVersion: expectedVersion,
+);
+
+Future<AgentRunView> startEditingRun({
+  required String handle,
+  required String workspaceId,
+  required String requestId,
+  required String prompt,
+  required RunPermissionSelection editing,
+  RunPermissionSelection? creation,
+  required bool userQuestions,
+}) => RustLib.instance.api.crateApiHostStartEditingRun(
+  handle: handle,
+  workspaceId: workspaceId,
+  requestId: requestId,
+  prompt: prompt,
+  editing: editing,
+  creation: creation,
+  userQuestions: userQuestions,
+);
+
+/// The trusted Runtime, not Dart/model arguments, builds this actual source diff.
+Future<EditPreviewView> previewEditingTool({
+  required String handle,
+  required String runId,
+  required String operationId,
+}) => RustLib.instance.api.crateApiHostPreviewEditingTool(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+);
+
+Future<AgentRunView> approveEditingTool({
+  required String handle,
+  required String runId,
+  required String operationId,
+  required String previewDigest,
+}) => RustLib.instance.api.crateApiHostApproveEditingTool(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+  previewDigest: previewDigest,
+);
+
 class AgentRunView {
   /// Immutable Run capability; never inferred from a pending tool name.
   final String? creationConsentId;
+  final String? editingConsentId;
   final String runId;
   final String workspaceId;
   final String modelId;
@@ -340,6 +421,7 @@ class AgentRunView {
 
   const AgentRunView({
     this.creationConsentId,
+    this.editingConsentId,
     required this.runId,
     required this.workspaceId,
     required this.modelId,
@@ -356,6 +438,7 @@ class AgentRunView {
   @override
   int get hashCode =>
       creationConsentId.hashCode ^
+      editingConsentId.hashCode ^
       runId.hashCode ^
       workspaceId.hashCode ^
       modelId.hashCode ^
@@ -374,6 +457,7 @@ class AgentRunView {
       other is AgentRunView &&
           runtimeType == other.runtimeType &&
           creationConsentId == other.creationConsentId &&
+          editingConsentId == other.editingConsentId &&
           runId == other.runId &&
           workspaceId == other.workspaceId &&
           modelId == other.modelId &&
@@ -445,12 +529,115 @@ class CreationAccessView {
           sessionToken == other.sessionToken;
 }
 
+class EditPreviewView {
+  final String runId;
+  final String operationId;
+  final String argumentDigest;
+  final String previewDigest;
+  final String path;
+  final String diff;
+  final String originalSha256;
+  final String resultSha256;
+  final String originalBytes;
+  final String resultBytes;
+  final int addedLines;
+  final int removedLines;
+
+  const EditPreviewView({
+    required this.runId,
+    required this.operationId,
+    required this.argumentDigest,
+    required this.previewDigest,
+    required this.path,
+    required this.diff,
+    required this.originalSha256,
+    required this.resultSha256,
+    required this.originalBytes,
+    required this.resultBytes,
+    required this.addedLines,
+    required this.removedLines,
+  });
+
+  @override
+  int get hashCode =>
+      runId.hashCode ^
+      operationId.hashCode ^
+      argumentDigest.hashCode ^
+      previewDigest.hashCode ^
+      path.hashCode ^
+      diff.hashCode ^
+      originalSha256.hashCode ^
+      resultSha256.hashCode ^
+      originalBytes.hashCode ^
+      resultBytes.hashCode ^
+      addedLines.hashCode ^
+      removedLines.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EditPreviewView &&
+          runtimeType == other.runtimeType &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          argumentDigest == other.argumentDigest &&
+          previewDigest == other.previewDigest &&
+          path == other.path &&
+          diff == other.diff &&
+          originalSha256 == other.originalSha256 &&
+          resultSha256 == other.resultSha256 &&
+          originalBytes == other.originalBytes &&
+          resultBytes == other.resultBytes &&
+          addedLines == other.addedLines &&
+          removedLines == other.removedLines;
+}
+
+class EditingAccessView {
+  final String consentId;
+  final String workspaceId;
+  final String displayPath;
+  final String permissionVersion;
+  final bool permissionActive;
+  final String? sessionToken;
+
+  const EditingAccessView({
+    required this.consentId,
+    required this.workspaceId,
+    required this.displayPath,
+    required this.permissionVersion,
+    required this.permissionActive,
+    this.sessionToken,
+  });
+
+  @override
+  int get hashCode =>
+      consentId.hashCode ^
+      workspaceId.hashCode ^
+      displayPath.hashCode ^
+      permissionVersion.hashCode ^
+      permissionActive.hashCode ^
+      sessionToken.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EditingAccessView &&
+          runtimeType == other.runtimeType &&
+          consentId == other.consentId &&
+          workspaceId == other.workspaceId &&
+          displayPath == other.displayPath &&
+          permissionVersion == other.permissionVersion &&
+          permissionActive == other.permissionActive &&
+          sessionToken == other.sessionToken;
+}
+
 class HostView {
   final String handle;
   final String contractVersion;
   final String runtimeVersion;
   final String runtimeSourceCommit;
   final List<String> availableReadTools;
+  final List<String> availableEditTools;
 
   const HostView({
     required this.handle,
@@ -458,6 +645,7 @@ class HostView {
     required this.runtimeVersion,
     required this.runtimeSourceCommit,
     required this.availableReadTools,
+    required this.availableEditTools,
   });
 
   @override
@@ -466,7 +654,8 @@ class HostView {
       contractVersion.hashCode ^
       runtimeVersion.hashCode ^
       runtimeSourceCommit.hashCode ^
-      availableReadTools.hashCode;
+      availableReadTools.hashCode ^
+      availableEditTools.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -477,7 +666,8 @@ class HostView {
           contractVersion == other.contractVersion &&
           runtimeVersion == other.runtimeVersion &&
           runtimeSourceCommit == other.runtimeSourceCommit &&
-          availableReadTools == other.availableReadTools;
+          availableReadTools == other.availableReadTools &&
+          availableEditTools == other.availableEditTools;
 }
 
 class ModelConnectionView {
@@ -566,6 +756,27 @@ class RunPage {
           runtimeType == other.runtimeType &&
           runs == other.runs &&
           nextCursor == other.nextCursor;
+}
+
+class RunPermissionSelection {
+  final String consentId;
+  final String permissionVersion;
+
+  const RunPermissionSelection({
+    required this.consentId,
+    required this.permissionVersion,
+  });
+
+  @override
+  int get hashCode => consentId.hashCode ^ permissionVersion.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RunPermissionSelection &&
+          runtimeType == other.runtimeType &&
+          consentId == other.consentId &&
+          permissionVersion == other.permissionVersion;
 }
 
 class RunSummary {

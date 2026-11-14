@@ -633,7 +633,334 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
             .all(|g| !g.session_access)
     );
     exercise_creation_actor(&reopened.handle, temporary.path()).await;
+    #[cfg(target_vendor = "apple")]
+    exercise_editing_actor(&reopened.handle, temporary.path()).await;
     api::close_host(reopened.handle).expect("fixture operation succeeds");
+}
+
+#[cfg(target_vendor = "apple")]
+async fn exercise_editing_actor(h: &str, base: &Path) {
+    use sha2::{Digest, Sha256};
+    let root = base.join("editing-workspace");
+    fs::create_dir(&root).expect("owned root");
+    fs::write(root.join("note.txt"), b"old\n").expect("source");
+    let workspace = api::authorize_workspace(
+        h.into(),
+        "edit-read-selection".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("read grant");
+    api::suspend_editing_selection(h.into(), "closed-edit-selection".into())
+        .await
+        .expect("close before callback");
+    assert_eq!(
+        api::authorize_editing_access(
+            h.into(),
+            workspace.workspace_id.clone(),
+            "closed-edit-selection".into(),
+            root.display().to_string()
+        )
+        .await
+        .expect_err("late callback")
+        .code,
+        "EDITING_SELECTION_CLOSED"
+    );
+    assert!(
+        api::authorize_editing_access(
+            h.into(),
+            workspace.workspace_id.clone(),
+            "wrong-edit-root".into(),
+            base.display().to_string()
+        )
+        .await
+        .is_err()
+    );
+    let first = api::authorize_editing_access(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "edit-selection-1".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("independent edit scope");
+    let editing = api::authorize_editing_access(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "edit-selection-2".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("replace OS scope");
+    assert_eq!(first.consent_id, editing.consent_id);
+    assert_eq!(
+        api::authorize_editing_access(
+            h.into(),
+            workspace.workspace_id.clone(),
+            "edit-selection-1".into(),
+            root.display().to_string()
+        )
+        .await
+        .expect_err("old callback cannot replace newer scope before UI cleanup")
+        .code,
+        "EDITING_SELECTION_CLOSED"
+    );
+    api::suspend_editing_selection(h.into(), "edit-selection-1".into())
+        .await
+        .expect("late old cleanup");
+    assert_eq!(
+        api::list_editing_access(h.into(), workspace.workspace_id.clone())
+            .await
+            .expect("inventory")[0]
+            .session_token
+            .as_deref(),
+        Some("edit-selection-2")
+    );
+    assert_eq!(
+        api::revoke_editing_access(h.into(), editing.consent_id.clone(), "999".into())
+            .await
+            .expect_err("wrong version")
+            .code,
+        "EDITING_PERMISSION_CHANGED"
+    );
+    let selection = || api::RunPermissionSelection {
+        consent_id: editing.consent_id.clone(),
+        permission_version: editing.permission_version.clone(),
+    };
+    let model=install_tool(h,false,"apply_patch",serde_json::json!({"path":"note.txt","expected_sha256":hex::encode(Sha256::digest(b"old\n")),"patch":"@@ -1 +1 @@\n-old\n+new\n"}),"apply_patch").await;
+    let readonly = api::start_run(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "independent-edit-readonly".into(),
+        "Read".into(),
+    )
+    .await
+    .expect("readonly Run");
+    assert!(
+        api::start_editing_run(
+            h.into(),
+            workspace.workspace_id.clone(),
+            readonly.run_id.clone(),
+            "Read".into(),
+            selection(),
+            None,
+            false
+        )
+        .await
+        .is_err()
+    );
+    let run = api::start_editing_run(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "edit-run".into(),
+        "Edit".into(),
+        selection(),
+        None,
+        false,
+    )
+    .await
+    .expect("explicit editing Run");
+    assert_eq!(
+        run.editing_consent_id.as_deref(),
+        Some(editing.consent_id.as_str())
+    );
+    let pending = step(h, &run).await.expect("model proposal");
+    let op = &pending.pending[0];
+    assert!(
+        api::approve_tool(
+            h.into(),
+            run.run_id.clone(),
+            op.operation_id.clone(),
+            op.argument_digest.clone()
+        )
+        .await
+        .is_err()
+    );
+    let preview = api::preview_editing_tool(h.into(), run.run_id.clone(), op.operation_id.clone())
+        .await
+        .expect("actual diff");
+    assert_eq!(preview.argument_digest, op.argument_digest);
+    assert!(preview.diff.contains("-old\n+new"));
+    assert!(
+        api::approve_editing_tool(
+            h.into(),
+            run.run_id.clone(),
+            op.operation_id.clone(),
+            op.argument_digest.clone()
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        step(h, &pending).await.expect_err("no exact approval").code,
+        "TOOL_APPROVAL_REQUIRED"
+    );
+    assert_eq!(
+        fs::read(root.join("note.txt")).expect("unchanged"),
+        b"old\n"
+    );
+    api::approve_editing_tool(
+        h.into(),
+        run.run_id.clone(),
+        op.operation_id.clone(),
+        preview.preview_digest,
+    )
+    .await
+    .expect("exact preview approval");
+    let written = step(h, &pending).await.expect("actual write");
+    assert_eq!(fs::read(root.join("note.txt")).expect("bytes"), b"new\n");
+    let done = step(h, &written).await.expect("final");
+    assert_eq!(done.phase, "completed");
+    assert_eq!(model.calls.load(Ordering::SeqCst), 2);
+    assert_eq!(step(h, &done).await.expect("no replay").steps, 3);
+    // Cancelling one editing Run must not revoke the shared OS editing session
+    // or another Run's independent execution capability.
+    fs::write(root.join("note.txt"), b"old\n").expect("owned next input");
+    let args = serde_json::json!({"path":"note.txt","expected_sha256":hex::encode(Sha256::digest(b"old\n")),"patch":"@@ -1 +1 @@\n-old\n+other Run write\n"});
+    install_tool(h, false, "apply_patch", args.clone(), "apply_patch").await;
+    let a = api::start_editing_run(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "cancel-edit-one".into(),
+        "edit".into(),
+        selection(),
+        None,
+        false,
+    )
+    .await
+    .expect("first Run");
+    let a = step(h, &a)
+        .await
+        .expect("first committed proposal, no dispatch");
+    let other_model = install_tool(h, false, "apply_patch", args, "apply_patch").await;
+    let other = api::start_editing_run(
+        h.into(),
+        workspace.workspace_id.clone(),
+        "cancel-edit-other".into(),
+        "edit".into(),
+        selection(),
+        None,
+        false,
+    )
+    .await
+    .expect("second Run");
+    let other = step(h, &other).await.expect("second committed proposal");
+    api::cancel_run(h.into(), a.run_id)
+        .await
+        .expect("cancel only first Run");
+    assert!(
+        api::list_editing_access(h.into(), workspace.workspace_id.clone())
+            .await
+            .expect("scope remains")[0]
+            .session_token
+            .is_some()
+    );
+    let op = &other.pending[0];
+    let preview =
+        api::preview_editing_tool(h.into(), other.run_id.clone(), op.operation_id.clone())
+            .await
+            .expect("other scope usable");
+    api::approve_editing_tool(
+        h.into(),
+        other.run_id.clone(),
+        op.operation_id.clone(),
+        preview.preview_digest,
+    )
+    .await
+    .expect("other approval");
+    let other = step(h, &other)
+        .await
+        .expect("other Run executes under separate capability");
+    assert_eq!(
+        fs::read(root.join("note.txt")).expect("real other Run effect"),
+        b"other Run write\n"
+    );
+    assert_eq!(other_model.calls.load(Ordering::SeqCst), 1);
+    api::revoke_editing_access(
+        h.into(),
+        editing.consent_id.clone(),
+        editing.permission_version.clone(),
+    )
+    .await
+    .expect("revoke entire edit scope");
+    assert_eq!(
+        api::inspect_run(h.into(), other.run_id)
+            .await
+            .expect("cancelled metadata")
+            .phase,
+        "cancelled"
+    );
+    assert_eq!(
+        api::inspect_run(h.into(), readonly.run_id)
+            .await
+            .expect("readonly unaffected")
+            .phase,
+        "ready"
+    );
+    assert!(
+        api::list_editing_access(h.into(), workspace.workspace_id)
+            .await
+            .expect("revoked inventory")
+            .iter()
+            .all(|g| !g.permission_active && g.session_token.is_none())
+    );
+    let unknown_root = base.join("edit-unknown-workspace");
+    fs::create_dir(&unknown_root).expect("owned root");
+    let unknown_read = api::authorize_workspace(
+        h.into(),
+        "edit-unknown-read".into(),
+        unknown_root.display().to_string(),
+    )
+    .await
+    .expect("read");
+    let unknown_edit = api::authorize_editing_access(
+        h.into(),
+        unknown_read.workspace_id.clone(),
+        "edit-unknown-scope".into(),
+        unknown_root.display().to_string(),
+    )
+    .await
+    .expect("edit scope");
+    let waiting = install(h, true).await;
+    let run = api::start_editing_run(
+        h.into(),
+        unknown_read.workspace_id.clone(),
+        "edit-unknown-run".into(),
+        "wait".into(),
+        api::RunPermissionSelection {
+            consent_id: unknown_edit.consent_id,
+            permission_version: unknown_edit.permission_version,
+        },
+        None,
+        false,
+    )
+    .await
+    .expect("Run");
+    let handle = h.to_owned();
+    let active = tokio::spawn(async move { step(&handle, &run).await });
+    bounded(waiting.started.notified()).await;
+    bounded(api::suspend_editing_selection(
+        h.into(),
+        "edit-unknown-scope".into(),
+    ))
+    .await
+    .expect("scope cancellation not queued behind model");
+    bounded(active)
+        .await
+        .expect("task")
+        .expect("cancelled model");
+    assert_eq!(
+        api::authorize_editing_access(
+            h.into(),
+            unknown_read.workspace_id,
+            "new-edit-scope".into(),
+            unknown_root.display().to_string()
+        )
+        .await
+        .expect_err("unknown cannot be bypassed by new OS scope")
+        .code,
+        "WORKSPACE_RECOVERY_REQUIRED"
+    );
 }
 
 struct QuestionGateway(Arc<AtomicUsize>);
@@ -1129,6 +1456,18 @@ async fn exercise_creation_actor(h: &str, base: &Path) {
     .await
     .expect("replacement scope");
     assert_eq!(first.consent_id, creation.consent_id);
+    assert_eq!(
+        api::authorize_creation_access(
+            h.into(),
+            workspace.workspace_id.clone(),
+            "write-selection-1".into(),
+            root.display().to_string()
+        )
+        .await
+        .expect_err("old callback cannot replace newer scope before UI cleanup")
+        .code,
+        "CREATION_SELECTION_CLOSED"
+    );
     api::suspend_creation_selection(h.into(), "write-selection-1".into())
         .await
         .expect("late old selection cleanup");

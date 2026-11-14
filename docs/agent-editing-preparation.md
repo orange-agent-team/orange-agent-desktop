@@ -1,16 +1,38 @@
-# 编辑客户端接线准备（候选分支）
+# 桌面现有文件编辑（候选实现）
 
-当前固定消费服务端 Runtime `216ca3d77ec2e77389fa85713b787e16b2a0e6f9`，由明确归档导入；普通构建不读取相邻仓库源码。完整来源及归档摘要在config/runtime.lock.json。共享源码有5个package，新增platform-files为E03内部支持库，不是新的核心工程；依赖身份经旧桌面锁与固定生产者锁的并集检查，无未知第三方包。
+## 来源与线程边界
 
-Host actor仍由原来的独立OS线程独占HostRegistry和Journal。其Tokio运行时显式改为两个worker，以便编辑发布进入阻塞通道时，撤权/取消及I/O任务仍可运行。队列、句柄检查和队列外信号机制保留；并未让多个线程并发访问SQLite。
+固定消费 Runtime `81bf2d9d6b85b07efb80f7a66528d911621cadca`；归档、清单及来源摘要见 `config/runtime.lock.json`。普通构建只使用本仓库固定 vendor，不读取相邻服务端源码。5 个共享 package 包括 E03 内部的 platform-files；不增加核心工程。消费者 Cargo.lock 的包身份未改变。
 
-9项Rust宿主测试及严格Clippy通过，覆盖已有只读、新建、问答、取消、撤权和重开等兼容性。这只是导入与执行环境准备，不表示桌面编辑已经可用。原生集成测试的固定来源断言已更新，但本轮尚未运行Flutter/native测试或生成新的模型服务组件包。
+独立 OS 线程仍独占 HostRegistry 和 Journal；Tokio 的两个 worker 支持发布阻塞通道之外的撤权、取消和 I/O，不让多线程并发访问 SQLite。
 
-后续必须单独完成：
+## 权限与接口
 
-- native目录选择及独立编辑scope，不能由只读或新建scope转换；迟到选择回调关闭、撤权排空和重开恢复。
-- Host/FRB中的编辑授权列表、默认关闭的Run编辑选项、实际diff预览和preview_digest批准。现有普通approve入口不能接受patch。
-- 显式组合create/edit权限，以及编辑Run的恢复、取消、预算与失败呈现。
-- 成对FRB生成、Dart组件与Rust测试、真实macOS原生流程、托管模型与默认无测试权重包恢复。
+读取、新建、编辑是三份独立授权。native 选择器分别取得 scope，释放时校验用途。编辑必须属于当前读取工作区；切换工作区、选择 token、权限版本或关闭 Host 时，旧预览及选择立即失效。重开不会自动恢复 OS 权限。
 
-服务端已有实际7B CPU模型的单次精确编辑证据；第一次无效hunk被拒绝，第二次澄清提示后通过。该结果不代表桌面OS权限认证、GPU认证或模型全面准入。客户端用户流程不得自动批准工具，也不得将unknown伪装成功。
+- `authorizeEditingWorkspace` / `listEditingWorkspaces`：登记或查询独立编辑选择，携带 consent、workspace、version 与 session token。
+- `suspendEditingWorkspace`：按精确 session token 停止；迟到的旧选择回调不能关闭或恢复新 scope。
+- `revokeEditingWorkspace`：按权限版本撤权；先发队列外信号，排空操作，再释放 native scope。
+- `startEditingRun`：显式传入编辑权限选择，可另传独立的新建权限。UI 默认关闭编辑，不从普通 Run 自动升级。
+- `previewEditingTool`：由 Rust 基于真实文件计算 diff、参数摘要和 preview digest。Dart 不从模型 patch 生成可信批准内容。
+- `approveEditingTool`：提交精确 preview digest。普通工具批准入口不能批准 patch；错操作、晚到预览及已失效选择均拒绝。
+
+每个 Run 使用独立的可撤销编辑句柄。取消一个已经提交提案但尚无效果的 Run 不撤销同 scope 下另一个 Run；执行状态不明时仍隔离工作区，不能以新授权绕过恢复门槛。撤销整个编辑权限会停止其绑定 Run，但不误伤独立只读 Run。
+
+当前实际发布后端仅 macOS；其他目标由 Host 明确返回不可用，不把空实现展示成成功。创建、删除、重命名及任意命令不是本编辑工具的权限。
+
+## 安全属性与失败处理
+
+首次真实 native 测试发现沙盒暂存文件的 quarantine 时间戳不同，原文件未变、操作进入 unknown。证据保留在统一执行目录，断言没有删除。Runtime81bf2d9 保留系统生成的较新时间戳，其他安全标记、隔离应用、事件标识、ACL、owner/group/mode/flags 及扩展属性仍精确比较。返回和持久化的是目标真实完整快照，后续检查不忽略时间戳。原文件完整快照必须未变。
+
+严格元数据复制 API 未改变。新增、移除或未知格式标签仍拒绝，因此某些外部来源文件尚不支持编辑；没有覆盖所有 macOS 文件。不会移除 quarantine，也不会绕过系统拒绝。source SHA、参数、实际预览、权限版本和发布前重验共同约束效果。unknown 不自动重放。
+
+捕获旧文件到发布新文件之间仍存在命名空间缺口；当前后端不能称为全局原子内容 CAS。手动恢复、保留原件管理、全部文件系统与跨 OS 行为尚需完成产品级验收。
+
+## 验证状态
+
+旧 Runtime216ca3d 的9项 Rust 宿主测试、严格 Clippy、21个组件测试与静态分析通过；原生6场景中5通过、编辑效果场景失败。独立签名沙盒探针已验证上述修复，服务端189 Runtime、7元数据测试与240共享制品测试通过。
+
+新固定版本的成对 FRB 已重新生成；模型组件清单为 `716511eb6796e1b2e3a19cc86682ab1ad2d84e53194d158418f684d5228c88f6`，开发签名、CPU、最低 macOS27.2、无测试权重。新固定版本完整桌面回归已通过：9项 Rust、严格 Clippy、21个组件测试、6项 macOS 原生场景，包含真实精确编辑和撤权排空。日志 desktop-edit-native-fixed.log，验证会话94984 exit0。实际托管模型流程仍在执行，随后需恢复默认 lib/main.dart 包。
+
+native 测试的模型 HTTP 和选择器回调是明确夹具；实际 Rust/FRB、SQLite、沙盒文件效果是真实运行。组件测试证明状态和交互，不能证明 OS 选择器或真实推理。已有服务端7B精确编辑证据属于上一固定 Runtime 的单次任务，不等于新版本全面模型准入、桌面实际7B流程或 GPU 认证。

@@ -33,6 +33,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  RunPermissionSelection dco_decode_box_autoadd_run_permission_selection(
+    dynamic raw,
+  );
+
+  @protected
   UserQuestionGroupView dco_decode_box_autoadd_user_question_group_view(
     dynamic raw,
   );
@@ -44,6 +49,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CreationAccessView dco_decode_creation_access_view(dynamic raw);
 
   @protected
+  EditPreviewView dco_decode_edit_preview_view(dynamic raw);
+
+  @protected
+  EditingAccessView dco_decode_editing_access_view(dynamic raw);
+
+  @protected
   HostView dco_decode_host_view(dynamic raw);
 
   @protected
@@ -51,6 +62,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<CreationAccessView> dco_decode_list_creation_access_view(dynamic raw);
+
+  @protected
+  List<EditingAccessView> dco_decode_list_editing_access_view(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -77,6 +91,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
+  RunPermissionSelection? dco_decode_opt_box_autoadd_run_permission_selection(
+    dynamic raw,
+  );
+
+  @protected
   UserQuestionGroupView? dco_decode_opt_box_autoadd_user_question_group_view(
     dynamic raw,
   );
@@ -86,6 +105,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RunPage dco_decode_run_page(dynamic raw);
+
+  @protected
+  RunPermissionSelection dco_decode_run_permission_selection(dynamic raw);
 
   @protected
   RunSummary dco_decode_run_summary(dynamic raw);
@@ -124,6 +146,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  RunPermissionSelection sse_decode_box_autoadd_run_permission_selection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   UserQuestionGroupView sse_decode_box_autoadd_user_question_group_view(
     SseDeserializer deserializer,
   );
@@ -137,6 +164,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  EditPreviewView sse_decode_edit_preview_view(SseDeserializer deserializer);
+
+  @protected
+  EditingAccessView sse_decode_editing_access_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   HostView sse_decode_host_view(SseDeserializer deserializer);
 
   @protected
@@ -144,6 +179,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<CreationAccessView> sse_decode_list_creation_access_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<EditingAccessView> sse_decode_list_editing_access_view(
     SseDeserializer deserializer,
   );
 
@@ -180,6 +220,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
+  RunPermissionSelection? sse_decode_opt_box_autoadd_run_permission_selection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   UserQuestionGroupView? sse_decode_opt_box_autoadd_user_question_group_view(
     SseDeserializer deserializer,
   );
@@ -189,6 +234,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RunPage sse_decode_run_page(SseDeserializer deserializer);
+
+  @protected
+  RunPermissionSelection sse_decode_run_permission_selection(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RunSummary sse_decode_run_summary(SseDeserializer deserializer);
@@ -232,6 +282,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_run_permission_selection(
+    RunPermissionSelection self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_user_question_group_view(
     UserQuestionGroupView self,
     SseSerializer serializer,
@@ -247,6 +303,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_edit_preview_view(
+    EditPreviewView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_editing_access_view(
+    EditingAccessView self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_host_view(HostView self, SseSerializer serializer);
 
   @protected
@@ -255,6 +323,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_creation_access_view(
     List<CreationAccessView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_editing_access_view(
+    List<EditingAccessView> self,
     SseSerializer serializer,
   );
 
@@ -304,6 +378,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_run_permission_selection(
+    RunPermissionSelection? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_user_question_group_view(
     UserQuestionGroupView? self,
     SseSerializer serializer,
@@ -314,6 +394,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_run_page(RunPage self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_run_permission_selection(
+    RunPermissionSelection self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_run_summary(RunSummary self, SseSerializer serializer);

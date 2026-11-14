@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'agent_controller.dart';
 import 'agent_panel.dart';
 import 'creation_panel.dart';
+import 'editing_panel.dart';
 import 'model_controller.dart';
 import 'model_panel.dart';
 import 'src/rust/api/host.dart';
@@ -29,6 +30,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
   ModelController? models;
   List<WorkspaceView> workspaces = [];
   List<CreationAccessView> creations = [];
+  List<EditingAccessView> editings = [];
   @override
   void initState() {
     super.initState();
@@ -100,10 +102,20 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
         onStopping: controller.creationStopping,
       ),
       const SizedBox(height: 16),
+      EditingPanel(
+        host: widget.host,
+        workspaces: workspaces,
+        onChanged: (rows) {
+          if (mounted) setState(() => editings = rows);
+        },
+        onStopping: controller.editingStopping,
+      ),
+      const SizedBox(height: 16),
       AgentPanel(
         controller: controller,
         workspaces: workspaces,
         creations: creations,
+        editings: editings,
       ),
     ],
   );

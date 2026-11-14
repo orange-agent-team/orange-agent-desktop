@@ -12,6 +12,7 @@ class LocalModelFixture {
     this.askFirst,
     this.readPath,
     this.createAfterRead,
+    this.editAfterRead,
   );
   final Directory root, ipc;
   final HttpServer server;
@@ -19,6 +20,7 @@ class LocalModelFixture {
   final bool askFirst;
   final String readPath;
   final bool createAfterRead;
+  final bool editAfterRead;
   int calls = 0;
   final failures = <String>[];
   static const key = 'fixtureonly0123456789fixtureonly0123456789';
@@ -28,6 +30,7 @@ class LocalModelFixture {
     bool askFirst = false,
     String readPath = 'proof.txt',
     bool createAfterRead = false,
+    bool editAfterRead = false,
   }) async {
     final root = await Directory('${hostRoot.path}/m').create();
     final ipc = await Directory.systemTemp.createTemp('oi');
@@ -85,6 +88,7 @@ class LocalModelFixture {
       askFirst,
       readPath,
       createAfterRead,
+      editAfterRead,
     );
     server.listen(
       fixture._handle,
@@ -159,6 +163,48 @@ class LocalModelFixture {
             ],
           };
           finish = 'tool_calls';
+        } else if (editAfterRead && calls == (askFirst ? 3 : 2)) {
+          final messages = input['messages'] as List<dynamic>;
+          final prior = messages
+              .where(
+                (m) =>
+                    m['role'] == 'tool' &&
+                    m['tool_call_id'] == 'native-fixture-call',
+              )
+              .toList();
+          if (prior.length != 1 ||
+              !(input['tools'] as List<dynamic>).any(
+                (t) => t['function']['name'] == 'apply_patch',
+              )) {
+            throw StateError(
+              'Missing read result or explicit editing capability',
+            );
+          }
+          final result = jsonDecode(
+            prior.single['content'] as String,
+          ) as Map<String, dynamic>;
+          if (result['data']['content'] != expected) {
+            throw StateError('Wrong actual read result');
+          }
+          delta = {
+            'tool_calls': [
+              {
+                'index': 0,
+                'id': 'native-edit-call',
+                'type': 'function',
+                'function': {
+                  'name': 'apply_patch',
+                  'arguments': jsonEncode({
+                    'path': readPath,
+                    'expected_sha256': result['data']['sha256'],
+                    'patch':
+                        '@@ -1 +1 @@\n-$expected\n\\ No newline at end of file\n+${expected}_EDITED\n\\ No newline at end of file\n',
+                  }),
+                },
+              },
+            ],
+          };
+          finish = 'tool_calls';
         } else if (createAfterRead && calls == (askFirst ? 3 : 2)) {
           final messages = input['messages'] as List<dynamic>;
           if (!messages.any(
@@ -193,7 +239,8 @@ class LocalModelFixture {
             ],
           };
           finish = 'tool_calls';
-        } else if (calls == (askFirst ? 3 : 2) + (createAfterRead ? 1 : 0)) {
+        } else if (calls ==
+            (askFirst ? 3 : 2) + ((createAfterRead || editAfterRead) ? 1 : 0)) {
           final messages = input['messages'] as List<dynamic>;
           if (!messages.any(
             (m) =>
@@ -201,6 +248,26 @@ class LocalModelFixture {
                 (m['content'] as String).contains(expected),
           )) {
             throw StateError('real tool result missing');
+          }
+          if (editAfterRead) {
+            final results = messages
+                .where(
+                  (m) =>
+                      m['role'] == 'tool' &&
+                      m['tool_call_id'] == 'native-edit-call',
+                )
+                .toList();
+            if (results.length != 1) {
+              throw StateError('Missing committed edit receipt');
+            }
+            final edited = jsonDecode(
+              results.single['content'] as String,
+            ) as Map<String, dynamic>;
+            if (edited['kind'] != 'apply_patch' ||
+                edited['data']['path'] != readPath ||
+                (edited['data'] as Map).containsKey('retained_original')) {
+              throw StateError('Wrong or private edit projection');
+            }
           }
           if (createAfterRead) {
             final receipts = messages

@@ -10,6 +10,14 @@ use std::{
 };
 use uuid::Uuid;
 mod creation;
+#[cfg(target_vendor = "apple")]
+mod editing;
+#[cfg(target_vendor = "apple")]
+pub(crate) use editing::{approve_editing_tool, preview_editing_tool, start_editing_run};
+#[cfg(target_vendor = "apple")]
+pub(crate) use editing::{
+    authorize_editing_access, list_editing_access, revoke_editing_access, suspend_editing_selection,
+};
 mod managed;
 pub(crate) use creation::{
     authorize_creation_access, list_creation_access, revoke_creation_access,
@@ -39,6 +47,13 @@ struct Host {
     grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
     access_tokens: std::collections::HashMap<String, String>,
     creations: std::collections::HashMap<String, creation::CreationSession>,
+    #[cfg(target_vendor = "apple")]
+    editings: std::collections::HashMap<String, editing::EditingSession>,
+    #[cfg(target_vendor = "apple")]
+    run_edit_grants: std::collections::HashMap<
+        String,
+        orange_agent_runtime::workspace::patch::authority::EditFileGrant,
+    >,
     model: Option<runs::ModelConnection>,
     service: Option<crate::service::Client>,
     run_grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
@@ -100,6 +115,11 @@ impl HostRegistry {
                 .as_str()
                 .ok_or_else(|| failure("RUNTIME_MANIFEST_INVALID"))?
                 .into(),
+            available_edit_tools: if cfg!(target_vendor = "apple") {
+                vec!["apply_patch".into()]
+            } else {
+                vec![]
+            },
             available_read_tools: workspace::definitions()
                 .into_iter()
                 .map(|tool| tool.name)
@@ -112,6 +132,10 @@ impl HostRegistry {
             grants: std::collections::HashMap::new(),
             access_tokens: std::collections::HashMap::new(),
             creations: std::collections::HashMap::new(),
+            #[cfg(target_vendor = "apple")]
+            editings: std::collections::HashMap::new(),
+            #[cfg(target_vendor = "apple")]
+            run_edit_grants: std::collections::HashMap::new(),
             model: None,
             service: None,
             run_grants: std::collections::HashMap::new(),
@@ -474,8 +498,14 @@ pub(crate) async fn suspend_workspace_access(
     crate::actor::signal_suspend(&handle, &workspace_id, &session_token)?;
     crate::actor::call(handle.clone(), move |host, rt| {
         let creation_leases = host.workspace_creation_leases(&handle, &workspace_id)?;
+        #[cfg(target_vendor = "apple")]
+        let editing_leases = host.workspace_editing_leases(&handle, &workspace_id)?;
         let view = host.suspend_workspace(&handle, &workspace_id, &session_token)?;
         rt.block_on(async {
+            #[cfg(target_vendor = "apple")]
+            for grant in editing_leases {
+                grant.wait_drained().await;
+            }
             for grant in creation_leases {
                 grant.wait_drained().await;
             }
@@ -493,9 +523,15 @@ pub(crate) async fn suspend_workspace_selection(
     };
     crate::actor::call(handle.clone(), move |host, rt| {
         let creation_leases = host.workspace_creation_leases(&handle, &workspace)?;
+        #[cfg(target_vendor = "apple")]
+        let editing_leases = host.workspace_editing_leases(&handle, &workspace)?;
         match host.suspend_workspace(&handle, &workspace, &request_id) {
             Ok(_) => {
                 rt.block_on(async {
+                    #[cfg(target_vendor = "apple")]
+                    for grant in editing_leases {
+                        grant.wait_drained().await;
+                    }
                     for grant in creation_leases {
                         grant.wait_drained().await;
                     }
@@ -516,8 +552,14 @@ pub(crate) async fn revoke_workspace(
     crate::actor::signal_revoke(&handle, &workspace_id, &expected_version)?;
     crate::actor::call(handle.clone(), move |host, rt| {
         let creation_leases = host.workspace_creation_leases(&handle, &workspace_id)?;
+        #[cfg(target_vendor = "apple")]
+        let editing_leases = host.workspace_editing_leases(&handle, &workspace_id)?;
         let view = host.revoke_workspace(&handle, &workspace_id, &expected_version)?;
         rt.block_on(async {
+            #[cfg(target_vendor = "apple")]
+            for grant in editing_leases {
+                grant.wait_drained().await;
+            }
             for grant in creation_leases {
                 grant.wait_drained().await;
             }
@@ -553,7 +595,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "216ca3d77ec2e77389fa85713b787e16b2a0e6f9"
+            "81bf2d9d6b85b07efb80f7a66528d911621cadca"
         );
         assert_eq!(
             registry
