@@ -505,3 +505,22 @@ pub async fn approve_editing_tool(
         Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
     }
 }
+
+/// Metadata-only, bounded recovery discovery. Does not restore OS access,
+/// inspect file contents, approve a recovery or replay the original operation.
+pub async fn list_unresolved_edits(
+    handle: String,
+    run_id: String,
+    before: Option<String>,
+    limit: u16,
+) -> Result<Vec<String>, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::list_unresolved_edits(handle, run_id, before, limit).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, run_id, before, limit);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}

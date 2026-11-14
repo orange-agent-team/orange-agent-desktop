@@ -403,6 +403,20 @@ Future<AgentRunView> approveEditingTool({
   previewDigest: previewDigest,
 );
 
+/// Metadata-only, bounded recovery discovery. Does not restore OS access,
+/// inspect file contents, approve a recovery or replay the original operation.
+Future<List<String>> listUnresolvedEdits({
+  required String handle,
+  required String runId,
+  String? before,
+  required int limit,
+}) => RustLib.instance.api.crateApiHostListUnresolvedEdits(
+  handle: handle,
+  runId: runId,
+  before: before,
+  limit: limit,
+);
+
 class AgentRunView {
   /// Immutable Run capability; never inferred from a pending tool name.
   final String? creationConsentId;

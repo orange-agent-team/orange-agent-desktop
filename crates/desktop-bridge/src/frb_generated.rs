@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1951955904;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1142341827;
 
 // Section: executor
 
@@ -1045,6 +1045,48 @@ fn wire__crate__api__host__list_runs_impl(
                             api_workspace_id,
                             api_before,
                             api_limit,
+                        )
+                        .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__host__list_unresolved_edits_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "list_unresolved_edits",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <String>::sse_decode(&mut deserializer);
+            let api_run_id = <String>::sse_decode(&mut deserializer);
+            let api_before = <Option<String>>::sse_decode(&mut deserializer);
+            let api_limit = <u16>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::host::BridgeError>(
+                    (move || async move {
+                        let output_ok = crate::api::host::list_unresolved_edits(
+                            api_handle, api_run_id, api_before, api_limit,
                         )
                         .await?;
                         std::result::Result::Ok(output_ok)
@@ -2308,44 +2350,45 @@ fn pde_ffi_dispatcher_primary_impl(
         23 => wire__crate__api__host__list_creation_access_impl(port, ptr, rust_vec_len, data_len),
         24 => wire__crate__api__host__list_editing_access_impl(port, ptr, rust_vec_len, data_len),
         25 => wire__crate__api__host__list_runs_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__host__list_workspaces_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__host__preview_editing_tool_impl(port, ptr, rust_vec_len, data_len),
-        28 => {
+        26 => wire__crate__api__host__list_unresolved_edits_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__host__list_workspaces_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__host__preview_editing_tool_impl(port, ptr, rust_vec_len, data_len),
+        29 => {
             wire__crate__api__host__restore_workspace_access_impl(port, ptr, rust_vec_len, data_len)
         }
-        29 => {
+        30 => {
             wire__crate__api__host__revoke_creation_access_impl(port, ptr, rust_vec_len, data_len)
         }
-        30 => wire__crate__api__host__revoke_editing_access_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__host__revoke_workspace_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__host__start_creation_run_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__host__start_editing_run_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__host__start_interactive_run_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__host__start_model_service_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__host__start_run_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__host__stop_model_service_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__host__suspend_creation_selection_impl(
+        31 => wire__crate__api__host__revoke_editing_access_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__host__revoke_workspace_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__host__start_creation_run_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__host__start_editing_run_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__host__start_interactive_run_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__host__start_model_service_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__host__start_run_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__host__stop_model_service_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__host__suspend_creation_selection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        39 => wire__crate__api__host__suspend_editing_selection_impl(
+        40 => wire__crate__api__host__suspend_editing_selection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        40 => {
+        41 => {
             wire__crate__api__host__suspend_workspace_access_impl(port, ptr, rust_vec_len, data_len)
         }
-        41 => wire__crate__api__host__suspend_workspace_selection_impl(
+        42 => wire__crate__api__host__suspend_workspace_selection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        42 => wire__crate__api__host__validate_amount_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__host__validate_amount_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

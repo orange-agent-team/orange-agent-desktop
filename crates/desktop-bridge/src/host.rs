@@ -16,7 +16,8 @@ mod editing;
 pub(crate) use editing::{approve_editing_tool, preview_editing_tool, start_editing_run};
 #[cfg(target_vendor = "apple")]
 pub(crate) use editing::{
-    authorize_editing_access, list_editing_access, revoke_editing_access, suspend_editing_selection,
+    authorize_editing_access, list_editing_access, list_unresolved_edits, revoke_editing_access,
+    suspend_editing_selection,
 };
 mod managed;
 pub(crate) use creation::{
@@ -595,7 +596,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "81bf2d9d6b85b07efb80f7a66528d911621cadca"
+            "4ab8c19f8034a77653cc103606d0d7d098238b97"
         );
         assert_eq!(
             registry

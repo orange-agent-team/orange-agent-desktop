@@ -6,6 +6,25 @@ use orange_agent_runtime::workspace::patch::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
+pub(crate) async fn list_unresolved_edits(
+    handle: String,
+    run: String,
+    before: Option<String>,
+    limit: u16,
+) -> Result<Vec<String>, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        // Deliberately do not use run_context: it restores execution/read
+        // grants, while an unresolved effect must remain discoverable even
+        // after native access has been released. Only opaque IDs leave here.
+        registry
+            .current(&handle)?
+            .journal
+            .agent_unresolved_patch_ids(LOCAL_OWNER, &run, before.as_deref(), limit)
+            .map_err(runs::engine_error)
+    })
+    .await
+}
+
 pub(super) struct EditingSession {
     pub workspace: String,
     pub token: String,

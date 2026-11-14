@@ -2,7 +2,7 @@
 
 ## 来源与线程边界
 
-固定消费 Runtime `81bf2d9d6b85b07efb80f7a66528d911621cadca`；归档、清单及来源摘要见 `config/runtime.lock.json`。普通构建只使用本仓库固定 vendor，不读取相邻服务端源码。5 个共享 package 包括 E03 内部的 platform-files；不增加核心工程。消费者 Cargo.lock 的包身份未改变。
+本候选固定消费 Runtime `4ab8c19f8034a77653cc103606d0d7d098238b97`；归档、清单及来源摘要见 `config/runtime.lock.json`。普通构建只使用本仓库固定 vendor，不读取相邻服务端源码。5 个共享 package 包括 E03 内部的 platform-files；不增加核心工程。消费者 Cargo.lock 的包身份未改变。
 
 独立 OS 线程仍独占 HostRegistry 和 Journal；Tokio 的两个 worker 支持发布阻塞通道之外的撤权、取消和 I/O，不让多线程并发访问 SQLite。
 
@@ -36,3 +36,11 @@
 新固定版本的成对 FRB 已重新生成；模型组件清单为 `716511eb6796e1b2e3a19cc86682ab1ad2d84e53194d158418f684d5228c88f6`，开发签名、CPU、最低 macOS27.2、无测试权重。新固定版本完整桌面回归已通过：9项 Rust、严格 Clippy、21个组件测试、6项 macOS 原生场景，包含真实精确编辑和撤权排空。日志 desktop-edit-native-fixed.log，验证会话94984 exit0。实际固定0.5B托管模型的2项测试也通过：导入/启动/35秒空闲心跳、批准后真实读取与搜索、删除源后清除上下文、停止与Host关闭清理。默认 lib/main.dart 开发包已恢复，严格签名和嵌入组件校验通过，实际包内0个GGUF。日志 desktop-edit-managed-model.log 和 desktop-edit-default-restoration.log，分别18107/21333 exit0。
 
 native 测试的模型 HTTP 和选择器回调是明确夹具；实际 Rust/FRB、SQLite、沙盒文件效果是真实运行。组件测试证明状态和交互，不能证明 OS 选择器或真实推理。已有服务端7B精确编辑证据属于上一固定 Runtime 的单次任务，不等于新版本全面模型准入、桌面实际7B流程或 GPU 认证。
+
+## 后续恢复索引增量（未合并主线）
+
+新增 `listUnresolvedEdits(handle, runId, before, limit)`。它只列出当前拥有者、指定Run下仍未解决的patch操作ID；limit为1—100，before为严格字典序上界。不打开工作区、不恢复原读取/编辑权限、不批准恢复、不重发模型或工具。其他目标明确返回不可用。取消Run后的不确定效果仍可由拥有者发现。
+
+当前候选固定Runtime4ab8c19的9项Rust测试、严格Clippy、21组件和静态检查通过；实际原生6场景通过，并新增了“释放读取权限后可查询元数据、但内容读取仍拒绝”的FRB验收。日志edit-recovery-desktop-check.log和edit-recovery-desktop-native.log，82309/80582 exit0。新的组件清单为cb4f0d4c870c91d9cc6687e25854ed9d72f9a747f05c94cd29a4ed4e7fb5f56d，无测试权重。
+
+上文真实0.5B/7B证据和默认包证据属于Runtime81bf2d9整合阶段，不冒充本增量的真实推理证据。此增量没有恢复授权/文件检查/决策批准界面；原生测试仅证明元数据入口不会恢复文件权限，并不代表完整恢复流程已完成。本候选默认App需在原生测试后独立恢复。

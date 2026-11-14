@@ -260,6 +260,25 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
             && !suspended.session_access
             && suspended.session_token.is_none()
     );
+    #[cfg(target_vendor = "apple")]
+    {
+        assert!(
+            api::list_unresolved_edits(h.clone(), "run-1".into(), None, 10)
+                .await
+                .expect("metadata discovery does not restore workspace access")
+                .is_empty()
+        );
+        assert!(
+            api::list_unresolved_edits(h.clone(), "run-1".into(), None, 101)
+                .await
+                .is_err()
+        );
+        assert!(
+            api::list_unresolved_edits(h.clone(), "other-run".into(), None, 10)
+                .await
+                .is_err()
+        );
+    }
     assert_eq!(
         api::inspect_run(h.clone(), "run-1".into())
             .await

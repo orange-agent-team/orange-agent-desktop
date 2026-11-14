@@ -439,6 +439,31 @@ void main() {
         expect(fixture.calls, 1);
         expect(fixture.failures, isEmpty);
         expect(await source.readAsString(), 'OWNED_ALIAS_FIXTURE');
+        await suspendWorkspaceAccess(
+          handle: handle,
+          workspaceId: grant.workspaceId,
+          sessionToken: grant.sessionToken!,
+        );
+        expect(
+          await listUnresolvedEdits(
+            handle: handle,
+            runId: run.runId,
+            limit: 10,
+          ),
+          isEmpty,
+          reason: 'A read failure is not an unresolved patch publication',
+        );
+        await expectLater(
+          inspectRun(handle: handle, runId: run.runId),
+          throwsA(
+            isA<BridgeError>().having(
+              (e) => e.code,
+              'code',
+              'WORKSPACE_SESSION_ACCESS_REQUIRED',
+            ),
+          ),
+          reason: 'Metadata discovery must not restore released file access',
+        );
       } finally {
         if (handle != null) await closeHost(handle: handle);
         await fixture?.close();
@@ -475,7 +500,7 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          '81bf2d9d6b85b07efb80f7a66528d911621cadca',
+          '4ab8c19f8034a77653cc103606d0d7d098238b97',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(
