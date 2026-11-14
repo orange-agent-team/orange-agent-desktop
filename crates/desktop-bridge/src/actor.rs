@@ -222,7 +222,11 @@ pub(crate) fn initialize(path: &Path) -> Result<HostView, BridgeError> {
                 closed: worker_closed.clone(),
                 signals: worker_signals.clone(),
             };
-            let runtime = match tokio::runtime::Builder::new_current_thread()
+            // HostRegistry and its Journal still belong exclusively to this
+            // named actor thread. Runtime workers service I/O and revocation
+            // while an approved editor enters its bounded blocking lane.
+            let runtime = match tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
                 .enable_all()
                 .build()
             {

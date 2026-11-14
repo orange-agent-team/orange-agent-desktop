@@ -1,15 +1,16 @@
 {
   "schema": "orange-shared-runtime-source-v1",
   "version": "0.1.0",
-  "origin_commit": "97fdddb3a23af373cc1ea3aebf18e622a1d0fb0f",
+  "origin_commit": "216ca3d77ec2e77389fa85713b787e16b2a0e6f9",
   "members": [
     "crates/domain",
     "crates/protocol",
     "crates/agent-runtime",
-    "crates/model-runtime"
+    "crates/model-runtime",
+    "crates/platform-files"
   ],
-  "archive_sha256": "1923894f1c99591335b60e0ffee860a0858d8eb4a239050056b134f288b0f668",
-  "archive_bytes": 164804,
-  "release_manifest_sha256": "1d50a526587e841c4b44e82a30ac1433130134fec10b6b8d9e50ca9fbe6efc5d",
-  "vendor_directory": "vendor/runtime-97fdddb"
+  "archive_sha256": "14240d1659ac847fff828b9f3316b659f9842ef169657115946aafcff1ea4a75",
+  "archive_bytes": 247860,
+  "release_manifest_sha256": "f79fac626be940a6f0e972821b913ad6e588dac4220e7ca82cd3aca77624cd2e",
+  "vendor_directory": "vendor/runtime-216ca3d"
 }

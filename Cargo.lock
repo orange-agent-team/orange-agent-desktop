@@ -1286,6 +1286,7 @@ dependencies = [
  "jsonschema",
  "libc",
  "orange-domain",
+ "orange-platform-files",
  "orange-protocol",
  "regex",
  "rusqlite",
@@ -1338,6 +1339,15 @@ dependencies = [
  "thiserror",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "orange-platform-files"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "rustix",
+ "sha2",
 ]
 
 [[package]]
