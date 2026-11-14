@@ -2,7 +2,7 @@
 
 ## 来源与线程边界
 
-本候选固定消费 Runtime `64748cd25940b9bef28d1efd90488a8e8ab76684`；归档、清单及来源摘要见 `config/runtime.lock.json`。普通构建只使用本仓库固定 vendor，不读取相邻服务端源码。5 个共享 package 包括 E03 内部的 platform-files；不增加核心工程。消费者 Cargo.lock 的包身份未改变。
+本候选固定消费 Runtime `f0474a4a4ff79f4cd104152de0ca82ea05350bd3`；归档、清单及来源摘要见 `config/runtime.lock.json`。普通构建只使用本仓库固定 vendor，不读取相邻服务端源码。5 个共享 package 包括 E03 内部的 platform-files；不增加核心工程。消费者 Cargo.lock 的包身份未改变。
 
 独立 OS 线程仍独占 HostRegistry 和 Journal；Tokio 的两个 worker 支持发布阻塞通道之外的撤权、取消和 I/O，不让多线程并发访问 SQLite。
 
@@ -48,3 +48,5 @@ native 测试的模型 HTTP 和选择器回调是明确夹具；实际 Rust/FRB�
 当前恢复读取界面与隔离边界见 [recovery-inspection.md](recovery-inspection.md)。上节4ab8c19描述保留为索引阶段历史证据；新766ff0d读取检查已通过实际原生回执故障测试，恢复写入UI仍未实现。
 
 64748cd候选进一步接入独立恢复写scope、当前决定摘要批准和不含文件数据的结果核对；实际三选择原生测试通过，见recovery-inspection.md。历史阶段的“尚未接入”说明不代表本候选当前状态；完整原件管理、兼容范围与全路线仍未完成。
+
+后续schema17捕获安全证据消费见[native-capture-consumption.md](native-capture-consumption.md)；上述具体日志保留为对应版本的历史证据。

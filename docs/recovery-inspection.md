@@ -1,6 +1,6 @@
 # 中断编辑检查（候选实现）
 
-当前候选固定使用 Runtime64748cd25940b9bef28d1efd90488a8e8ab76684。主线仍使用已经验收的81bf2d9；本候选尚未合并。
+恢复功能已在64748cd主线验收；当前后续候选固定消费f0474a4a4ff79f4cd104152de0ca82ea05350bd3/schema17，尚未合并。消费证据见native-capture-consumption.md。
 
 ## 用户流程
 
