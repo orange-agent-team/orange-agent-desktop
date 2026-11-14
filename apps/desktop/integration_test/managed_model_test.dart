@@ -741,8 +741,20 @@ void main() {
               )
               .take(30)
               .toList();
+          final service = handle == null
+              ? null
+              : await inspectModelService(handle: handle)
+                    .timeout(const Duration(seconds: 2));
+          final evidenceFile = File('${data.path}/m/failure.json');
+          final failureEvidence = await evidenceFile.exists()
+              ? jsonDecode(await evidenceFile.readAsString())
+              : null;
           debugPrint(
             jsonEncode({
+              'modelService': service == null
+                  ? null
+                  : {'phase': service.phase, 'failure': service.failure},
+              'modelFailureEvidence': failureEvidence,
               'managedUiFailureStage': stage,
               'exceptionType': error.runtimeType.toString(),
               'runs': details,

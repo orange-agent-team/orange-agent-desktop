@@ -34,6 +34,11 @@ class ModelPanel extends StatelessWidget {
                   _ => '状态尚未确认',
                 }),
               ],
+              if (view?.failure != null)
+                Text(
+                  describeModelFailureCode(view!.failure!),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               const Text('使用本机 CPU；只接受当前清单中的模型文件。'),
               const SizedBox(height: 12),
               Wrap(

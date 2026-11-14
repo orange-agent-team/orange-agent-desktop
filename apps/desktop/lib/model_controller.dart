@@ -322,6 +322,19 @@ class ManagedAgentCommands extends NativeAgentCommands {
   ManagedAgentCommands(super.handle, this.models);
   final ModelController models;
   @override
+  Future<api.AgentRunView> advance(String id, String revision) async {
+    try {
+      return await super.advance(id, revision);
+    } on api.BridgeError catch (failure) {
+      if (failure.code == 'MODEL_SERVICE_UNAVAILABLE') {
+        // Refresh status only. Never restart the model or repeat the command.
+        await models.refresh();
+      }
+      rethrow;
+    }
+  }
+
+  @override
   Future<api.ModelConnectionView> connect(String directory) async {
     try {
       await models.start();
@@ -335,7 +348,16 @@ class ManagedAgentCommands extends NativeAgentCommands {
 
 String describeModelError(Object failure) {
   if (failure is! api.BridgeError) return '无法完成本地模型操作，请重试或核对状态。';
-  return switch (failure.code) {
+  return describeModelFailureCode(failure.code);
+}
+
+String describeModelFailureCode(String code) {
+  return switch (code) {
+    'MODEL_CONTROL_HEARTBEAT_LOST' ||
+    'MODEL_CONTROL_SEND_FAILED' => '本地模型连接已中断，请核对状态后重新启动。',
+    'MODEL_HOST_EXITED' || 'MODEL_BACKEND_EXITED' => '本地模型进程已退出，请核对状态后重新启动。',
+    'MODEL_CONTROL_AUTH_FAILED' => '模型控制连接未通过验证，服务已停止。',
+    'MODEL_DIAGNOSTIC_UNAVAILABLE' => '模型已停止，但退出诊断未能保存。',
     'MODEL_SERVICE_NOT_PACKAGED' => '此构建未包含本地模型组件。',
     'MODEL_PLATFORM_UNAVAILABLE' => '本机系统版本或架构不满足模型组件要求。',
     'MODEL_NOT_INSTALLED' => '请先导入清单中指定的模型文件。',
@@ -348,6 +370,6 @@ String describeModelError(Object failure) {
     'MODEL_CLEANUP_UNCONFIRMED' => '模型进程状态尚未确认，已禁止重新启动。',
     'MODEL_INSTANCE_CHANGED' => '模型实例已经改变，请重新核对状态。',
     'MODEL_COMMAND_LIMIT' => '模型控制记录已达到当前限额。',
-    _ => '模型操作未完成，错误编号：${failure.code}',
+    _ => '模型操作未完成，错误编号：$code',
   };
 }
