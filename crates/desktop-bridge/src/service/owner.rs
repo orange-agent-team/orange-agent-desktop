@@ -19,6 +19,8 @@ use tokio::{
     sync::{mpsc, oneshot, watch},
 };
 
+mod diagnostics;
+
 const ALIAS: &str = "orange-local-qwen-v1";
 #[derive(Clone)]
 pub(crate) struct Settings {
@@ -77,6 +79,9 @@ struct Owned {
     output: BufReader<ChildStdout>,
     instance: String,
     index: usize,
+    diagnostics: Option<tokio::task::JoinHandle<diagnostics::HelperFailure>>,
+    last_ping: std::time::Instant,
+    max_ping_gap_ms: u64,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -446,6 +451,14 @@ async fn stop_owned(
     state: &Arc<Mutex<Shared>>,
     owned: &mut Option<Owned>,
 ) -> Result<ModelServiceView, BridgeError> {
+    stop_owned_with_cause(settings, state, owned, None).await
+}
+async fn stop_owned_with_cause(
+    settings: &Settings,
+    state: &Arc<Mutex<Shared>>,
+    owned: &mut Option<Owned>,
+    cause: Option<&str>,
+) -> Result<ModelServiceView, BridgeError> {
     let process = owned
         .as_mut()
         .ok_or_else(|| failure("MODEL_RECOVERY_REQUIRED"))?;
@@ -457,18 +470,60 @@ async fn stop_owned(
         let _ = tokio::time::timeout(Duration::from_secs(2), input.shutdown()).await;
     }
     let exited = tokio::time::timeout(Duration::from_secs(15), process.child.wait()).await;
-    let stopped = exited.is_ok_and(|result| result.is_ok())
-        && record(settings)?.is_some_and(|r| {
-            r.instance_id == process.instance
-                && r.phase == "stopped"
-                && r.cpu_only
-                && r.model_sha256 == settings.bundle.model_sha
-                && r.executable_sha256 == settings.bundle.backend_sha
-                && r.model_version == ALIAS
+    let status = exited.ok().and_then(Result::ok);
+    let observed = record(settings);
+    let stopped = status.is_some()
+        && observed.as_ref().is_ok_and(|record| {
+            record.as_ref().is_some_and(|r| {
+                r.instance_id == process.instance
+                    && r.phase == "stopped"
+                    && r.cpu_only
+                    && r.model_sha256 == settings.bundle.model_sha
+                    && r.executable_sha256 == settings.bundle.backend_sha
+                    && r.model_version == ALIAS
+            })
         });
     if stopped {
+        let reason = if let Some(mut task) = process.diagnostics.take() {
+            match tokio::time::timeout(Duration::from_secs(1), &mut task).await {
+                Ok(Ok(reason)) => reason,
+                _ => {
+                    task.abort();
+                    let _ = task.await;
+                    diagnostics::HelperFailure::Other
+                }
+            }
+        } else {
+            diagnostics::HelperFailure::None
+        };
+        let mut code =
+            diagnostics::failure_code(reason, cause, status.as_ref().is_some_and(|s| s.success()));
+        if let Some(reason_code) = code {
+            #[cfg(unix)]
+            let signal = {
+                use std::os::unix::process::ExitStatusExt;
+                status.as_ref().and_then(|s| s.signal())
+            };
+            #[cfg(not(unix))]
+            let signal = None;
+            let evidence = diagnostics::FailureEvidence {
+                schema: 1,
+                instance: &process.instance,
+                cause: reason_code,
+                helper_classification: reason.code(),
+                helper_exit_code: status.as_ref().and_then(|s| s.code()),
+                helper_exit_signal: signal,
+                last_ping_age_ms: u64::try_from(process.last_ping.elapsed().as_millis())
+                    .unwrap_or(u64::MAX),
+                max_ping_gap_ms: process.max_ping_gap_ms,
+            };
+            if io::write_json(&settings.root.join("failure.json"), &evidence).is_err() {
+                // Diagnostic failure must not leave a known exited process ready.
+                code = Some("MODEL_DIAGNOSTIC_UNAVAILABLE");
+            }
+        }
         *owned = None;
-        change(settings, state, index, "stopped", None)
+        change(settings, state, index, "stopped", code)
     } else {
         change(
             settings,
@@ -532,7 +587,7 @@ async fn start_owned(
         .env_clear()
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|_| failure("MODEL_START_FAILED"))?;
     let input = child
@@ -543,12 +598,20 @@ async fn start_owned(
         .stdout
         .take()
         .ok_or_else(|| failure("MODEL_START_FAILED"))?;
+    let error_output = child
+        .stderr
+        .take()
+        .ok_or_else(|| failure("MODEL_START_FAILED"))?;
+    let diagnostics = tokio::spawn(diagnostics::collect(error_output));
     *owned = Some(Owned {
         child,
         input: Some(input),
         output: BufReader::new(output),
         instance: instance.clone(),
         index,
+        diagnostics: Some(diagnostics),
+        last_ping: std::time::Instant::now(),
+        max_ping_gap_ms: 0,
     });
     let process = owned
         .as_mut()
@@ -572,7 +635,11 @@ async fn start_owned(
             _=closing.changed()=>break Err(failure("MODEL_START_CANCELLED")),
             _=&mut deadline=>break Err(failure("MODEL_START_UNCONFIRMED")),
             result=&mut ready=>break result,
-            _=ping.tick()=>{if send(process.input.as_mut().ok_or_else(||failure("MODEL_START_FAILED"))?,b"ping\n").await.is_err(){break Err(failure("MODEL_START_FAILED"));}}
+            _=ping.tick()=>{
+                process.max_ping_gap_ms=process.max_ping_gap_ms.max(u64::try_from(process.last_ping.elapsed().as_millis()).unwrap_or(u64::MAX));
+                if send(process.input.as_mut().ok_or_else(||failure("MODEL_START_FAILED"))?,b"ping\n").await.is_err(){break Err(failure("MODEL_START_FAILED"));}
+                process.last_ping=std::time::Instant::now();
+            }
         }
     };
     let cancelled = *cancel.borrow() || *closing.borrow();
@@ -630,8 +697,14 @@ async fn run(
                 if cancelled && owned.is_some(){let _=stop_owned(&settings,&state,&mut owned).await;continue;}
                 if let Some(process)=owned.as_mut() {
                     match process.child.try_wait() {
-                        Ok(Some(_))=>{let _=stop_owned(&settings,&state,&mut owned).await;}
-                        Ok(None)=>{if let Some(input)=process.input.as_mut() && send(input,b"ping\n").await.is_err(){let _=stop_owned(&settings,&state,&mut owned).await;}}
+                        Ok(Some(_))=>{let _=stop_owned_with_cause(&settings,&state,&mut owned,Some("MODEL_HOST_EXITED")).await;}
+                        Ok(None)=>{
+                            process.max_ping_gap_ms=process.max_ping_gap_ms.max(u64::try_from(process.last_ping.elapsed().as_millis()).unwrap_or(u64::MAX));
+                            if let Some(input)=process.input.as_mut() {
+                                if send(input,b"ping\n").await.is_err(){let _=stop_owned_with_cause(&settings,&state,&mut owned,Some("MODEL_CONTROL_SEND_FAILED")).await;}
+                                else {process.last_ping=std::time::Instant::now();}
+                            }
+                        }
                         Err(_)=>{let _=change(&settings,&state,process.index,"recovery_required",Some("MODEL_SERVICE_UNAVAILABLE"));}
                     }
                 }
@@ -663,6 +736,135 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn completed_helper_failure_is_preserved_and_diagnostic_errors_never_leave_ready() {
+        // Explicit control-helper/receipt substitutes; no model is launched.
+        // Real backend exit and lease cleanup remain native acceptance checks.
+        for case in [
+            "normal",
+            "control-lost",
+            "diagnostic-denied",
+            "receipt-invalid",
+        ] {
+            let temp = tempfile::tempdir().expect("owned fixture");
+            let root = io::directory(&temp.path().join("private")).expect("private");
+            let settings = Settings {
+                bundle: Bundle {
+                    contents: root.clone(),
+                    helper: root.join("unused"),
+                    backend: root.join("unused"),
+                    helper_sha: "0".repeat(64),
+                    helper_bytes: 1,
+                    backend_sha: "0".repeat(64),
+                    backend_bytes: 1,
+                    model_sha: "0".repeat(64),
+                    model_bytes: 4,
+                    model_name: "fixture".into(),
+                    model_url: "https://example.invalid".into(),
+                },
+                root: root.clone(),
+                ipc: root.clone(),
+                cache: root.clone(),
+                startup_seconds: 1,
+            };
+            io::write_json(&root.join("process.json"),&serde_json::json!({"instance_id":"owned-instance","model_version":ALIAS,"executable_sha256":"0".repeat(64),"model_sha256":"0".repeat(64),"phase":"stopped","pid":null,"exit_code":null,"cpu_only":true})).expect("declared receipt fixture");
+            let state = Arc::new(Mutex::new(Shared {
+                history: History {
+                    schema: 1,
+                    entries: vec![Entry {
+                        request: "owned-request".into(),
+                        instance: "owned-instance".into(),
+                        phase: "ready".into(),
+                        failure: None,
+                    }],
+                    closed_requests: vec![],
+                },
+                installed: true,
+                cancel: None,
+                phase: "ready".into(),
+                failure: None,
+                closed_requests: Default::default(),
+            }));
+            let script = if case == "normal" {
+                "exit 0"
+            } else {
+                "printf 'control channel ended without a valid frame\n' >&2; exit 1"
+            };
+            let mut child = Command::new("/bin/sh")
+                .arg("-c")
+                .arg(script)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .expect("owned helper fixture");
+            let input = child.stdin.take();
+            let output = BufReader::new(child.stdout.take().expect("stdout"));
+            let diagnostics =
+                tokio::spawn(diagnostics::collect(child.stderr.take().expect("stderr")));
+            child.wait().await.expect("exact owned child exited");
+            if case == "diagnostic-denied" {
+                std::fs::create_dir(root.join("failure.json"))
+                    .expect("owned diagnostic-path fault");
+            }
+            let mut owned = Some(Owned {
+                child,
+                input,
+                output,
+                instance: "owned-instance".into(),
+                index: 0,
+                diagnostics: Some(diagnostics),
+                last_ping: std::time::Instant::now(),
+                max_ping_gap_ms: 5_000,
+            });
+            if case == "receipt-invalid" {
+                std::fs::write(root.join("process.json"), b"invalid owned receipt")
+                    .expect("owned receipt fault");
+                let error =
+                    stop_owned_with_cause(&settings, &state, &mut owned, Some("MODEL_HOST_EXITED"))
+                        .await
+                        .expect_err("no cleanup claim without valid receipt");
+                assert_eq!(error.code, "MODEL_CLEANUP_UNCONFIRMED");
+                assert_eq!(state.lock().expect("state").phase, "recovery_required");
+                assert!(owned.is_some());
+                continue;
+            }
+            let view = stop_owned_with_cause(
+                &settings,
+                &state,
+                &mut owned,
+                if case == "normal" {
+                    None
+                } else {
+                    Some("MODEL_HOST_EXITED")
+                },
+            )
+            .await
+            .expect("confirmed stopped even if diagnostics unavailable");
+            assert!(owned.is_none());
+            assert_eq!(view.phase, "stopped");
+            let expected = match case {
+                "normal" => None,
+                "control-lost" => Some("MODEL_CONTROL_HEARTBEAT_LOST"),
+                _ => Some("MODEL_DIAGNOSTIC_UNAVAILABLE"),
+            };
+            assert_eq!(view.failure.as_deref(), expected);
+            let history: History = serde_json::from_slice(
+                &io::read(&root.join("manager.json"), 256 * 1024, true).expect("durable state"),
+            )
+            .expect("history");
+            assert_eq!(history.entries[0].failure.as_deref(), expected);
+            if case == "control-lost" {
+                let evidence: serde_json::Value = serde_json::from_slice(
+                    &io::read(&root.join("failure.json"), 4096, true).expect("metadata evidence"),
+                )
+                .expect("json");
+                assert_eq!(evidence["helper_exit_code"], 1);
+                assert_eq!(evidence["cause"], "MODEL_CONTROL_HEARTBEAT_LOST");
+            }
+        }
+    }
     #[tokio::test]
     async fn rejected_queue_request_is_durable_without_inventing_a_process() {
         let temp = tempfile::tempdir().expect("fixture");
