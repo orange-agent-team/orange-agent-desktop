@@ -10,9 +10,9 @@
 
 读取、新建、编辑是三份独立授权。native 选择器分别取得 scope，释放时校验用途。编辑必须属于当前读取工作区；切换工作区、选择 token、权限版本或关闭 Host 时，旧预览及选择立即失效。重开不会自动恢复 OS 权限。
 
-- `authorizeEditingWorkspace` / `listEditingWorkspaces`：登记或查询独立编辑选择，携带 consent、workspace、version 与 session token。
-- `suspendEditingWorkspace`：按精确 session token 停止；迟到的旧选择回调不能关闭或恢复新 scope。
-- `revokeEditingWorkspace`：按权限版本撤权；先发队列外信号，排空操作，再释放 native scope。
+- `authorizeEditingAccess` / `listEditingAccess`：登记或查询独立编辑选择，携带 consent、workspace、version 与 session token。
+- `suspendEditingSelection`：按精确 session token 停止；迟到的旧选择回调不能关闭或恢复新 scope。
+- `revokeEditingAccess`：按权限版本撤权；先发队列外信号，排空操作，再释放 native scope。
 - `startEditingRun`：显式传入编辑权限选择，可另传独立的新建权限。UI 默认关闭编辑，不从普通 Run 自动升级。
 - `previewEditingTool`：由 Rust 基于真实文件计算 diff、参数摘要和 preview digest。Dart 不从模型 patch 生成可信批准内容。
 - `approveEditingTool`：提交精确 preview digest。普通工具批准入口不能批准 patch；错操作、晚到预览及已失效选择均拒绝。
