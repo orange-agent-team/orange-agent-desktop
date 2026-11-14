@@ -2,7 +2,7 @@
 
 ## 来源与线程边界
 
-本候选固定消费 Runtime `4ab8c19f8034a77653cc103606d0d7d098238b97`；归档、清单及来源摘要见 `config/runtime.lock.json`。普通构建只使用本仓库固定 vendor，不读取相邻服务端源码。5 个共享 package 包括 E03 内部的 platform-files；不增加核心工程。消费者 Cargo.lock 的包身份未改变。
+本候选固定消费 Runtime `766ff0db8324c49539d8f2005b12434d09ff324c`；归档、清单及来源摘要见 `config/runtime.lock.json`。普通构建只使用本仓库固定 vendor，不读取相邻服务端源码。5 个共享 package 包括 E03 内部的 platform-files；不增加核心工程。消费者 Cargo.lock 的包身份未改变。
 
 独立 OS 线程仍独占 HostRegistry 和 Journal；Tokio 的两个 worker 支持发布阻塞通道之外的撤权、取消和 I/O，不让多线程并发访问 SQLite。
 
@@ -44,3 +44,5 @@ native 测试的模型 HTTP 和选择器回调是明确夹具；实际 Rust/FRB�
 当前候选固定Runtime4ab8c19的9项Rust测试、严格Clippy、21组件和静态检查通过；实际原生6场景通过，并新增了“释放读取权限后可查询元数据、但内容读取仍拒绝”的FRB验收。日志edit-recovery-desktop-check.log和edit-recovery-desktop-native.log，82309/80582 exit0。新的组件清单为cb4f0d4c870c91d9cc6687e25854ed9d72f9a747f05c94cd29a4ed4e7fb5f56d，无测试权重。
 
 上文真实0.5B/7B证据和默认包证据属于Runtime81bf2d9整合阶段，不冒充本增量的真实推理证据。此增量没有恢复授权/文件检查/决策批准界面；原生测试仅证明元数据入口不会恢复文件权限，并不代表完整恢复流程已完成。本候选默认App需在原生测试后独立恢复。
+
+当前恢复读取界面与隔离边界见 [recovery-inspection.md](recovery-inspection.md)。上节4ab8c19描述保留为索引阶段历史证据；新766ff0d读取检查已通过实际原生回执故障测试，恢复写入UI仍未实现。

@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -417,6 +417,39 @@ Future<List<String>> listUnresolvedEdits({
   limit: limit,
 );
 
+/// Trusted UI only after a separate native recovery-read directory selection.
+Future<RecoveryInspectionAccessView> authorizeRecoveryInspection({
+  required String handle,
+  required String runId,
+  required String operationId,
+  required String requestId,
+  required String workspaceVersion,
+  required String selectedDirectory,
+}) => RustLib.instance.api.crateApiHostAuthorizeRecoveryInspection(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+  requestId: requestId,
+  workspaceVersion: workspaceVersion,
+  selectedDirectory: selectedDirectory,
+);
+
+Future<RecoveryInspectionView> inspectRecovery({
+  required String handle,
+  required String sessionToken,
+}) => RustLib.instance.api.crateApiHostInspectRecovery(
+  handle: handle,
+  sessionToken: sessionToken,
+);
+
+Future<void> suspendRecoveryInspection({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostSuspendRecoveryInspection(
+  handle: handle,
+  requestId: requestId,
+);
+
 class AgentRunView {
   /// Immutable Run capability; never inferred from a pending tool name.
   final String? creationConsentId;
@@ -752,6 +785,135 @@ class ModelServiceView {
           installed == other.installed &&
           instanceId == other.instanceId &&
           failure == other.failure;
+}
+
+class RecoveryFileStatusView {
+  final String kind;
+  final String? refusal;
+  final String? bytes;
+  final String? sha256;
+  final String? securitySha256;
+  final bool reviewedOriginalInode;
+  final bool matchesOriginalContent;
+  final bool matchesResultContent;
+
+  const RecoveryFileStatusView({
+    required this.kind,
+    this.refusal,
+    this.bytes,
+    this.sha256,
+    this.securitySha256,
+    required this.reviewedOriginalInode,
+    required this.matchesOriginalContent,
+    required this.matchesResultContent,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^
+      refusal.hashCode ^
+      bytes.hashCode ^
+      sha256.hashCode ^
+      securitySha256.hashCode ^
+      reviewedOriginalInode.hashCode ^
+      matchesOriginalContent.hashCode ^
+      matchesResultContent.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecoveryFileStatusView &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          refusal == other.refusal &&
+          bytes == other.bytes &&
+          sha256 == other.sha256 &&
+          securitySha256 == other.securitySha256 &&
+          reviewedOriginalInode == other.reviewedOriginalInode &&
+          matchesOriginalContent == other.matchesOriginalContent &&
+          matchesResultContent == other.matchesResultContent;
+}
+
+class RecoveryInspectionAccessView {
+  final String sessionToken;
+  final String runId;
+  final String operationId;
+  final String workspaceId;
+  final String displayDirectory;
+
+  const RecoveryInspectionAccessView({
+    required this.sessionToken,
+    required this.runId,
+    required this.operationId,
+    required this.workspaceId,
+    required this.displayDirectory,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      runId.hashCode ^
+      operationId.hashCode ^
+      workspaceId.hashCode ^
+      displayDirectory.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecoveryInspectionAccessView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          workspaceId == other.workspaceId &&
+          displayDirectory == other.displayDirectory;
+}
+
+class RecoveryInspectionView {
+  final String runId;
+  final String operationId;
+  final String path;
+  final String executionState;
+  final String? lastDurableStage;
+  final RecoveryFileStatusView target;
+  final RecoveryFileStatusView staged;
+  final RecoveryFileStatusView original;
+
+  const RecoveryInspectionView({
+    required this.runId,
+    required this.operationId,
+    required this.path,
+    required this.executionState,
+    this.lastDurableStage,
+    required this.target,
+    required this.staged,
+    required this.original,
+  });
+
+  @override
+  int get hashCode =>
+      runId.hashCode ^
+      operationId.hashCode ^
+      path.hashCode ^
+      executionState.hashCode ^
+      lastDurableStage.hashCode ^
+      target.hashCode ^
+      staged.hashCode ^
+      original.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecoveryInspectionView &&
+          runtimeType == other.runtimeType &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          path == other.path &&
+          executionState == other.executionState &&
+          lastDurableStage == other.lastDurableStage &&
+          target == other.target &&
+          staged == other.staged &&
+          original == other.original;
 }
 
 class RunPage {

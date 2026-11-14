@@ -13,11 +13,17 @@ mod creation;
 #[cfg(target_vendor = "apple")]
 mod editing;
 #[cfg(target_vendor = "apple")]
+mod recovery;
+#[cfg(target_vendor = "apple")]
 pub(crate) use editing::{approve_editing_tool, preview_editing_tool, start_editing_run};
 #[cfg(target_vendor = "apple")]
 pub(crate) use editing::{
     authorize_editing_access, list_editing_access, list_unresolved_edits, revoke_editing_access,
     suspend_editing_selection,
+};
+#[cfg(target_vendor = "apple")]
+pub(crate) use recovery::{
+    authorize_recovery_inspection, inspect_recovery, suspend_recovery_inspection,
 };
 mod managed;
 pub(crate) use creation::{
@@ -50,6 +56,8 @@ struct Host {
     creations: std::collections::HashMap<String, creation::CreationSession>,
     #[cfg(target_vendor = "apple")]
     editings: std::collections::HashMap<String, editing::EditingSession>,
+    #[cfg(target_vendor = "apple")]
+    recovery_inspections: std::collections::HashMap<String, recovery::InspectionSession>,
     #[cfg(target_vendor = "apple")]
     run_edit_grants: std::collections::HashMap<
         String,
@@ -135,6 +143,8 @@ impl HostRegistry {
             creations: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             editings: std::collections::HashMap::new(),
+            #[cfg(target_vendor = "apple")]
+            recovery_inspections: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             run_edit_grants: std::collections::HashMap::new(),
             model: None,
@@ -501,10 +511,16 @@ pub(crate) async fn suspend_workspace_access(
         let creation_leases = host.workspace_creation_leases(&handle, &workspace_id)?;
         #[cfg(target_vendor = "apple")]
         let editing_leases = host.workspace_editing_leases(&handle, &workspace_id)?;
+        #[cfg(target_vendor = "apple")]
+        let recovery_leases = host.workspace_recovery_leases(&handle, &workspace_id)?;
         let view = host.suspend_workspace(&handle, &workspace_id, &session_token)?;
         rt.block_on(async {
             #[cfg(target_vendor = "apple")]
             for grant in editing_leases {
+                grant.wait_drained().await;
+            }
+            #[cfg(target_vendor = "apple")]
+            for grant in recovery_leases {
                 grant.wait_drained().await;
             }
             for grant in creation_leases {
@@ -526,11 +542,17 @@ pub(crate) async fn suspend_workspace_selection(
         let creation_leases = host.workspace_creation_leases(&handle, &workspace)?;
         #[cfg(target_vendor = "apple")]
         let editing_leases = host.workspace_editing_leases(&handle, &workspace)?;
+        #[cfg(target_vendor = "apple")]
+        let recovery_leases = host.workspace_recovery_leases(&handle, &workspace)?;
         match host.suspend_workspace(&handle, &workspace, &request_id) {
             Ok(_) => {
                 rt.block_on(async {
                     #[cfg(target_vendor = "apple")]
                     for grant in editing_leases {
+                        grant.wait_drained().await;
+                    }
+                    #[cfg(target_vendor = "apple")]
+                    for grant in recovery_leases {
                         grant.wait_drained().await;
                     }
                     for grant in creation_leases {
@@ -555,10 +577,16 @@ pub(crate) async fn revoke_workspace(
         let creation_leases = host.workspace_creation_leases(&handle, &workspace_id)?;
         #[cfg(target_vendor = "apple")]
         let editing_leases = host.workspace_editing_leases(&handle, &workspace_id)?;
+        #[cfg(target_vendor = "apple")]
+        let recovery_leases = host.workspace_recovery_leases(&handle, &workspace_id)?;
         let view = host.revoke_workspace(&handle, &workspace_id, &expected_version)?;
         rt.block_on(async {
             #[cfg(target_vendor = "apple")]
             for grant in editing_leases {
+                grant.wait_drained().await;
+            }
+            #[cfg(target_vendor = "apple")]
+            for grant in recovery_leases {
                 grant.wait_drained().await;
             }
             for grant in creation_leases {
@@ -596,7 +624,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "4ab8c19f8034a77653cc103606d0d7d098238b97"
+            "766ff0db8324c49539d8f2005b12434d09ff324c"
         );
         assert_eq!(
             registry

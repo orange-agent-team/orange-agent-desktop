@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(target_vendor = "apple")]
+mod recovery_inspection;
 use crate::api::host as api;
 use orange_protocol::model::{ResponseCandidate, ToolCall};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -654,7 +656,11 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
     exercise_creation_actor(&reopened.handle, temporary.path()).await;
     #[cfg(target_vendor = "apple")]
     exercise_editing_actor(&reopened.handle, temporary.path()).await;
-    api::close_host(reopened.handle).expect("fixture operation succeeds");
+    #[cfg(target_vendor = "apple")]
+    let closing_handle = recovery_inspection::exercise(&reopened.handle, temporary.path()).await;
+    #[cfg(not(target_vendor = "apple"))]
+    let closing_handle = reopened.handle;
+    api::close_host(closing_handle).expect("fixture operation succeeds");
 }
 
 #[cfg(target_vendor = "apple")]

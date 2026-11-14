@@ -6,6 +6,8 @@ import 'creation_panel.dart';
 import 'editing_panel.dart';
 import 'model_controller.dart';
 import 'model_panel.dart';
+import 'recovery_controller.dart';
+import 'recovery_panel.dart';
 import 'src/rust/api/host.dart';
 import 'workspaces.dart';
 
@@ -27,6 +29,7 @@ class LocalAgentShell extends StatefulWidget {
 
 class _LocalAgentShellState extends State<LocalAgentShell> {
   late final AgentController controller;
+  late final RecoveryController recovery;
   ModelController? models;
   List<WorkspaceView> workspaces = [];
   List<CreationAccessView> creations = [];
@@ -50,6 +53,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
           ? widget.serviceDirectory
           : () async => 'managed',
     );
+    recovery = RecoveryController(NativeRecoveryCommands(widget.host.handle));
     models?.configure();
   }
 
@@ -57,11 +61,20 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
   void dispose() {
     models?.dispose();
     controller.dispose();
+    recovery.dispose();
     super.dispose();
   }
 
   void changed(List<WorkspaceView> rows) {
     if (!mounted) return;
+    for (final old in workspaces) {
+      final current = rows.where((w) => w.workspaceId == old.workspaceId);
+      if (current.isEmpty ||
+          current.single.permissionVersion != old.permissionVersion ||
+          (old.sessionAccess && !current.single.sessionAccess)) {
+        recovery.workspaceStopping(old.workspaceId);
+      }
+    }
     setState(() => workspaces = rows);
     if (controller.workspaceId != null &&
         !rows.any(
@@ -85,12 +98,22 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
       WorkspacePanel(
         host: widget.host,
         onChanged: changed,
-        onAccessStopping: (id) => controller.hideContent(stoppingWorkspace: id),
-        onOpenRun: (run) => controller.load(
-          run.runId,
-          reopen: true,
-          expectedWorkspace: run.workspaceId,
-        ),
+        onAccessStopping: (id) {
+          controller.hideContent(stoppingWorkspace: id);
+          recovery.workspaceStopping(id);
+        },
+        onOpenRun: (run) {
+          if (run.phase == 'recovery_required') {
+            controller.hideContent();
+            recovery.selectRun(run);
+          } else {
+            controller.load(
+              run.runId,
+              reopen: true,
+              expectedWorkspace: run.workspaceId,
+            );
+          }
+        },
       ),
       const SizedBox(height: 16),
       CreationPanel(
@@ -109,6 +132,11 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
           if (mounted) setState(() => editings = rows);
         },
         onStopping: controller.editingStopping,
+      ),
+      const SizedBox(height: 16),
+      RecoveryPanel(
+        controller: recovery,
+        supported: widget.host.availableEditTools.contains('apply_patch'),
       ),
       const SizedBox(height: 16),
       AgentPanel(

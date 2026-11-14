@@ -1311,6 +1311,7 @@ dependencies = [
  "orange-domain",
  "orange-model-runtime",
  "orange-protocol",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",

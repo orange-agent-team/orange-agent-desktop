@@ -524,3 +524,96 @@ pub async fn list_unresolved_edits(
         Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct RecoveryInspectionAccessView {
+    pub session_token: String,
+    pub run_id: String,
+    pub operation_id: String,
+    pub workspace_id: String,
+    pub display_directory: String,
+}
+#[derive(Debug, Clone)]
+pub struct RecoveryFileStatusView {
+    pub kind: String,
+    pub refusal: Option<String>,
+    pub bytes: Option<String>,
+    pub sha256: Option<String>,
+    pub security_sha256: Option<String>,
+    pub reviewed_original_inode: bool,
+    pub matches_original_content: bool,
+    pub matches_result_content: bool,
+}
+#[derive(Debug, Clone)]
+pub struct RecoveryInspectionView {
+    pub run_id: String,
+    pub operation_id: String,
+    pub path: String,
+    pub execution_state: String,
+    pub last_durable_stage: Option<String>,
+    pub target: RecoveryFileStatusView,
+    pub staged: RecoveryFileStatusView,
+    pub original: RecoveryFileStatusView,
+}
+/// Trusted UI only after a separate native recovery-read directory selection.
+pub async fn authorize_recovery_inspection(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    request_id: String,
+    workspace_version: String,
+    selected_directory: String,
+) -> Result<RecoveryInspectionAccessView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::authorize_recovery_inspection(
+            handle,
+            run_id,
+            operation_id,
+            request_id,
+            workspace_version,
+            selected_directory,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (
+            handle,
+            run_id,
+            operation_id,
+            request_id,
+            workspace_version,
+            selected_directory,
+        );
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn inspect_recovery(
+    handle: String,
+    session_token: String,
+) -> Result<RecoveryInspectionView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::inspect_recovery(handle, session_token).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, session_token);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn suspend_recovery_inspection(
+    handle: String,
+    request_id: String,
+) -> Result<(), BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::suspend_recovery_inspection(handle, request_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, request_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}

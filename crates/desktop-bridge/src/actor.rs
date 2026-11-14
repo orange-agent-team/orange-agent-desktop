@@ -21,7 +21,11 @@ mod creation;
 #[cfg(target_vendor = "apple")]
 mod editing;
 #[cfg(target_vendor = "apple")]
+mod recovery;
+#[cfg(target_vendor = "apple")]
 pub(crate) use editing::{signal_editing_release, signal_editing_revoke};
+#[cfg(target_vendor = "apple")]
+pub(crate) use recovery::{RecoveryInspectionSignal, signal_recovery_inspection_release};
 #[cfg(target_vendor = "apple")]
 pub(crate) struct EditingSignal {
     pub workspace: String,
@@ -80,12 +84,22 @@ pub(crate) struct Signals {
     pub editings: HashMap<String, EditingSignal>,
     #[cfg(target_vendor = "apple")]
     pub closed_editing_selections: HashSet<String>,
+    #[cfg(target_vendor = "apple")]
+    pub recovery_inspections: HashMap<String, RecoveryInspectionSignal>,
+    #[cfg(target_vendor = "apple")]
+    pub closed_recovery_selections: HashSet<String>,
+    #[cfg(target_vendor = "apple")]
+    pub recovery_epochs: HashMap<String, u64>,
     pub service: Option<crate::service::Client>,
     pub imports: HashMap<String, (String, watch::Sender<bool>)>,
     pub closed_imports: HashSet<String>,
 }
 impl Signals {
     pub fn stop_all(&self) {
+        #[cfg(target_vendor = "apple")]
+        for scope in self.recovery_inspections.values() {
+            scope.suspend();
+        }
         if let Some(service) = &self.service {
             service.close();
         }
@@ -403,10 +417,18 @@ pub(crate) fn signal_revoke(
         .as_ref()
         .filter(|s| s.view.handle == handle)
         .ok_or_else(|| failure("STALE_HOST_HANDLE"))?;
-    let signals = session
+    let mut signals = session
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
+    #[cfg(target_vendor = "apple")]
+    if signals.recovery_inspections.values().any(|scope| {
+        scope.workspace == workspace
+            && scope.available.load(Ordering::Acquire)
+            && scope.workspace_version != version
+    }) {
+        return Err(failure("WORKSPACE_CONFLICT"));
+    }
     if let Some(current) = signals.workspaces.get(workspace) {
         if current.version != version {
             return Err(failure("WORKSPACE_CONFLICT"));
@@ -439,6 +461,8 @@ pub(crate) fn signal_revoke(
             run.cancel.send_replace(true);
         }
     }
+    #[cfg(target_vendor = "apple")]
+    signals.stop_recovery_workspace(workspace);
     Ok(())
 }
 pub(crate) fn signal_suspend(
@@ -488,6 +512,8 @@ pub(crate) fn signal_suspend(
             run.cancel.send_replace(true);
         }
         signals.closed_selections.insert(session_token.into());
+        #[cfg(target_vendor = "apple")]
+        signals.stop_recovery_workspace(workspace);
     }
     Ok(())
 }
@@ -538,6 +564,10 @@ pub(crate) fn signal_release_selection(
             }
             run.cancel.send_replace(true);
         }
+    }
+    #[cfg(target_vendor = "apple")]
+    if let Some(workspace) = &workspace {
+        signals.stop_recovery_workspace(workspace);
     }
     Ok(workspace)
 }
