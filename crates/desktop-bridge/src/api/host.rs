@@ -525,6 +525,43 @@ pub async fn list_unresolved_edits(
     }
 }
 
+/// Owned operation IDs eligible for retained-file management, including
+/// archived records. Does not authorize reading, archival, export or deletion.
+pub async fn list_retained_edits(
+    handle: String,
+    run_id: String,
+    before: Option<String>,
+    limit: u16,
+) -> Result<Vec<String>, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::list_retained_edits(handle, run_id, before, limit).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, run_id, before, limit);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+
+/// Query the committed archival review ID after a lost reply. None is not
+/// approval to retry, and this query never opens files or restores a Run.
+pub async fn inspect_retention_outcome(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+) -> Result<Option<String>, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::inspect_retention_outcome(handle, run_id, operation_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, run_id, operation_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RecoveryInspectionAccessView {
     pub session_token: String,

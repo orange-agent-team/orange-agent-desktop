@@ -417,6 +417,32 @@ Future<List<String>> listUnresolvedEdits({
   limit: limit,
 );
 
+/// Owned operation IDs eligible for retained-file management, including
+/// archived records. Does not authorize reading, archival, export or deletion.
+Future<List<String>> listRetainedEdits({
+  required String handle,
+  required String runId,
+  String? before,
+  required int limit,
+}) => RustLib.instance.api.crateApiHostListRetainedEdits(
+  handle: handle,
+  runId: runId,
+  before: before,
+  limit: limit,
+);
+
+/// Query the committed archival review ID after a lost reply. None is not
+/// approval to retry, and this query never opens files or restores a Run.
+Future<String?> inspectRetentionOutcome({
+  required String handle,
+  required String runId,
+  required String operationId,
+}) => RustLib.instance.api.crateApiHostInspectRetentionOutcome(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+);
+
 Future<RecoveryDecisionView> prepareRecoveryDecision({
   required String handle,
   required String readSessionToken,

@@ -15,6 +15,8 @@ mod editing;
 #[cfg(target_vendor = "apple")]
 mod recovery;
 #[cfg(target_vendor = "apple")]
+mod retention;
+#[cfg(target_vendor = "apple")]
 pub(crate) use editing::{approve_editing_tool, preview_editing_tool, start_editing_run};
 #[cfg(target_vendor = "apple")]
 pub(crate) use editing::{
@@ -30,6 +32,8 @@ pub(crate) use recovery::{
 };
 #[cfg(target_vendor = "apple")]
 pub(crate) use recovery::{authorize_recovery_write_access, suspend_recovery_write_selection};
+#[cfg(target_vendor = "apple")]
+pub(crate) use retention::{inspect_retention_outcome, list_retained_edits};
 mod managed;
 pub(crate) use creation::{
     authorize_creation_access, list_creation_access, revoke_creation_access,
@@ -633,7 +637,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "f0474a4a4ff79f4cd104152de0ca82ea05350bd3"
+            "a2cdafb95fab90bc1ded82d4a4c061be40463d35"
         );
         assert_eq!(
             registry

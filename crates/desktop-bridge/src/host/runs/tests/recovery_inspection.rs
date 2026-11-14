@@ -66,6 +66,12 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
             .expect("unknown index"),
         vec![operation.clone()]
     );
+    assert!(
+        api::list_retained_edits(h.into(), run.run_id.clone(), None, 10)
+            .await
+            .expect("unknown not eligible for archival")
+            .is_empty()
+    );
     assert_eq!(
         api::authorize_recovery_inspection(
             h.into(),
@@ -487,10 +493,82 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
     api::suspend_recovery_write_selection(h.into(), write_again.session_token)
         .await
         .expect("idempotent physical write release barrier");
-    let saved = api::inspect_recovery_outcome(h.into(), run.run_id.clone(), operation)
+    let saved = api::inspect_recovery_outcome(h.into(), run.run_id.clone(), operation.clone())
         .await
         .expect("lost reply reconciled without file access");
     assert_eq!(saved.recovery_id, completed.recovery_id);
+    assert_eq!(
+        api::list_retained_edits(h.into(), run.run_id.clone(), None, 10)
+            .await
+            .expect("resolved retention metadata"),
+        vec![operation.clone()]
+    );
+    assert!(
+        api::list_retained_edits(h.into(), run.run_id.clone(), Some(operation.clone()), 1)
+            .await
+            .expect("strict cursor")
+            .is_empty()
+    );
+    assert!(
+        api::list_retained_edits(h.into(), "foreign-run".into(), None, 10)
+            .await
+            .is_err()
+    );
+    assert!(
+        api::list_retained_edits(h.into(), run.run_id.clone(), None, 101)
+            .await
+            .is_err()
+    );
+    assert!(
+        api::inspect_retention_outcome(h.into(), "foreign-run".into(), operation.clone())
+            .await
+            .is_err()
+    );
+    assert!(
+        api::inspect_retention_outcome(h.into(), run.run_id.clone(), operation.clone())
+            .await
+            .expect("not archived")
+            .is_none()
+    );
+    // Test-only trusted-host selection/approval. Production native selection
+    // and retention UI are a separate implementation, not simulated here.
+    let handle = h.to_owned();
+    let retained_run = run.run_id.clone();
+    let retained_operation = operation.clone();
+    let retained_root = root.clone();
+    let review_id = crate::actor::call(handle.clone(), move |registry, rt| {
+        let journal = &mut registry.current(&handle)?.journal;
+        let grant = journal
+            .authorize_patch_retention(
+                LOCAL_OWNER,
+                &retained_run,
+                &retained_operation,
+                &retained_root,
+            )
+            .expect("test-owned native selection");
+        let review = rt
+            .block_on(journal.prepare_selected_retention(&grant, "bridge-retention-fixture"))
+            .expect("actual preview");
+        rt.block_on(journal.approve_selected_retention(&grant, &review.review_id, &review.digest))
+            .expect("actual archive transaction");
+        grant.request_revoke();
+        rt.block_on(grant.wait_drained());
+        Ok(review.review_id)
+    })
+    .await
+    .expect("owned fixture transaction");
+    assert_eq!(
+        api::inspect_retention_outcome(h.into(), run.run_id.clone(), operation.clone())
+            .await
+            .expect("lost response lookup after scope release"),
+        Some(review_id)
+    );
+    assert_eq!(
+        api::list_retained_edits(h.into(), run.run_id.clone(), None, 10)
+            .await
+            .expect("archived remains discoverable"),
+        vec![operation]
+    );
     assert!(
         api::list_unresolved_edits(h.into(), run.run_id.clone(), None, 10)
             .await
