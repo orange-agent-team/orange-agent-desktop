@@ -7,9 +7,9 @@ use orange_agent_runtime::workspace::patch::{
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub(super) struct InspectionSession {
-    view: ExportInspectionAccessView,
-    grant: Arc<ExportInspectionGrant>,
-    available: Arc<AtomicBool>,
+    pub(super) view: ExportInspectionAccessView,
+    pub(super) grant: Arc<ExportInspectionGrant>,
+    pub(super) available: Arc<AtomicBool>,
 }
 fn error(e: PatchError) -> BridgeError {
     failure(match e {
@@ -34,10 +34,11 @@ fn foreign(c: &crate::actor::Signals, t: &str) -> bool {
         || c.editings.values().any(|s| s.token == t)
         || c.retentions.contains_key(t)
         || c.exports.contains_key(t)
+        || c.export_retirements.contains_key(t)
         || c.recovery_inspections.contains_key(t)
         || c.recovery_writes.contains_key(t)
 }
-fn observed(value: &ExportFileObservation) -> ExportObservedFileView {
+pub(super) fn observed(value: &ExportFileObservation) -> ExportObservedFileView {
     let mut out = ExportObservedFileView {
         kind: "missing".into(),
         reason: None,
@@ -198,6 +199,8 @@ impl HostRegistry {
         Ok(view)
     }
     async fn close_export_check(&mut self, handle: &str, token: &str) -> Result<(), BridgeError> {
+        self.close_export_retirements(handle, Some(token), None)
+            .await?;
         let signals = self.signals.clone();
         let host = self.current(handle)?;
         if let Some(scope) = host.export_checks.get(token) {

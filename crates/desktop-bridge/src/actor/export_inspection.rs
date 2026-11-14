@@ -29,6 +29,7 @@ pub(crate) fn signal_export_inspection_release(
         .map_err(|_| failure("HOST_INTERNAL"))?;
     if signals.retentions.contains_key(token)
         || signals.exports.contains_key(token)
+        || signals.export_retirements.contains_key(token)
         || signals.recovery_inspections.contains_key(token)
         || signals.recovery_writes.contains_key(token)
     {
@@ -37,6 +38,13 @@ pub(crate) fn signal_export_inspection_release(
     if signals.closed_recovery_selections.len() < 8192 || signals.export_checks.contains_key(token)
     {
         signals.closed_recovery_selections.insert(token.into());
+    }
+    for scope in signals
+        .export_retirements
+        .values()
+        .filter(|s| s.reader == token)
+    {
+        scope.suspend();
     }
     if let Some(scope) = signals.export_checks.get(token) {
         scope.suspend();

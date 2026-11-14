@@ -744,6 +744,8 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
     );
     super::export_inspection::exercise(h, base, &run.run_id, &operation, &completed_export_id)
         .await;
+    super::export_retirement::exercise(h, base, &run.run_id, &operation, &completed_export_id)
+        .await;
     assert!(
         api::inspect_retention(h.into(), access.session_token)
             .await

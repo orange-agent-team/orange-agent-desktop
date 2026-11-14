@@ -31,6 +31,7 @@ pub(crate) fn signal_retention_release(handle: &str, token: &str) -> Result<(), 
         || signals.recovery_writes.contains_key(token)
         || signals.exports.contains_key(token)
         || signals.export_checks.contains_key(token)
+        || signals.export_retirements.contains_key(token)
     {
         return Err(failure("RETENTION_SELECTION_CONFLICT"));
     }
@@ -80,7 +81,8 @@ pub(crate) fn signal_export_release(handle: &str, token: &str) -> Result<(), Bri
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
-    if signals.export_checks.contains_key(token)
+    if signals.export_retirements.contains_key(token)
+        || signals.export_checks.contains_key(token)
         || signals.retentions.contains_key(token)
         || signals.recovery_inspections.contains_key(token)
         || signals.recovery_writes.contains_key(token)
@@ -90,6 +92,7 @@ pub(crate) fn signal_export_release(handle: &str, token: &str) -> Result<(), Bri
     if signals.closed_recovery_selections.len() < 8192
         || signals.exports.contains_key(token)
         || signals.export_checks.contains_key(token)
+        || signals.export_retirements.contains_key(token)
     {
         signals.closed_recovery_selections.insert(token.into());
     }

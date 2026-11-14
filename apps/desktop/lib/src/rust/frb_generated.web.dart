@@ -36,6 +36,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_box_autoadd_bool(dynamic raw);
 
   @protected
+  ExportObservedFileView dco_decode_box_autoadd_export_observed_file_view(
+    dynamic raw,
+  );
+
+  @protected
   ExportOutcomeView dco_decode_box_autoadd_export_outcome_view(dynamic raw);
 
   @protected
@@ -81,6 +86,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ExportOutcomeView dco_decode_export_outcome_view(dynamic raw);
 
   @protected
+  ExportRetirementAccessView dco_decode_export_retirement_access_view(
+    dynamic raw,
+  );
+
+  @protected
+  ExportRetirementInspectionView dco_decode_export_retirement_inspection_view(
+    dynamic raw,
+  );
+
+  @protected
+  ExportRetirementOutcomeView dco_decode_export_retirement_outcome_view(
+    dynamic raw,
+  );
+
+  @protected
+  ExportRetirementReviewView dco_decode_export_retirement_review_view(
+    dynamic raw,
+  );
+
+  @protected
   ExportReviewView dco_decode_export_review_view(dynamic raw);
 
   @protected
@@ -103,6 +128,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ExportOutcomeView> dco_decode_list_export_outcome_view(dynamic raw);
+
+  @protected
+  List<ExportRetirementOutcomeView>
+  dco_decode_list_export_retirement_outcome_view(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -130,6 +159,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   bool? dco_decode_opt_box_autoadd_bool(dynamic raw);
+
+  @protected
+  ExportObservedFileView? dco_decode_opt_box_autoadd_export_observed_file_view(
+    dynamic raw,
+  );
 
   @protected
   ExportOutcomeView? dco_decode_opt_box_autoadd_export_outcome_view(
@@ -224,6 +258,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
 
   @protected
+  ExportObservedFileView sse_decode_box_autoadd_export_observed_file_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ExportOutcomeView sse_decode_box_autoadd_export_outcome_view(
     SseDeserializer deserializer,
   );
@@ -281,6 +320,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ExportRetirementAccessView sse_decode_export_retirement_access_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ExportRetirementInspectionView sse_decode_export_retirement_inspection_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ExportRetirementOutcomeView sse_decode_export_retirement_outcome_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ExportRetirementReviewView sse_decode_export_retirement_review_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ExportReviewView sse_decode_export_review_view(SseDeserializer deserializer);
 
   @protected
@@ -311,6 +370,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ExportOutcomeView> sse_decode_list_export_outcome_view(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<ExportRetirementOutcomeView>
+  sse_decode_list_export_retirement_outcome_view(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -346,6 +409,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
+  ExportObservedFileView? sse_decode_opt_box_autoadd_export_observed_file_view(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ExportOutcomeView? sse_decode_opt_box_autoadd_export_outcome_view(
@@ -463,6 +531,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_export_observed_file_view(
+    ExportObservedFileView self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_export_outcome_view(
     ExportOutcomeView self,
     SseSerializer serializer,
@@ -538,6 +612,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_export_retirement_access_view(
+    ExportRetirementAccessView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_export_retirement_inspection_view(
+    ExportRetirementInspectionView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_export_retirement_outcome_view(
+    ExportRetirementOutcomeView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_export_retirement_review_view(
+    ExportRetirementReviewView self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_export_review_view(
     ExportReviewView self,
     SseSerializer serializer,
@@ -573,6 +671,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_export_outcome_view(
     List<ExportOutcomeView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_export_retirement_outcome_view(
+    List<ExportRetirementOutcomeView> self,
     SseSerializer serializer,
   );
 
@@ -623,6 +727,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_export_observed_file_view(
+    ExportObservedFileView? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_export_outcome_view(

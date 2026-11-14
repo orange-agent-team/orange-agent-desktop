@@ -1,3 +1,5 @@
+当前候选已升级Runtime e77a61e/schema20，并接入独立保留区流程，详见[导出保留区](export-retirement.md)。下文保留schema19基础验证历史。
+
 # 写入者停止证明：消费准备
 
 固定Runtime c60c50290ea901ebeea2a4c0cb4b307d79f3cb4f/schema19已通过显式导入，257共享测试含204Runtime及严格Clippy通过，真实旧schema18 CLI迁移/非修改式拒绝通过。没有改写vendor，普通构建不读取相邻源码。

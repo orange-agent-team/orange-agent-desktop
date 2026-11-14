@@ -63,6 +63,8 @@ void main() {
       bool passed = false;
       Directory? detachedWorkspace;
       final inspectionReleased = Completer<void>();
+      var inspectionSelections = 0;
+      var retirementReleaseConfirmed = false;
       final released = Completer<void>();
       const channel = MethodChannel('orange_agent/platform');
       try {
@@ -151,7 +153,8 @@ void main() {
           (call) async {
             if (call.method == 'chooseExportInspectionDirectory') {
               return {
-                'selectionId': 'native-independent-export-check',
+                'selectionId':
+                    'native-independent-export-check-${++inspectionSelections}',
                 'path': output.path,
               };
             }
@@ -159,7 +162,8 @@ void main() {
               await expectLater(
                 inspectExportFiles(
                   handle: handle!,
-                  sessionToken: 'native-independent-export-check',
+                  sessionToken:
+                      (call.arguments as Map)['selectionId'] as String,
                 ),
                 throwsA(
                   isA<BridgeError>().having(
@@ -172,6 +176,31 @@ void main() {
               if (!inspectionReleased.isCompleted) {
                 inspectionReleased.complete();
               }
+              return null;
+            }
+            if (call.method == 'chooseExportRetirementDirectory') {
+              return {
+                'selectionId': 'native-retirement-write',
+                'path': output.path,
+              };
+            }
+            if (call.method == 'releaseExportRetirementSelection') {
+              await expectLater(
+                prepareExportRetirement(
+                  handle: handle!,
+                  sessionToken: 'native-retirement-write',
+                  requestId: 'late-retirement',
+                  choice: 'target',
+                ),
+                throwsA(
+                  isA<BridgeError>().having(
+                    (e) => e.code,
+                    'code',
+                    'EXPORT_RETIREMENT_CLOSED',
+                  ),
+                ),
+              );
+              retirementReleaseConfirmed = true;
               return null;
             }
             if (call.method == 'chooseExportDestination') {
@@ -487,10 +516,114 @@ void main() {
             'modelAndPicker': 'explicit fixtures',
           }),
         );
+        // The prior read-only evidence is complete. Exercise a separate native
+        // write selection and exact confirmation with actual FRB/SQLite/files.
+        await controller.exportInspection!.open(
+          run.runId,
+          operation,
+          records.singleWhere((r) => r.exportId == uncertain.exportId),
+        );
+        await helpers.settle(tester, 'retirement-read');
+        final retire = controller.exportInspection!.retirement!;
+        expect(retire.error, isNull);
+        await tester.ensureVisible(find.text('选择目录并预览移出目标'));
+        await tester.tap(find.text('选择目录并预览移出目标'));
+        await helpers.settle(tester, 'retirement-prepare');
+        expect(retire.error, isNull);
+        final retirement = retire.review!;
+        expect(await uncertainFile.readAsBytes(), uncertainBytes);
+        await tester.ensureVisible(find.text('确认移入保留区'));
+        await tester.tap(find.text('确认移入保留区'));
+        await helpers.settle(tester, 'retirement-approve');
+        expect(retire.error, isNull);
+        expect(retire.records.single.state, 'retained');
+        expect(retirementReleaseConfirmed, isTrue);
+        expect(
+          controller.exportInspection!.view,
+          isNull,
+          reason: 'discard pre-move snapshot',
+        );
+        expect(await uncertainFile.exists(), isFalse);
+        final retained = File(
+          '${output.path}/.orange-agent-tmp-retired-${retirement.retirementId}/item',
+        );
+        expect(await retained.readAsBytes(), uncertainBytes);
+        expect(
+          await artifact.readAsBytes(),
+          bytes,
+          reason: 'other exported package untouched',
+        );
+        await tester.ensureVisible(
+          find.byKey(Key('inspect-retirement-${retirement.retirementId}')),
+        );
+        await tester.tap(
+          find.byKey(Key('inspect-retirement-${retirement.retirementId}')),
+        );
+        await helpers.settle(tester, 'retirement-inspect');
+        expect(retire.inspection!.retained!.matchesApprovedArtifact, isTrue);
+        expect(
+          (await inspectExportOutcome(
+            handle: handle,
+            runId: run.runId,
+            operationId: operation,
+            exportId: uncertain.exportId,
+          ))!.state,
+          'unknown',
+        );
         await controller.stop();
         await tester.pumpWidget(const SizedBox.shrink());
         controller.dispose();
         controller = null;
+        await closeHost(handle: handle);
+        host = await helpers.reopenHost(private.path);
+        handle = host.handle;
+        final retirementRecords = await listExportRetirements(
+          handle: handle,
+          runId: run.runId,
+          operationId: operation,
+          exportId: uncertain.exportId,
+          limit: 50,
+        );
+        expect(retirementRecords.single.retirementId, retirement.retirementId);
+        expect(retirementRecords.single.state, 'retained');
+        final fresh = await authorizeExportInspection(
+          handle: handle,
+          runId: run.runId,
+          operationId: operation,
+          exportId: uncertain.exportId,
+          requestId: 'retirement-reopened-read',
+          selectedDirectory: output.path,
+        );
+        final checked = await inspectExportRetirement(
+          handle: handle,
+          readSessionToken: fresh.sessionToken,
+          retirementId: retirement.retirementId,
+        );
+        expect(checked.capsuleBound, isTrue);
+        expect(checked.retained!.matchesApprovedArtifact, isTrue);
+        await suspendExportInspection(
+          handle: handle,
+          requestId: fresh.sessionToken,
+        );
+        expect(await uncertainFile.exists(), isFalse);
+        expect(await retained.readAsBytes(), uncertainBytes);
+        expect(await detachedWorkspace.list().length, 2);
+        debugPrint(
+          jsonEncode({
+            'nativeExportRetirement': true,
+            'independentWriteSelection': true,
+            'exactApproval': true,
+            'actualBytesRetained': true,
+            'otherExportUnchanged': true,
+            'unknownExportNotRepaired': true,
+            'recordsSurviveReopen': true,
+            'freshCapsuleInspection': true,
+            'closedBeforeNativeRelease': retirementReleaseConfirmed,
+            'automaticReplay': false,
+            'permanentDeletion': false,
+            'modelAndPicker': 'explicit fixtures',
+          }),
+        );
         debugPrint(
           jsonEncode({
             'nativeRetentionExport': true,

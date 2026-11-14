@@ -23,6 +23,10 @@ mod editing;
 #[cfg(target_vendor = "apple")]
 mod export_inspection;
 #[cfg(target_vendor = "apple")]
+mod export_retirement;
+#[cfg(target_vendor = "apple")]
+pub(crate) use export_retirement::{ExportRetirementSignal, signal_export_retirement_release};
+#[cfg(target_vendor = "apple")]
 mod recovery;
 #[cfg(target_vendor = "apple")]
 pub(crate) use export_inspection::{ExportInspectionSignal, signal_export_inspection_release};
@@ -108,6 +112,8 @@ pub(crate) struct Signals {
     #[cfg(target_vendor = "apple")]
     pub export_checks: HashMap<String, ExportInspectionSignal>,
     #[cfg(target_vendor = "apple")]
+    pub export_retirements: HashMap<String, ExportRetirementSignal>,
+    #[cfg(target_vendor = "apple")]
     pub closed_recovery_selections: HashSet<String>,
     #[cfg(target_vendor = "apple")]
     pub recovery_epochs: HashMap<String, u64>,
@@ -117,6 +123,10 @@ pub(crate) struct Signals {
 }
 impl Signals {
     pub fn stop_all(&self) {
+        #[cfg(target_vendor = "apple")]
+        for scope in self.export_retirements.values() {
+            scope.suspend();
+        }
         #[cfg(target_vendor = "apple")]
         for scope in self.export_checks.values() {
             scope.suspend();

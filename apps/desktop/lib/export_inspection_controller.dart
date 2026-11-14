@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'export_retirement_controller.dart';
 import 'recovery_controller.dart' show RecoverySelection;
 import 'src/rust/api/host.dart' as api;
 
@@ -70,7 +71,28 @@ class NativeExportInspectionCommands implements ExportInspectionCommands {
 }
 
 class ExportInspectionController extends ChangeNotifier {
-  ExportInspectionController(this.commands);
+  ExportInspectionController(
+    this.commands, {
+    ExportRetirementCommands? retirementCommands,
+  }) {
+    final source =
+        retirementCommands ??
+        (commands is NativeExportInspectionCommands
+            ? NativeExportRetirementCommands(
+                (commands as NativeExportInspectionCommands).handle,
+              )
+            : null);
+    if (source != null) {
+      retirement = ExportRetirementController(
+        source,
+        afterDispatch: () {
+          view = null;
+          _notify();
+        },
+      );
+    }
+  }
+  ExportRetirementController? retirement;
   final ExportInspectionCommands commands;
   api.ExportInspectionAccessView? access;
   api.ExportInspectionView? view;
@@ -85,6 +107,7 @@ class ExportInspectionController extends ChangeNotifier {
   }
 
   void invalidate() {
+    retirement?.invalidate();
     ++_epoch;
     access = null;
     view = null;
@@ -110,6 +133,7 @@ class ExportInspectionController extends ChangeNotifier {
   Future<void> close() async {
     invalidate();
     try {
+      await retirement?.close();
       await Future.wait(_held.toList().map(_release), eagerError: false);
     } catch (_) {
       error = '检查目录权限释放尚未确认，请重试结束检查。';
@@ -154,6 +178,7 @@ class ExportInspectionController extends ChangeNotifier {
     String? token;
     bool kept = false;
     try {
+      await retirement?.close();
       await Future.wait(_held.toList().map(_release), eagerError: false);
       if (!_live(epoch)) return;
       final choice = await commands.choose();
@@ -203,6 +228,7 @@ class ExportInspectionController extends ChangeNotifier {
       access = granted;
       view = snapshot;
       kept = true;
+      await retirement?.attach(granted, snapshot);
     } catch (failure) {
       if (_live(epoch)) {
         error = switch (failure) {
@@ -228,6 +254,7 @@ class ExportInspectionController extends ChangeNotifier {
 
   @override
   void dispose() {
+    retirement?.dispose();
     _disposed = true;
     ++_epoch;
     access = null;

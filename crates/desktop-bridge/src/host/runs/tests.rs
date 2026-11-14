@@ -2,6 +2,8 @@ use super::*;
 #[cfg(target_vendor = "apple")]
 mod export_inspection;
 #[cfg(target_vendor = "apple")]
+mod export_retirement;
+#[cfg(target_vendor = "apple")]
 mod recovery_inspection;
 use crate::api::host as api;
 use orange_protocol::model::{ResponseCandidate, ToolCall};

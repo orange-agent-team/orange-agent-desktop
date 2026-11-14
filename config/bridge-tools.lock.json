@@ -34,7 +34,11 @@
     "ToolApprovalView",
     "UserQuestionGroupView",
     "UserQuestionView",
-    "WorkspaceView"
+    "WorkspaceView",
+    "ExportRetirementAccessView",
+    "ExportRetirementReviewView",
+    "ExportRetirementOutcomeView",
+    "ExportRetirementInspectionView"
   ],
   "public_functions": [
     "advanceRun",
@@ -102,6 +106,12 @@
     "suspendRetentionAccess",
     "suspendWorkspaceAccess",
     "suspendWorkspaceSelection",
-    "validateAmount"
+    "validateAmount",
+    "authorizeExportRetirement",
+    "prepareExportRetirement",
+    "approveExportRetirement",
+    "listExportRetirements",
+    "inspectExportRetirement",
+    "suspendExportRetirement"
   ]
 }

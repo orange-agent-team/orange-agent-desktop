@@ -28,7 +28,7 @@ class MainFlutterWindow: NSWindow {
         ])
         return
       }
-      if call.method == "chooseWorkspace" || call.method == "chooseModelFile" || call.method == "chooseCreationWorkspace" || call.method == "chooseEditingWorkspace" || call.method == "chooseRecoveryInspectionWorkspace" || call.method == "chooseRecoveryWriteWorkspace" || call.method == "chooseRetentionWorkspace" || call.method == "chooseExportDestination" || call.method == "chooseExportInspectionDirectory" {
+      if call.method == "chooseWorkspace" || call.method == "chooseModelFile" || call.method == "chooseCreationWorkspace" || call.method == "chooseEditingWorkspace" || call.method == "chooseRecoveryInspectionWorkspace" || call.method == "chooseRecoveryWriteWorkspace" || call.method == "chooseRetentionWorkspace" || call.method == "chooseExportDestination" || call.method == "chooseExportInspectionDirectory" || call.method == "chooseExportRetirementDirectory" {
         guard !self.pickerActive else { result(FlutterError(code: "PICKER_BUSY", message: nil, details: nil)); return }
         self.pickerActive = true
         let panel = NSOpenPanel()
@@ -39,6 +39,7 @@ class MainFlutterWindow: NSWindow {
         let recoveryWriteSelection = call.method == "chooseRecoveryWriteWorkspace"
         let retentionSelection = call.method == "chooseRetentionWorkspace"
         let exportSelection = call.method == "chooseExportDestination"
+        let exportRetirement = call.method == "chooseExportRetirementDirectory"
         let exportInspection = call.method == "chooseExportInspectionDirectory"
         panel.canChooseDirectories = !modelSelection
         panel.canChooseFiles = modelSelection
@@ -70,6 +71,10 @@ class MainFlutterWindow: NSWindow {
           panel.prompt = "只读检查导出位置"
           panel.message = "请选择这条导出记录对应的目标目录。查看当前目标与暂存文件状态；不会恢复原目录权限。"
         }
+        if exportRetirement {
+          panel.prompt = "允许移入保留区"
+          panel.message = "请选择当前检查的导出目录。核对具体文件后还需单独批准移出；文件保留在该目录的保留区，不会永久删除或释放空间。"
+        }
         if modelSelection { panel.allowedContentTypes = [UTType(filenameExtension: "gguf") ?? .data] }
         panel.beginSheetModal(for: self) { response in
           self.pickerActive = false
@@ -77,17 +82,17 @@ class MainFlutterWindow: NSWindow {
           let normalized = url.resolvingSymlinksInPath().standardizedFileURL
           let selection = UUID().uuidString
           let scoped = normalized.startAccessingSecurityScopedResource()
-          let purpose = exportInspection ? "export_inspection" : exportSelection ? "export" : retentionSelection ? "retention" : modelSelection ? "model" : (createSelection ? "creation" : (editSelection ? "editing" : (inspectionSelection ? "recovery_inspection" : (recoveryWriteSelection ? "recovery_write" : "workspace"))))
+          let purpose = exportRetirement ? "export_retirement" : exportInspection ? "export_inspection" : exportSelection ? "export" : retentionSelection ? "retention" : modelSelection ? "model" : (createSelection ? "creation" : (editSelection ? "editing" : (inspectionSelection ? "recovery_inspection" : (recoveryWriteSelection ? "recovery_write" : "workspace"))))
           self.selections[selection] = (normalized, scoped, purpose)
           result(["selectionId": selection, "path": normalized.path])
         }
         return
       }
-      if call.method == "releaseWorkspaceSelection" || call.method == "releaseModelSelection" || call.method == "releaseCreationSelection" || call.method == "releaseEditingSelection" || call.method == "releaseRecoveryInspectionSelection" || call.method == "releaseRecoveryWriteSelection" || call.method == "releaseRetentionSelection" || call.method == "releaseExportDestinationSelection" || call.method == "releaseExportInspectionSelection" {
+      if call.method == "releaseWorkspaceSelection" || call.method == "releaseModelSelection" || call.method == "releaseCreationSelection" || call.method == "releaseEditingSelection" || call.method == "releaseRecoveryInspectionSelection" || call.method == "releaseRecoveryWriteSelection" || call.method == "releaseRetentionSelection" || call.method == "releaseExportDestinationSelection" || call.method == "releaseExportInspectionSelection" || call.method == "releaseExportRetirementSelection" {
         guard let arguments = call.arguments as? [String: Any], let id = arguments["selectionId"] as? String else {
           result(FlutterError(code: "INVALID_SELECTION", message: nil, details: nil)); return
         }
-        let purpose = call.method == "releaseExportInspectionSelection" ? "export_inspection" : call.method == "releaseExportDestinationSelection" ? "export" : call.method == "releaseRetentionSelection" ? "retention" : call.method == "releaseModelSelection" ? "model" : (call.method == "releaseCreationSelection" ? "creation" : (call.method == "releaseEditingSelection" ? "editing" : (call.method == "releaseRecoveryInspectionSelection" ? "recovery_inspection" : (call.method == "releaseRecoveryWriteSelection" ? "recovery_write" : "workspace"))))
+        let purpose = call.method == "releaseExportRetirementSelection" ? "export_retirement" : call.method == "releaseExportInspectionSelection" ? "export_inspection" : call.method == "releaseExportDestinationSelection" ? "export" : call.method == "releaseRetentionSelection" ? "retention" : call.method == "releaseModelSelection" ? "model" : (call.method == "releaseCreationSelection" ? "creation" : (call.method == "releaseEditingSelection" ? "editing" : (call.method == "releaseRecoveryInspectionSelection" ? "recovery_inspection" : (call.method == "releaseRecoveryWriteSelection" ? "recovery_write" : "workspace"))))
         if let (_, _, actual) = self.selections[id], actual != purpose {
           result(FlutterError(code: "SELECTION_PURPOSE_MISMATCH", message: nil, details: nil)); return
         }

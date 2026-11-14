@@ -15,6 +15,10 @@ mod editing;
 #[cfg(target_vendor = "apple")]
 mod export_inspection;
 #[cfg(target_vendor = "apple")]
+mod export_retirement;
+#[cfg(target_vendor = "apple")]
+pub(crate) use export_retirement::*;
+#[cfg(target_vendor = "apple")]
 mod recovery;
 #[cfg(target_vendor = "apple")]
 pub(crate) use export_inspection::{
@@ -91,6 +95,8 @@ struct Host {
     exports: std::collections::HashMap<String, retention::ExportSession>,
     #[cfg(target_vendor = "apple")]
     export_checks: std::collections::HashMap<String, export_inspection::InspectionSession>,
+    #[cfg(target_vendor = "apple")]
+    export_retirements: std::collections::HashMap<String, export_retirement::RetirementSession>,
     #[cfg(target_vendor = "apple")]
     run_edit_grants: std::collections::HashMap<
         String,
@@ -186,6 +192,8 @@ impl HostRegistry {
             exports: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             export_checks: std::collections::HashMap::new(),
+            #[cfg(target_vendor = "apple")]
+            export_retirements: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             run_edit_grants: std::collections::HashMap::new(),
             model: None,
@@ -665,7 +673,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "c60c50290ea901ebeea2a4c0cb4b307d79f3cb4f"
+            "e77a61e2a213b817770e7e01e38a742043df86b6"
         );
         assert_eq!(
             registry

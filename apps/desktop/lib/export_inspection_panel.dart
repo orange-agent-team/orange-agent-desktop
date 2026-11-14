@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'export_inspection_controller.dart';
+import 'export_retirement_panel.dart';
 import 'src/rust/api/host.dart';
 
 class ExportInspectionPanel extends StatelessWidget {
@@ -60,7 +61,12 @@ class ExportInspectionPanel extends StatelessWidget {
               SelectableText('目标 SHA-256：${view.target.sha256}'),
             const Text('本次检查只读取状态。'),
           ],
-          if (view != null || controller.busy || controller.error != null)
+          if (controller.retirement != null)
+            ExportRetirementPanel(controller: controller.retirement!),
+          if (controller.access != null ||
+              view != null ||
+              controller.busy ||
+              controller.error != null)
             OutlinedButton(onPressed: close, child: const Text('结束导出检查')),
         ],
       );

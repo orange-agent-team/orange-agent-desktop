@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -698,6 +698,76 @@ Future<void> suspendExportInspection({
   requestId: requestId,
 );
 
+Future<ExportRetirementAccessView> authorizeExportRetirement({
+  required String handle,
+  required String readSessionToken,
+  required String requestId,
+  required String selectedDirectory,
+}) => RustLib.instance.api.crateApiHostAuthorizeExportRetirement(
+  handle: handle,
+  readSessionToken: readSessionToken,
+  requestId: requestId,
+  selectedDirectory: selectedDirectory,
+);
+
+Future<ExportRetirementReviewView> prepareExportRetirement({
+  required String handle,
+  required String sessionToken,
+  required String requestId,
+  required String choice,
+}) => RustLib.instance.api.crateApiHostPrepareExportRetirement(
+  handle: handle,
+  sessionToken: sessionToken,
+  requestId: requestId,
+  choice: choice,
+);
+
+Future<ExportRetirementOutcomeView> approveExportRetirement({
+  required String handle,
+  required String sessionToken,
+  required String retirementId,
+  required String expectedDigest,
+}) => RustLib.instance.api.crateApiHostApproveExportRetirement(
+  handle: handle,
+  sessionToken: sessionToken,
+  retirementId: retirementId,
+  expectedDigest: expectedDigest,
+);
+
+Future<List<ExportRetirementOutcomeView>> listExportRetirements({
+  required String handle,
+  required String runId,
+  required String operationId,
+  required String exportId,
+  String? before,
+  required int limit,
+}) => RustLib.instance.api.crateApiHostListExportRetirements(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+  exportId: exportId,
+  before: before,
+  limit: limit,
+);
+
+Future<ExportRetirementInspectionView> inspectExportRetirement({
+  required String handle,
+  required String readSessionToken,
+  required String retirementId,
+}) => RustLib.instance.api.crateApiHostInspectExportRetirement(
+  handle: handle,
+  readSessionToken: readSessionToken,
+  retirementId: retirementId,
+);
+
+Future<void> suspendExportRetirement({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostSuspendExportRetirement(
+  handle: handle,
+  requestId: requestId,
+);
+
 class AgentRunView {
   /// Immutable Run capability; never inferred from a pending tool name.
   final String? creationConsentId;
@@ -1152,6 +1222,166 @@ class ExportOutcomeView {
           exportId == other.exportId &&
           reviewDigest == other.reviewDigest &&
           state == other.state;
+}
+
+class ExportRetirementAccessView {
+  final String sessionToken;
+  final String readSessionToken;
+  final String runId;
+  final String operationId;
+  final String exportId;
+  final String displayDirectory;
+
+  const ExportRetirementAccessView({
+    required this.sessionToken,
+    required this.readSessionToken,
+    required this.runId,
+    required this.operationId,
+    required this.exportId,
+    required this.displayDirectory,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      readSessionToken.hashCode ^
+      runId.hashCode ^
+      operationId.hashCode ^
+      exportId.hashCode ^
+      displayDirectory.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExportRetirementAccessView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          readSessionToken == other.readSessionToken &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          exportId == other.exportId &&
+          displayDirectory == other.displayDirectory;
+}
+
+class ExportRetirementInspectionView {
+  final String sessionToken;
+  final String retirementId;
+  final String exportId;
+  final String recordedState;
+  final String choice;
+  final bool capsuleBound;
+  final ExportObservedFileView? retained;
+
+  const ExportRetirementInspectionView({
+    required this.sessionToken,
+    required this.retirementId,
+    required this.exportId,
+    required this.recordedState,
+    required this.choice,
+    required this.capsuleBound,
+    this.retained,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      retirementId.hashCode ^
+      exportId.hashCode ^
+      recordedState.hashCode ^
+      choice.hashCode ^
+      capsuleBound.hashCode ^
+      retained.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExportRetirementInspectionView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          retirementId == other.retirementId &&
+          exportId == other.exportId &&
+          recordedState == other.recordedState &&
+          choice == other.choice &&
+          capsuleBound == other.capsuleBound &&
+          retained == other.retained;
+}
+
+class ExportRetirementOutcomeView {
+  final String retirementId;
+  final String exportId;
+  final String reviewDigest;
+  final String state;
+
+  const ExportRetirementOutcomeView({
+    required this.retirementId,
+    required this.exportId,
+    required this.reviewDigest,
+    required this.state,
+  });
+
+  @override
+  int get hashCode =>
+      retirementId.hashCode ^
+      exportId.hashCode ^
+      reviewDigest.hashCode ^
+      state.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExportRetirementOutcomeView &&
+          runtimeType == other.runtimeType &&
+          retirementId == other.retirementId &&
+          exportId == other.exportId &&
+          reviewDigest == other.reviewDigest &&
+          state == other.state;
+}
+
+class ExportRetirementReviewView {
+  final String sessionToken;
+  final String retirementId;
+  final String exportId;
+  final String digest;
+  final String choice;
+  final String fileName;
+  final ExportObservedFileView observed;
+  final PlatformInt64 expiresAt;
+
+  const ExportRetirementReviewView({
+    required this.sessionToken,
+    required this.retirementId,
+    required this.exportId,
+    required this.digest,
+    required this.choice,
+    required this.fileName,
+    required this.observed,
+    required this.expiresAt,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      retirementId.hashCode ^
+      exportId.hashCode ^
+      digest.hashCode ^
+      choice.hashCode ^
+      fileName.hashCode ^
+      observed.hashCode ^
+      expiresAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExportRetirementReviewView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          retirementId == other.retirementId &&
+          exportId == other.exportId &&
+          digest == other.digest &&
+          choice == other.choice &&
+          fileName == other.fileName &&
+          observed == other.observed &&
+          expiresAt == other.expiresAt;
 }
 
 class ExportReviewView {
