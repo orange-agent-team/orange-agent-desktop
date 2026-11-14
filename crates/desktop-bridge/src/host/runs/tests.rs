@@ -2,6 +2,8 @@ use super::*;
 #[cfg(target_vendor = "apple")]
 mod export_inspection;
 #[cfg(target_vendor = "apple")]
+mod export_restoration;
+#[cfg(target_vendor = "apple")]
 mod export_retirement;
 #[cfg(target_vendor = "apple")]
 mod recovery_inspection;

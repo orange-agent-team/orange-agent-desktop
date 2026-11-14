@@ -1,3 +1,5 @@
+当前候选固定Runtime48a7aae/schema21；恢复副本及最新验证见[恢复副本](export-restoration.md)。
+
 当前候选已升级Runtime e77a61e/schema20，并接入独立保留区流程，详见[导出保留区](export-retirement.md)。下文保留schema19基础验证历史。
 
 # 写入者停止证明：消费准备

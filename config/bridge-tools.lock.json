@@ -38,7 +38,11 @@
     "ExportRetirementAccessView",
     "ExportRetirementReviewView",
     "ExportRetirementOutcomeView",
-    "ExportRetirementInspectionView"
+    "ExportRetirementInspectionView",
+    "ExportRestorationAccessView",
+    "ExportRestorationReviewView",
+    "ExportRestorationOutcomeView",
+    "ExportRestorationInspectionView"
   ],
   "public_functions": [
     "advanceRun",
@@ -112,6 +116,12 @@
     "approveExportRetirement",
     "listExportRetirements",
     "inspectExportRetirement",
-    "suspendExportRetirement"
+    "suspendExportRetirement",
+    "authorizeExportRestoration",
+    "prepareExportRestoration",
+    "approveExportRestoration",
+    "listExportRestorations",
+    "inspectExportRestoration",
+    "suspendExportRestoration"
   ]
 }

@@ -94,7 +94,7 @@ pub(super) async fn exercise(h: &str, base: &Path, run: &str, operation: &str, e
         api::approve_export_retirement(
             h.into(),
             write.session_token,
-            review.retirement_id,
+            review.retirement_id.clone(),
             review.digest
         )
         .await
@@ -183,7 +183,7 @@ pub(super) async fn exercise(h: &str, base: &Path, run: &str, operation: &str, e
         api::approve_export_retirement(
             h.into(),
             write.session_token,
-            review.retirement_id,
+            review.retirement_id.clone(),
             review.digest
         )
         .await
@@ -192,4 +192,6 @@ pub(super) async fn exercise(h: &str, base: &Path, run: &str, operation: &str, e
     bounded(api::suspend_export_inspection(h.into(), read.session_token))
         .await
         .expect("close");
+    super::export_restoration::exercise(h, base, run, operation, export, &review.retirement_id)
+        .await;
 }

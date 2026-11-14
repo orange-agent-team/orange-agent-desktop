@@ -30,6 +30,7 @@ pub(crate) fn signal_export_inspection_release(
     if signals.retentions.contains_key(token)
         || signals.exports.contains_key(token)
         || signals.export_retirements.contains_key(token)
+        || signals.export_restorations.contains_key(token)
         || signals.recovery_inspections.contains_key(token)
         || signals.recovery_writes.contains_key(token)
     {
@@ -41,6 +42,13 @@ pub(crate) fn signal_export_inspection_release(
     }
     for scope in signals
         .export_retirements
+        .values()
+        .filter(|s| s.reader == token)
+    {
+        scope.suspend();
+    }
+    for scope in signals
+        .export_restorations
         .values()
         .filter(|s| s.reader == token)
     {

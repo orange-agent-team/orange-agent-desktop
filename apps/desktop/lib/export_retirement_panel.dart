@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'export_retirement_controller.dart';
+import 'export_restoration_panel.dart';
 
 class ExportRetirementPanel extends StatelessWidget {
   const ExportRetirementPanel({super.key, required this.controller});
@@ -16,7 +17,7 @@ class ExportRetirementPanel extends StatelessWidget {
         children: [
           const Divider(),
           const Text('导出文件保留区'),
-          const Text('经单独批准后移出目标或暂存位置，数据保留在原目录的保留区。不会释放空间；当前版本尚无恢复按钮。'),
+          const Text('经单独批准后移出目标或暂存位置，数据保留在原目录的保留区。不会释放空间，可另行批准恢复为新副本。'),
           if (c.busy) const LinearProgressIndicator(),
           if (c.error != null)
             Text(
@@ -66,10 +67,20 @@ class ExportRetirementPanel extends StatelessWidget {
                 _ => '结果待核对',
               }),
               subtitle: SelectableText(r.retirementId),
-              trailing: TextButton(
-                key: Key('inspect-retirement-${r.retirementId}'),
-                onPressed: c.busy ? null : () => c.inspect(r),
-                child: const Text('检查保留区'),
+              trailing: Wrap(
+                children: [
+                  TextButton(
+                    key: Key('inspect-retirement-${r.retirementId}'),
+                    onPressed: c.busy ? null : () => c.inspect(r),
+                    child: const Text('检查保留区'),
+                  ),
+                  if (c.restoration != null)
+                    TextButton(
+                      key: Key('restore-retirement-${r.retirementId}'),
+                      onPressed: c.busy ? null : () => c.openRestoration(r),
+                      child: const Text('恢复副本'),
+                    ),
+                ],
               ),
             ),
           if (c.hasMore)
@@ -77,6 +88,8 @@ class ExportRetirementPanel extends StatelessWidget {
               onPressed: c.busy ? null : () => c.refresh(more: true),
               child: const Text('更多移出记录'),
             ),
+          if (c.restoration != null)
+            ExportRestorationPanel(controller: c.restoration!),
           if (inspection != null) ...[
             Text(
               !inspection.capsuleBound

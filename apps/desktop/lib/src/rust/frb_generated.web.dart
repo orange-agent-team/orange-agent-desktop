@@ -86,6 +86,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ExportOutcomeView dco_decode_export_outcome_view(dynamic raw);
 
   @protected
+  ExportRestorationAccessView dco_decode_export_restoration_access_view(
+    dynamic raw,
+  );
+
+  @protected
+  ExportRestorationInspectionView dco_decode_export_restoration_inspection_view(
+    dynamic raw,
+  );
+
+  @protected
+  ExportRestorationOutcomeView dco_decode_export_restoration_outcome_view(
+    dynamic raw,
+  );
+
+  @protected
+  ExportRestorationReviewView dco_decode_export_restoration_review_view(
+    dynamic raw,
+  );
+
+  @protected
   ExportRetirementAccessView dco_decode_export_retirement_access_view(
     dynamic raw,
   );
@@ -128,6 +148,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ExportOutcomeView> dco_decode_list_export_outcome_view(dynamic raw);
+
+  @protected
+  List<ExportRestorationOutcomeView>
+  dco_decode_list_export_restoration_outcome_view(dynamic raw);
 
   @protected
   List<ExportRetirementOutcomeView>
@@ -320,6 +344,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ExportRestorationAccessView sse_decode_export_restoration_access_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ExportRestorationInspectionView sse_decode_export_restoration_inspection_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ExportRestorationOutcomeView sse_decode_export_restoration_outcome_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ExportRestorationReviewView sse_decode_export_restoration_review_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ExportRetirementAccessView sse_decode_export_retirement_access_view(
     SseDeserializer deserializer,
   );
@@ -370,6 +414,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ExportOutcomeView> sse_decode_list_export_outcome_view(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<ExportRestorationOutcomeView>
+  sse_decode_list_export_restoration_outcome_view(SseDeserializer deserializer);
 
   @protected
   List<ExportRetirementOutcomeView>
@@ -612,6 +660,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_export_restoration_access_view(
+    ExportRestorationAccessView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_export_restoration_inspection_view(
+    ExportRestorationInspectionView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_export_restoration_outcome_view(
+    ExportRestorationOutcomeView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_export_restoration_review_view(
+    ExportRestorationReviewView self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_export_retirement_access_view(
     ExportRetirementAccessView self,
     SseSerializer serializer,
@@ -671,6 +743,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_export_outcome_view(
     List<ExportOutcomeView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_export_restoration_outcome_view(
+    List<ExportRestorationOutcomeView> self,
     SseSerializer serializer,
   );
 

@@ -1309,3 +1309,167 @@ pub async fn suspend_export_retirement(
         Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct ExportRestorationAccessView {
+    pub session_token: String,
+    pub read_session_token: String,
+    pub run_id: String,
+    pub operation_id: String,
+    pub export_id: String,
+    pub display_directory: String,
+}
+#[derive(Debug, Clone)]
+pub struct ExportRestorationReviewView {
+    pub session_token: String,
+    pub restoration_id: String,
+    pub retirement_id: String,
+    pub export_id: String,
+    pub digest: String,
+    pub file_name: String,
+    pub source: ExportObservedFileView,
+    pub expires_at: i64,
+}
+#[derive(Debug, Clone)]
+pub struct ExportRestorationOutcomeView {
+    pub restoration_id: String,
+    pub retirement_id: String,
+    pub export_id: String,
+    pub review_digest: String,
+    pub file_name: String,
+    pub state: String,
+}
+#[derive(Debug, Clone)]
+pub struct ExportRestorationInspectionView {
+    pub session_token: String,
+    pub restoration_id: String,
+    pub retirement_id: String,
+    pub export_id: String,
+    pub recorded_state: String,
+    pub file_name: String,
+    pub target: ExportObservedFileView,
+    pub staged: ExportObservedFileView,
+}
+pub async fn authorize_export_restoration(
+    handle: String,
+    read_session_token: String,
+    request_id: String,
+    selected_directory: String,
+) -> Result<ExportRestorationAccessView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::authorize_export_restoration(
+            handle,
+            read_session_token,
+            request_id,
+            selected_directory,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, read_session_token, request_id, selected_directory);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn prepare_export_restoration(
+    handle: String,
+    session_token: String,
+    request_id: String,
+    retirement_id: String,
+    file_name: String,
+) -> Result<ExportRestorationReviewView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::prepare_export_restoration(
+            handle,
+            session_token,
+            request_id,
+            retirement_id,
+            file_name,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, session_token, request_id, retirement_id, file_name);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn approve_export_restoration(
+    handle: String,
+    session_token: String,
+    restoration_id: String,
+    expected_digest: String,
+) -> Result<ExportRestorationOutcomeView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::approve_export_restoration(
+            handle,
+            session_token,
+            restoration_id,
+            expected_digest,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, session_token, restoration_id, expected_digest);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn list_export_restorations(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    retirement_id: String,
+    before: Option<String>,
+    limit: u16,
+) -> Result<Vec<ExportRestorationOutcomeView>, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::list_export_restorations(
+            handle,
+            run_id,
+            operation_id,
+            retirement_id,
+            before,
+            limit,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, run_id, operation_id, retirement_id, before, limit);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn inspect_export_restoration(
+    handle: String,
+    read_session_token: String,
+    restoration_id: String,
+) -> Result<ExportRestorationInspectionView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::inspect_export_restoration(handle, read_session_token, restoration_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, read_session_token, restoration_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn suspend_export_restoration(
+    handle: String,
+    request_id: String,
+) -> Result<(), BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::suspend_export_restoration(handle, request_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, request_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}

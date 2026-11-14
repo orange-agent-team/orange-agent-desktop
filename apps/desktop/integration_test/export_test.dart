@@ -65,6 +65,7 @@ void main() {
       final inspectionReleased = Completer<void>();
       var inspectionSelections = 0;
       var retirementReleaseConfirmed = false;
+      var restorationSelections = 0, restorationReleases = 0;
       final released = Completer<void>();
       const channel = MethodChannel('orange_agent/platform');
       try {
@@ -176,6 +177,33 @@ void main() {
               if (!inspectionReleased.isCompleted) {
                 inspectionReleased.complete();
               }
+              return null;
+            }
+            if (call.method == 'chooseExportRestorationDirectory') {
+              return {
+                'selectionId': 'native-restore-${++restorationSelections}',
+                'path': output.path,
+              };
+            }
+            if (call.method == 'releaseExportRestorationSelection') {
+              await expectLater(
+                prepareExportRestoration(
+                  handle: handle!,
+                  sessionToken:
+                      (call.arguments as Map)['selectionId'] as String,
+                  requestId: 'late-restore',
+                  retirementId: 'not-used',
+                  fileName: 'late.orange-retained.json',
+                ),
+                throwsA(
+                  isA<BridgeError>().having(
+                    (e) => e.code,
+                    'code',
+                    'EXPORT_RESTORATION_CLOSED',
+                  ),
+                ),
+              );
+              restorationReleases++;
               return null;
             }
             if (call.method == 'chooseExportRetirementDirectory') {
@@ -516,6 +544,7 @@ void main() {
             'modelAndPicker': 'explicit fixtures',
           }),
         );
+        final beforeRetirementEntryCount = await output.list().length;
         // The prior read-only evidence is complete. Exercise a separate native
         // write selection and exact confirmation with actual FRB/SQLite/files.
         await controller.exportInspection!.open(
@@ -570,6 +599,85 @@ void main() {
           ))!.state,
           'unknown',
         );
+        await tester.ensureVisible(
+          find.byKey(Key('restore-retirement-${retirement.retirementId}')),
+        );
+        await tester.tap(
+          find.byKey(Key('restore-retirement-${retirement.retirementId}')),
+        );
+        await helpers.settle(tester, 'restoration-open');
+        final restore = retire.restoration!;
+        expect(restore.error, isNull);
+        final nameInput = find.byKey(
+          ValueKey('restore-name-${retirement.retirementId}'),
+        );
+        await tester.ensureVisible(nameInput);
+        await tester.enterText(
+          nameInput,
+          'restored-proof.orange-retained.json',
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('选择目录并预览恢复副本'));
+        await tester.tap(find.text('选择目录并预览恢复副本'));
+        await helpers.settle(tester, 'restoration-prepare');
+        expect(restore.error, isNull);
+        final restoration = restore.review!;
+        final restoredFile = File('${output.path}/${restoration.fileName}');
+        expect(await restoredFile.exists(), isFalse);
+        await tester.ensureVisible(find.text('确认创建恢复副本'));
+        await tester.tap(find.text('确认创建恢复副本'));
+        await helpers.settle(tester, 'restoration-approve');
+        expect(restore.error, isNull);
+        expect(restore.records.single.state, 'succeeded');
+        expect(await restoredFile.readAsBytes(), uncertainBytes);
+        expect(await retained.readAsBytes(), uncertainBytes);
+        expect(restorationReleases, 1);
+        // Occupied destination cannot be overwritten, including through fresh consent.
+        await restore.prepare();
+        expect(restore.review, isNull);
+        expect(restore.error, isNotNull);
+        expect(await restoredFile.readAsBytes(), uncertainBytes);
+        expect(restorationReleases, 2);
+        final receiptFault = await Process.run('/usr/bin/sqlite3', [
+          '${private.path}/host.sqlite',
+          "CREATE TRIGGER restoration_native_fault BEFORE INSERT ON events WHEN NEW.kind='patch.export_restoration_completed' BEGIN SELECT RAISE(ABORT,'owned restoration receipt failure');END;",
+        ]);
+        expect(
+          receiptFault.exitCode,
+          0,
+          reason: receiptFault.stderr.toString(),
+        );
+        restore.setFileName('unconfirmed-copy.orange-retained.json');
+        await restore.prepare();
+        expect(restore.error, isNull);
+        final uncertainRestoration = restore.review!;
+        await restore.approve();
+        expect(restore.error, isNotNull);
+        expect(restore.notice, isNull);
+        expect(restore.review, isNull);
+        final unconfirmedFile = File(
+          '${output.path}/${uncertainRestoration.fileName}',
+        );
+        expect(await unconfirmedFile.readAsBytes(), uncertainBytes);
+        expect(restorationReleases, 3);
+        final unknownRestore = restore.records.singleWhere(
+          (v) => v.restorationId == uncertainRestoration.restorationId,
+        );
+        expect(unknownRestore.state, 'unknown');
+        await restore.inspect(unknownRestore);
+        expect(restore.inspection!.target.matchesApprovedArtifact, isTrue);
+        expect(restore.inspection!.recordedState, 'unknown');
+        await restore.approve();
+        expect(restore.review, isNull);
+        expect(
+          (await inspectExportOutcome(
+            handle: handle,
+            runId: run.runId,
+            operationId: operation,
+            exportId: uncertain.exportId,
+          ))!.state,
+          'unknown',
+        );
         await controller.stop();
         await tester.pumpWidget(const SizedBox.shrink());
         controller.dispose();
@@ -601,6 +709,38 @@ void main() {
         );
         expect(checked.capsuleBound, isTrue);
         expect(checked.retained!.matchesApprovedArtifact, isTrue);
+        final restoredRecords = await listExportRestorations(
+          handle: handle,
+          runId: run.runId,
+          operationId: operation,
+          retirementId: retirement.retirementId,
+          limit: 50,
+        );
+        expect(restoredRecords.length, 2);
+        expect(
+          restoredRecords
+              .singleWhere((v) => v.restorationId == restoration.restorationId)
+              .state,
+          'succeeded',
+        );
+        expect(
+          restoredRecords
+              .singleWhere(
+                (v) => v.restorationId == uncertainRestoration.restorationId,
+              )
+              .state,
+          'unknown',
+        );
+        final restoredCheck = await inspectExportRestoration(
+          handle: handle,
+          readSessionToken: fresh.sessionToken,
+          restorationId: uncertainRestoration.restorationId,
+        );
+        expect(restoredCheck.target.matchesApprovedArtifact, isTrue);
+        expect(restoredCheck.staged.kind, 'missing');
+        expect(restoredCheck.recordedState, 'unknown');
+        expect(await restoredFile.readAsBytes(), uncertainBytes);
+        expect(await unconfirmedFile.readAsBytes(), uncertainBytes);
         await suspendExportInspection(
           handle: handle,
           requestId: fresh.sessionToken,
@@ -627,16 +767,35 @@ void main() {
         debugPrint(
           jsonEncode({
             'nativeRetentionExport': true,
+            'scope': 'export verification before retirement and restoration',
             'actualArtifactVerified': true,
             'approvalCalls': exporter.approvals,
             'lostReplyLookups': exporter.lookups,
             'receiptFailureUnknown': true,
             'pendingNeverPublished': true,
             'sourceFilesRetained': 2,
-            'exportFiles': 2,
+            'exportFiles': beforeRetirementEntryCount,
             'ordinaryAccessRestored': false,
             'destinationClosedBeforeSource': true,
             'recordsSurviveReopen': true,
+            'modelAndPicker': 'explicit fixtures',
+          }),
+        );
+        debugPrint(
+          jsonEncode({
+            'nativeExportRestoration': true,
+            'independentWriteSelection': true,
+            'exactApproval': true,
+            'actualRestoredBytes': true,
+            'capsuleRetained': true,
+            'occupiedTargetUnchanged': true,
+            'receiptFailureUnknown': true,
+            'reopenWithoutReplay': true,
+            'freshTargetInspection': true,
+            'oldExportUnknownPreserved': true,
+            'nativeReleaseChecks': restorationReleases,
+            'restorationRecords': restoredRecords.length,
+            'permanentDeletion': false,
             'modelAndPicker': 'explicit fixtures',
           }),
         );

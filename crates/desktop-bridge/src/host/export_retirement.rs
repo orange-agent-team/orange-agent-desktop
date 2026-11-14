@@ -44,6 +44,7 @@ pub(crate) fn export_retirement_foreign(c: &crate::actor::Signals, token: &str) 
         || c.recovery_inspections.contains_key(token)
         || c.recovery_writes.contains_key(token)
         || c.export_checks.contains_key(token)
+        || c.export_restorations.contains_key(token)
 }
 fn outcome(v: ExportRetirementOutcome) -> ExportRetirementOutcomeView {
     ExportRetirementOutcomeView {

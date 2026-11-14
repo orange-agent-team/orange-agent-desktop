@@ -45,6 +45,7 @@ fn foreign_token(c: &crate::actor::Signals, t: &str) -> bool {
         || c.editings.values().any(|s| s.token == t)
         || c.export_checks.contains_key(t)
         || c.export_retirements.contains_key(t)
+        || c.export_restorations.contains_key(t)
         || c.retentions.contains_key(t)
         || c.recovery_inspections.contains_key(t)
         || c.recovery_writes.contains_key(t)

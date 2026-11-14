@@ -35,6 +35,7 @@ fn foreign(c: &crate::actor::Signals, t: &str) -> bool {
         || c.retentions.contains_key(t)
         || c.exports.contains_key(t)
         || c.export_retirements.contains_key(t)
+        || c.export_restorations.contains_key(t)
         || c.recovery_inspections.contains_key(t)
         || c.recovery_writes.contains_key(t)
 }
@@ -199,6 +200,8 @@ impl HostRegistry {
         Ok(view)
     }
     async fn close_export_check(&mut self, handle: &str, token: &str) -> Result<(), BridgeError> {
+        self.close_export_restorations(handle, Some(token), None)
+            .await?;
         self.close_export_retirements(handle, Some(token), None)
             .await?;
         let signals = self.signals.clone();

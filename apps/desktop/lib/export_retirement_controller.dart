@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'export_restoration_controller.dart';
 import 'recovery_controller.dart' show RecoverySelection;
 import 'src/rust/api/host.dart' as api;
 
@@ -118,7 +119,54 @@ class NativeExportRetirementCommands implements ExportRetirementCommands {
 }
 
 class ExportRetirementController extends ChangeNotifier {
-  ExportRetirementController(this.commands, {this.afterDispatch});
+  ExportRetirementController(
+    this.commands, {
+    this.afterDispatch,
+    ExportRestorationCommands? restorationCommands,
+  }) {
+    final source =
+        restorationCommands ??
+        (commands is NativeExportRetirementCommands
+            ? NativeExportRestorationCommands(
+                (commands as NativeExportRetirementCommands).handle,
+              )
+            : null);
+    if (source != null) {
+      restoration = ExportRestorationController(
+        source,
+        afterDispatch: () {
+          snapshot = null;
+          inspection = null;
+          afterDispatch?.call();
+          _notify();
+        },
+      );
+    }
+  }
+  ExportRestorationController? restoration;
+  Future<void> openRestoration(api.ExportRetirementOutcomeView record) async {
+    final source = read, target = restoration;
+    if (_disposed || busy || source == null || target == null) return;
+    final epoch = _epoch;
+    busy = true;
+    review = null;
+    access = null;
+    error = null;
+    _notify();
+    try {
+      await Future.wait(_held.toList().map(_release), eagerError: false);
+      if (!_live(epoch)) return;
+      await target.open(source, record);
+    } catch (_) {
+      if (_live(epoch)) error = '权限释放或恢复记录查询未完成，请重试。';
+    } finally {
+      if (_live(epoch)) {
+        busy = false;
+        _notify();
+      }
+    }
+  }
+
   final ExportRetirementCommands commands;
   final VoidCallback? afterDispatch;
   api.ExportInspectionAccessView? read;
@@ -157,6 +205,7 @@ class ExportRetirementController extends ChangeNotifier {
   }
 
   void invalidate() {
+    restoration?.invalidate();
     ++_epoch;
     read = null;
     snapshot = null;
@@ -189,6 +238,7 @@ class ExportRetirementController extends ChangeNotifier {
   Future<void> close() async {
     invalidate();
     try {
+      await restoration?.close();
       await Future.wait(_held.toList().map(_release), eagerError: false);
     } catch (_) {
       error = '移出权限释放尚未确认，请重试结束检查。';
@@ -274,6 +324,7 @@ class ExportRetirementController extends ChangeNotifier {
     String? token;
     bool kept = false;
     try {
+      await restoration?.close();
       await Future.wait(_held.toList().map(_release), eagerError: false);
       if (!_live(epoch)) return;
       final selected = await commands.choose();
@@ -432,6 +483,7 @@ class ExportRetirementController extends ChangeNotifier {
 
   @override
   void dispose() {
+    restoration?.dispose();
     _disposed = true;
     ++_epoch;
     read = null;

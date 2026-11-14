@@ -32,6 +32,7 @@ pub(crate) fn signal_export_retirement_release(
     }
     if signals.closed_recovery_selections.len() < 8192
         || signals.export_retirements.contains_key(token)
+        || signals.export_restorations.contains_key(token)
     {
         signals.closed_recovery_selections.insert(token.into());
     }
