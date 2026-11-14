@@ -1,19 +1,19 @@
 {
   "codegen_version": "2.13.0",
-  "content_hash": "1807445275",
+  "content_hash": "1516034980",
   "source_sha256": {
-    "Cargo.toml": "2ba57bff4aebe242f003e98e295a71b65f5f4c6e00188207678b48bc9578bf2e",
+    "Cargo.toml": "f5a664ce9e35f3f00c1df90c96c2f9089de1994bd18a9bafa7ebe9e4604de222",
     "Cargo.lock": "6f2c3323f999f92507f1aacdabe0599abe37b02814bd55dc7c23866c424f6bec",
-    "config/runtime.lock.json": "849091168412ebbd9472fcd768dc3401e37e321b94f52c4d15197f80f367d74a",
-    "config/bridge-tools.lock.json": "84f2c280e57b84864da6f6d29db034911d3bd66f0f1a7beaa3d5fd4aba6afea9",
+    "config/runtime.lock.json": "f4c4b928e1772b98e04de17ed9eaea71753eccec417f3e35d630815b882aa6dc",
+    "config/bridge-tools.lock.json": "b9c9cac4e8990caf093f675caaad4e74f1a971d31d828405f9f3321aa524ebfd",
     "crates/desktop-bridge/Cargo.toml": "5b2c69dc60df2531d48745be5737a15a360e82056c6b1e4fa715dc9c50eba40f",
     "crates/desktop-bridge/rust-toolchain.toml": "3855acb0e4bf2e1d78cd8c4a5223d3f628e0a6f193de415a7a5ef94daae953c1",
     "crates/desktop-bridge/src/lib.rs": "8a5b5974984b34364f44ef94da46d1ccd87fe900056715286c706281e4710b9c",
-    "crates/desktop-bridge/src/host.rs": "6bb117bc84a5c331ea32c699722f9d966069d07a06fe5f2334866197929108b4",
-    "crates/desktop-bridge/src/actor.rs": "01bbea6fe63faabcd464cb181fee38f9bf7c9aaea961f1ad85a8e7eab95f9626",
+    "crates/desktop-bridge/src/host.rs": "608e076dce610dda0d1468967a5026f84600f31edba231e6be27ef01d92b2e24",
+    "crates/desktop-bridge/src/actor.rs": "b7d961ff8e7c4808614c9d24e7afab4767e49e7a6e743c773df4bab31d7c47b5",
     "crates/desktop-bridge/src/host/runs.rs": "e2b9e41983f97d992ad0be420aaff98730621521525f3172ac0f779ad8f29e67",
     "crates/desktop-bridge/src/api/mod.rs": "9d34982b126c95cac8930dcfbec46168c167bdfb34b8ab343e18238f1e9fcd1c",
-    "crates/desktop-bridge/src/api/host.rs": "6aa3d88a3d4ff15de4ce9e198e3ace49e165fe2c63d5198bc168ed192babfeb3",
+    "crates/desktop-bridge/src/api/host.rs": "7a8a1e3e4521214594c8c52d52d4e73fa46259906a823fd075eb87f483a64d55",
     "apps/desktop/flutter_rust_bridge.yaml": "afd300908942aab6ffcccf880fb16aae8cb6b738365bd96190f77a052c1860bb",
     "apps/desktop/pubspec.lock": "f21742a97d2b7109c429899ef2ede4d95e4e9d71f93363f9dcbd00cc959689c9",
     "crates/desktop-bridge/src/service/bundle.rs": "60f85701d44b46e5ccc903255003e2ab25aafebab3c98b91121a91c0f9e5846b",
@@ -23,18 +23,19 @@
     "crates/desktop-bridge/src/host/creation.rs": "352bf57df0a5e9887dea07b9ff4bca3dbdc8cc70a3fcefb73d137949c822e355",
     "crates/desktop-bridge/src/host/editing.rs": "59500da856d34689935d86482c1af75d1a3358906d6e503a65f8ec923e984e69",
     "crates/desktop-bridge/src/host/managed.rs": "16d5c8e9d5e93e239e44eb67318613cf9ef36ba71e6bc2d7fa8e2c0ad36b7580",
-    "crates/desktop-bridge/src/host/recovery.rs": "f918299946a0145e345ed30fdfbc8ffbf5d8c7bbee074fb1bf0381a5d564b560",
-    "crates/desktop-bridge/src/host/runs/tests/recovery_inspection.rs": "1a3442b6cf417b45455138cdd925293c9a62e18b4e9c5a46943f7ea042ec175f",
+    "crates/desktop-bridge/src/host/recovery/writing.rs": "ab929700a36c94453738885c06a40fa6abc5fbd9bb8fabd9c2252bca46b3c3a0",
+    "crates/desktop-bridge/src/host/recovery.rs": "389708bf23fc63fdfe5cf103d1fcbce5c5723109e061b6d63ec99de62a6810e0",
+    "crates/desktop-bridge/src/host/runs/tests/recovery_inspection.rs": "f32fdce1f3f362ff13b6fa1020c741f559d333c1a4a1c8e863569bc53041ec3d",
     "crates/desktop-bridge/src/host/runs/tests.rs": "57f39b12d235bbbaa39dc8d3470503292651f4fa369676bfa9bce089e4007e90",
     "crates/desktop-bridge/src/actor/creation.rs": "b5f28894db99ac218c267b6ff8dc1740af774b96b226da712462e056754d27c1",
     "crates/desktop-bridge/src/actor/editing.rs": "adaaa7e0e4fe2f8a8429a938d1f74f22decd113cb2dd1eeb1b9a337a7ed65445",
-    "crates/desktop-bridge/src/actor/recovery.rs": "3b536a5570a380966cc4f163b0c1bf7528f4c57519c36158de910c114e307bc3"
+    "crates/desktop-bridge/src/actor/recovery.rs": "fe21887b8e40f55aab5034eb7d57e8ddec5bb3888aa3a31b54c084e3c07856f1"
   },
   "generated_sha256": {
-    "crates/desktop-bridge/src/frb_generated.rs": "f93374b294e2d5bc28a7244480ab722bf9c32d61c608e62a923b6cd41b7d8938",
-    "apps/desktop/lib/src/rust/api/host.dart": "cc51bb30fb8c19cc5e72f5e1993e4495123704dc5fee6efe0f5dffa65ee33b9d",
-    "apps/desktop/lib/src/rust/frb_generated.dart": "87be2c9d17d754968a407e84fa98351314dbf85d2c9262350a4907b94ac24372",
-    "apps/desktop/lib/src/rust/frb_generated.io.dart": "fbeb4a7296766a88906123b95883ff0a02d441cbb4ff65eb2bcba2ad076c6b5c",
-    "apps/desktop/lib/src/rust/frb_generated.web.dart": "b33fd68deb207ec677ce89ca73275ed044b1a943a77fecb26d658e027c509835"
+    "crates/desktop-bridge/src/frb_generated.rs": "d9e32d521f9a19602780f4581b5b2c2dba52628d45717e48564f1568e05d3770",
+    "apps/desktop/lib/src/rust/api/host.dart": "6e0af798828a52cbd9a6aafb5e227e7e64acb7a11b832c38ba1892be5f872a8c",
+    "apps/desktop/lib/src/rust/frb_generated.dart": "1fb98945a2d832a07d227c8876c77431a208283d236e96fd30fd56fed33f2b50",
+    "apps/desktop/lib/src/rust/frb_generated.io.dart": "39b8657a9f249d8199c41f9aca3e313295915954dc6bf2648f1645c11f3e060b",
+    "apps/desktop/lib/src/rust/frb_generated.web.dart": "093e7b7740098d7004e482c2fade996523288e666117553ff724c39cd293d7fb"
   }
 }

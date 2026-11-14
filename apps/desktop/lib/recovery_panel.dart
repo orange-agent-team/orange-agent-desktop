@@ -81,6 +81,12 @@ class _RecoveryPanelState extends State<RecoveryPanel> {
     'regular' => '文件存在，内容已变化',
     _ => '无法识别当前状态',
   };
+  String _choice(String? value) => switch (value) {
+    'keep_current_target' => '保留当前文件',
+    'restore_original_to_missing_target' => '把保留原件放回空缺位置',
+    'publish_staged_to_missing_target' => '把待发布版本放到空缺位置',
+    _ => '未识别的处理决定',
+  };
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: controller,
@@ -184,7 +190,8 @@ class _RecoveryPanelState extends State<RecoveryPanel> {
                         onPressed:
                             c.busy ||
                                 c.operation == null ||
-                                c.selected?.workspaceId == null
+                                c.selected?.workspaceId == null ||
+                                c.outcome?.recoveryId != null
                             ? null
                             : c.chooseAndInspect,
                         child: const Text('选择目录进行恢复检查'),
@@ -194,11 +201,21 @@ class _RecoveryPanelState extends State<RecoveryPanel> {
                       SelectableText(
                         '检查目录：${jsonEncode(c.access!.displayDirectory)}',
                       ),
+                    if (c.access != null)
+                      OutlinedButton(
+                        onPressed: c.busy ? null : c.inspectCurrent,
+                        child: const Text('刷新文件观察'),
+                      ),
+                    if (c.notice != null) Text(c.notice!),
+                    if (c.outcome?.recoveryId != null)
+                      Text('已记录决定：${_choice(c.outcome!.choice)}'),
                     if (view != null) ...[
                       const SizedBox(height: 12),
-                      const Text(
-                        '原修改记录仍待核对',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      Text(
+                        c.outcome?.recoveryId == null
+                            ? '原修改记录仍待核对'
+                            : '已记录处理后的文件观察',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const Text('以下是本次检查时观察到的文件状态。'),
                       SelectableText('文件：${jsonEncode(view.path)}'),
@@ -206,6 +223,67 @@ class _RecoveryPanelState extends State<RecoveryPanel> {
                       Text('待发布文件：${_file(view.staged)}'),
                       Text('保留原件：${_file(view.original)}'),
                       const Text('内容匹配不代表原操作已经确认完成。'),
+                      if (c.writer != null &&
+                          c.outcome?.recoveryId == null) ...[
+                        OutlinedButton(
+                          onPressed: c.busy ? null : c.chooseWrite,
+                          child: const Text('单独授权处理这次改动'),
+                        ),
+                        if (c.writeAccess != null) ...[
+                          const Text('写入目录已单独授权。选择处理方式后，仍需核对实际决定并批准。'),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              if (view.target.kind == 'regular')
+                                OutlinedButton(
+                                  onPressed: c.busy
+                                      ? null
+                                      : () => c.prepareDecision(
+                                          'keep_current_target',
+                                        ),
+                                  child: const Text('核对保留当前文件'),
+                                ),
+                              if (view.target.kind == 'missing' &&
+                                  view.original.kind == 'regular' &&
+                                  view.original.reviewedOriginalInode &&
+                                  view.original.matchesOriginalContent)
+                                OutlinedButton(
+                                  onPressed: c.busy
+                                      ? null
+                                      : () => c.prepareDecision(
+                                          'restore_original_to_missing_target',
+                                        ),
+                                  child: const Text('核对放回原件'),
+                                ),
+                              if (view.target.kind == 'missing' &&
+                                  view.staged.kind == 'regular' &&
+                                  view.staged.matchesResultContent)
+                                OutlinedButton(
+                                  onPressed: c.busy
+                                      ? null
+                                      : () => c.prepareDecision(
+                                          'publish_staged_to_missing_target',
+                                        ),
+                                  child: const Text('核对发布待写入版本'),
+                                ),
+                            ],
+                          ),
+                        ],
+                        if (c.decision != null) ...[
+                          Text(
+                            '待批准决定：${_choice(c.decision!.choice)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          SelectableText(
+                            '对应文件：${jsonEncode(c.decision!.inspection.path)}',
+                          ),
+                          const Text('其他保留版本不会因此删除，旧任务不会自动继续。'),
+                          FilledButton(
+                            onPressed: c.busy ? null : c.approveDecision,
+                            child: const Text('批准这个处理决定'),
+                          ),
+                        ],
+                      ],
                       ExpansionTile(
                         title: const Text('查看核对摘要'),
                         children: [

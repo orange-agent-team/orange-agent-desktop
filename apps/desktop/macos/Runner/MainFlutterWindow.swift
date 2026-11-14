@@ -28,7 +28,7 @@ class MainFlutterWindow: NSWindow {
         ])
         return
       }
-      if call.method == "chooseWorkspace" || call.method == "chooseModelFile" || call.method == "chooseCreationWorkspace" || call.method == "chooseEditingWorkspace" || call.method == "chooseRecoveryInspectionWorkspace" {
+      if call.method == "chooseWorkspace" || call.method == "chooseModelFile" || call.method == "chooseCreationWorkspace" || call.method == "chooseEditingWorkspace" || call.method == "chooseRecoveryInspectionWorkspace" || call.method == "chooseRecoveryWriteWorkspace" {
         guard !self.pickerActive else { result(FlutterError(code: "PICKER_BUSY", message: nil, details: nil)); return }
         self.pickerActive = true
         let panel = NSOpenPanel()
@@ -36,6 +36,7 @@ class MainFlutterWindow: NSWindow {
         let createSelection = call.method == "chooseCreationWorkspace"
         let editSelection = call.method == "chooseEditingWorkspace"
         let inspectionSelection = call.method == "chooseRecoveryInspectionWorkspace"
+        let recoveryWriteSelection = call.method == "chooseRecoveryWriteWorkspace"
         panel.canChooseDirectories = !modelSelection
         panel.canChooseFiles = modelSelection
         panel.allowsMultipleSelection = false
@@ -50,6 +51,10 @@ class MainFlutterWindow: NSWindow {
           panel.prompt = "允许恢复检查"
           panel.message = "请选择待核对运行的工作区。本次只读取文件状态；恢复写入需要另行授权并批准具体决定。"
         }
+        if recoveryWriteSelection {
+          panel.prompt = "允许处理待核对改动"
+          panel.message = "请选择与检查目录相同的工作区。此权限仅用于已选改动的恢复处理；每个具体决定仍需核对实际状态后单独批准。"
+        }
         if modelSelection { panel.allowedContentTypes = [UTType(filenameExtension: "gguf") ?? .data] }
         panel.beginSheetModal(for: self) { response in
           self.pickerActive = false
@@ -57,17 +62,17 @@ class MainFlutterWindow: NSWindow {
           let normalized = url.resolvingSymlinksInPath().standardizedFileURL
           let selection = UUID().uuidString
           let scoped = normalized.startAccessingSecurityScopedResource()
-          let purpose = modelSelection ? "model" : (createSelection ? "creation" : (editSelection ? "editing" : (inspectionSelection ? "recovery_inspection" : "workspace")))
+          let purpose = modelSelection ? "model" : (createSelection ? "creation" : (editSelection ? "editing" : (inspectionSelection ? "recovery_inspection" : (recoveryWriteSelection ? "recovery_write" : "workspace"))))
           self.selections[selection] = (normalized, scoped, purpose)
           result(["selectionId": selection, "path": normalized.path])
         }
         return
       }
-      if call.method == "releaseWorkspaceSelection" || call.method == "releaseModelSelection" || call.method == "releaseCreationSelection" || call.method == "releaseEditingSelection" || call.method == "releaseRecoveryInspectionSelection" {
+      if call.method == "releaseWorkspaceSelection" || call.method == "releaseModelSelection" || call.method == "releaseCreationSelection" || call.method == "releaseEditingSelection" || call.method == "releaseRecoveryInspectionSelection" || call.method == "releaseRecoveryWriteSelection" {
         guard let arguments = call.arguments as? [String: Any], let id = arguments["selectionId"] as? String else {
           result(FlutterError(code: "INVALID_SELECTION", message: nil, details: nil)); return
         }
-        let purpose = call.method == "releaseModelSelection" ? "model" : (call.method == "releaseCreationSelection" ? "creation" : (call.method == "releaseEditingSelection" ? "editing" : (call.method == "releaseRecoveryInspectionSelection" ? "recovery_inspection" : "workspace")))
+        let purpose = call.method == "releaseModelSelection" ? "model" : (call.method == "releaseCreationSelection" ? "creation" : (call.method == "releaseEditingSelection" ? "editing" : (call.method == "releaseRecoveryInspectionSelection" ? "recovery_inspection" : (call.method == "releaseRecoveryWriteSelection" ? "recovery_write" : "workspace"))))
         if let (_, _, actual) = self.selections[id], actual != purpose {
           result(FlutterError(code: "SELECTION_PURPOSE_MISMATCH", message: nil, details: nil)); return
         }

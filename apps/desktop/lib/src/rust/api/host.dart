@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -417,6 +417,66 @@ Future<List<String>> listUnresolvedEdits({
   limit: limit,
 );
 
+Future<RecoveryDecisionView> prepareRecoveryDecision({
+  required String handle,
+  required String readSessionToken,
+  required String writeSessionToken,
+  required String requestId,
+  required String choice,
+}) => RustLib.instance.api.crateApiHostPrepareRecoveryDecision(
+  handle: handle,
+  readSessionToken: readSessionToken,
+  writeSessionToken: writeSessionToken,
+  requestId: requestId,
+  choice: choice,
+);
+
+Future<RecoveryOutcomeView> approveRecoveryDecision({
+  required String handle,
+  required String readSessionToken,
+  required String writeSessionToken,
+  required String recoveryId,
+  required String expectedDigest,
+}) => RustLib.instance.api.crateApiHostApproveRecoveryDecision(
+  handle: handle,
+  readSessionToken: readSessionToken,
+  writeSessionToken: writeSessionToken,
+  recoveryId: recoveryId,
+  expectedDigest: expectedDigest,
+);
+
+/// Trusted UI only after a separate native recovery-write selection.
+Future<RecoveryWriteAccessView> authorizeRecoveryWriteAccess({
+  required String handle,
+  required String readSessionToken,
+  required String requestId,
+  required String selectedDirectory,
+}) => RustLib.instance.api.crateApiHostAuthorizeRecoveryWriteAccess(
+  handle: handle,
+  readSessionToken: readSessionToken,
+  requestId: requestId,
+  selectedDirectory: selectedDirectory,
+);
+
+Future<void> suspendRecoveryWriteSelection({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostSuspendRecoveryWriteSelection(
+  handle: handle,
+  requestId: requestId,
+);
+
+/// Metadata-only outcome reconciliation; no files or permission restoration.
+Future<RecoveryOutcomeView> inspectRecoveryOutcome({
+  required String handle,
+  required String runId,
+  required String operationId,
+}) => RustLib.instance.api.crateApiHostInspectRecoveryOutcome(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+);
+
 /// Trusted UI only after a separate native recovery-read directory selection.
 Future<RecoveryInspectionAccessView> authorizeRecoveryInspection({
   required String handle,
@@ -787,6 +847,45 @@ class ModelServiceView {
           failure == other.failure;
 }
 
+class RecoveryDecisionView {
+  final String readSessionToken;
+  final String writeSessionToken;
+  final String recoveryId;
+  final String digest;
+  final String choice;
+  final RecoveryInspectionView inspection;
+
+  const RecoveryDecisionView({
+    required this.readSessionToken,
+    required this.writeSessionToken,
+    required this.recoveryId,
+    required this.digest,
+    required this.choice,
+    required this.inspection,
+  });
+
+  @override
+  int get hashCode =>
+      readSessionToken.hashCode ^
+      writeSessionToken.hashCode ^
+      recoveryId.hashCode ^
+      digest.hashCode ^
+      choice.hashCode ^
+      inspection.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecoveryDecisionView &&
+          runtimeType == other.runtimeType &&
+          readSessionToken == other.readSessionToken &&
+          writeSessionToken == other.writeSessionToken &&
+          recoveryId == other.recoveryId &&
+          digest == other.digest &&
+          choice == other.choice &&
+          inspection == other.inspection;
+}
+
 class RecoveryFileStatusView {
   final String kind;
   final String? refusal;
@@ -914,6 +1013,80 @@ class RecoveryInspectionView {
           target == other.target &&
           staged == other.staged &&
           original == other.original;
+}
+
+class RecoveryOutcomeView {
+  final String runId;
+  final String operationId;
+  final String originalExecutionState;
+  final String? recoveryId;
+  final String? choice;
+
+  const RecoveryOutcomeView({
+    required this.runId,
+    required this.operationId,
+    required this.originalExecutionState,
+    this.recoveryId,
+    this.choice,
+  });
+
+  @override
+  int get hashCode =>
+      runId.hashCode ^
+      operationId.hashCode ^
+      originalExecutionState.hashCode ^
+      recoveryId.hashCode ^
+      choice.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecoveryOutcomeView &&
+          runtimeType == other.runtimeType &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          originalExecutionState == other.originalExecutionState &&
+          recoveryId == other.recoveryId &&
+          choice == other.choice;
+}
+
+class RecoveryWriteAccessView {
+  final String sessionToken;
+  final String readSessionToken;
+  final String runId;
+  final String operationId;
+  final String workspaceId;
+  final String displayDirectory;
+
+  const RecoveryWriteAccessView({
+    required this.sessionToken,
+    required this.readSessionToken,
+    required this.runId,
+    required this.operationId,
+    required this.workspaceId,
+    required this.displayDirectory,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      readSessionToken.hashCode ^
+      runId.hashCode ^
+      operationId.hashCode ^
+      workspaceId.hashCode ^
+      displayDirectory.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RecoveryWriteAccessView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          readSessionToken == other.readSessionToken &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          workspaceId == other.workspaceId &&
+          displayDirectory == other.displayDirectory;
 }
 
 class RunPage {

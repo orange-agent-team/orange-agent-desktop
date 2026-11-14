@@ -10,7 +10,70 @@ use orange_agent_runtime::workspace::patch::{
     },
 };
 use std::sync::atomic::{AtomicBool, Ordering};
+mod writing;
+pub(super) use writing::WriteSession;
+pub(crate) use writing::{approve_recovery_decision, prepare_recovery_decision};
+pub(crate) use writing::{authorize_recovery_write_access, suspend_recovery_write_selection};
 
+pub(super) enum RecoveryLease {
+    Read(Arc<PatchInspectionGrant>),
+    Write(Arc<orange_agent_runtime::workspace::patch::review::dispatch::recovery::resolution::PatchRecoveryGrant>),
+}
+impl RecoveryLease {
+    pub(super) async fn wait_drained(&self) {
+        match self {
+            Self::Read(grant) => grant.wait_drained().await,
+            Self::Write(grant) => grant.wait_drained().await,
+        }
+    }
+}
+
+pub(crate) async fn inspect_recovery_outcome(
+    handle: String,
+    run: String,
+    operation: String,
+) -> Result<crate::api::host::RecoveryOutcomeView, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        let value = registry
+            .current(&handle)?
+            .journal
+            .agent_patch_recovery_outcome(LOCAL_OWNER, &run, &operation)
+            .map_err(runs::engine_error)?;
+        Ok(outcome_view(value))
+    })
+    .await
+}
+
+fn outcome_view(
+    value: orange_agent_runtime::engine::PatchRecoveryOutcome,
+) -> crate::api::host::RecoveryOutcomeView {
+    use orange_agent_runtime::workspace::patch::review::dispatch::recovery::resolution::PatchRecoveryChoice;
+    let (recovery_id, choice) = match value.decision {
+        Some(decision) => (
+            Some(decision.recovery_id),
+            Some(
+                match decision.choice {
+                    PatchRecoveryChoice::KeepCurrentTarget => "keep_current_target",
+                    PatchRecoveryChoice::RestoreOriginalToMissingTarget => {
+                        "restore_original_to_missing_target"
+                    }
+                    PatchRecoveryChoice::PublishStagedToMissingTarget => {
+                        "publish_staged_to_missing_target"
+                    }
+                }
+                .into(),
+            ),
+        ),
+        None => (None, None),
+    };
+    crate::api::host::RecoveryOutcomeView {
+        run_id: value.run_id,
+        operation_id: value.operation_id,
+        original_execution_state: value.original_execution_state,
+        recovery_id,
+        choice,
+    }
+}
 pub(super) struct InspectionSession {
     view: RecoveryInspectionAccessView,
     read: Arc<PatchInspectionGrant>,
@@ -79,6 +142,38 @@ fn file(value: &RecoveryFileObservation) -> RecoveryFileStatusView {
     }
     view
 }
+fn snapshot_view(
+    run: &str,
+    operation: &str,
+    snapshot: &orange_agent_runtime::workspace::patch::review::dispatch::recovery::inspection::PatchRecoverySnapshot,
+) -> Result<RecoveryInspectionView, BridgeError> {
+    if snapshot.journal.plan.operation_id != operation {
+        return Err(failure("RECOVERY_CONTEXT_CHANGED"));
+    }
+    let stage = snapshot.journal.last_durable_stage.map(|s| {
+        match s {
+            PublicationStage::StageIntent => "stage_intent",
+            PublicationStage::Staged => "staged",
+            PublicationStage::CaptureIntent => "capture_intent",
+            PublicationStage::Captured => "captured",
+            PublicationStage::PublishIntent => "publish_intent",
+            PublicationStage::Published => "published",
+            PublicationStage::Confirmed => "confirmed",
+        }
+        .into()
+    });
+    let view = RecoveryInspectionView {
+        run_id: run.into(),
+        operation_id: operation.into(),
+        path: snapshot.journal.plan.path.clone(),
+        execution_state: snapshot.journal.execution_state.clone(),
+        last_durable_stage: stage,
+        target: file(&snapshot.target),
+        staged: file(&snapshot.staged),
+        original: file(&snapshot.original),
+    };
+    Ok(view)
+}
 impl HostRegistry {
     async fn authorize_inspection(
         &mut self,
@@ -108,7 +203,9 @@ impl HostRegistry {
         }
         let epoch = {
             let mut controls = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
-            if other_selection_kind(&controls, token) {
+            if other_selection_kind(&controls, token)
+                || controls.recovery_writes.contains_key(token)
+            {
                 return Err(failure("RECOVERY_SELECTION_CONFLICT"));
             }
             if controls.closed_recovery_selections.contains(token)
@@ -161,6 +258,7 @@ impl HostRegistry {
                 || controls.closed_recovery_selections.len() >= 8192
                 || controls.recovery_epochs.get(&workspace) != Some(&epoch)
                 || other_selection_kind(&controls, token)
+                || controls.recovery_writes.contains_key(token)
             {
                 read.request_revoke();
                 return Err(failure("RECOVERY_SELECTION_CLOSED"));
@@ -209,31 +307,7 @@ impl HostRegistry {
             .await
             .map_err(error)?;
         let snapshot = receipt.snapshot().map_err(error)?;
-        if snapshot.journal.plan.operation_id != scope.view.operation_id {
-            return Err(failure("RECOVERY_CONTEXT_CHANGED"));
-        }
-        let stage = snapshot.journal.last_durable_stage.map(|s| {
-            match s {
-                PublicationStage::StageIntent => "stage_intent",
-                PublicationStage::Staged => "staged",
-                PublicationStage::CaptureIntent => "capture_intent",
-                PublicationStage::Captured => "captured",
-                PublicationStage::PublishIntent => "publish_intent",
-                PublicationStage::Published => "published",
-                PublicationStage::Confirmed => "confirmed",
-            }
-            .into()
-        });
-        let view = RecoveryInspectionView {
-            run_id: scope.view.run_id.clone(),
-            operation_id: scope.view.operation_id.clone(),
-            path: snapshot.journal.plan.path.clone(),
-            execution_state: snapshot.journal.execution_state.clone(),
-            last_durable_stage: stage,
-            target: file(&snapshot.target),
-            staged: file(&snapshot.staged),
-            original: file(&snapshot.original),
-        };
+        let view = snapshot_view(&scope.view.run_id, &scope.view.operation_id, snapshot)?;
         // Never expose protected staging names, raw contents, or an already
         // revoked snapshot through the Flutter projection.
         receipt.snapshot().map_err(error)?;
@@ -243,6 +317,8 @@ impl HostRegistry {
         Ok(view)
     }
     async fn suspend_inspection(&mut self, handle: &str, token: &str) -> Result<(), BridgeError> {
+        self.close_recovery_writes(handle, Some(token), None)
+            .await?;
         let signals = self.signals.clone();
         let host = self.current(handle)?;
         if let Some(scope) = host.recovery_inspections.get(token) {
@@ -262,7 +338,7 @@ impl HostRegistry {
         &mut self,
         handle: &str,
         workspace: &str,
-    ) -> Result<Vec<Arc<PatchInspectionGrant>>, BridgeError> {
+    ) -> Result<Vec<RecoveryLease>, BridgeError> {
         let signals = self.signals.clone();
         let host = self.current(handle)?;
         let ids: Vec<_> = host
@@ -273,11 +349,26 @@ impl HostRegistry {
             .collect();
         let mut leases = Vec::new();
         let mut controls = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+        let writes: Vec<_> = host
+            .recovery_writes
+            .iter()
+            .filter(|(_, s)| s.view.workspace_id == workspace)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in writes {
+            if let Some(scope) = host.recovery_writes.remove(&id) {
+                scope.available.store(false, Ordering::Release);
+                scope.write.request_revoke();
+                leases.push(RecoveryLease::Write(scope.write));
+            }
+            controls.closed_recovery_selections.insert(id.clone());
+            controls.recovery_writes.remove(&id);
+        }
         for id in ids {
             if let Some(scope) = host.recovery_inspections.remove(&id) {
                 scope.available.store(false, Ordering::Release);
                 scope.read.request_revoke();
-                leases.push(scope.read);
+                leases.push(RecoveryLease::Read(scope.read));
             }
             controls.closed_recovery_selections.insert(id.clone());
             controls.recovery_inspections.remove(&id);

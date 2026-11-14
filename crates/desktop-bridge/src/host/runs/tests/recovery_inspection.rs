@@ -175,6 +175,79 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
     )
     .await
     .expect("independent read consent while ordinary execution stays quarantined");
+    assert_eq!(
+        api::authorize_recovery_write_access(
+            h.into(),
+            access.session_token.clone(),
+            access.session_token.clone(),
+            root.display().to_string()
+        )
+        .await
+        .expect_err("read selection cannot become write consent")
+        .code,
+        "RECOVERY_SELECTION_CONFLICT"
+    );
+    api::suspend_recovery_write_selection(h.into(), "closed-recovery-write".into())
+        .await
+        .expect("close lost write callback");
+    assert!(
+        api::authorize_recovery_write_access(
+            h.into(),
+            access.session_token.clone(),
+            "closed-recovery-write".into(),
+            root.display().to_string()
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        api::authorize_recovery_write_access(
+            h.into(),
+            access.session_token.clone(),
+            "wrong-recovery-write-root".into(),
+            base.display().to_string()
+        )
+        .await
+        .is_err()
+    );
+    let first_write = api::authorize_recovery_write_access(
+        h.into(),
+        access.session_token.clone(),
+        "recovery-write-1".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("separate write selection");
+    assert_eq!(first_write.read_session_token, access.session_token);
+    assert!(
+        api::suspend_recovery_inspection(h.into(), first_write.session_token.clone())
+            .await
+            .is_err(),
+        "wrong release kind must not stop a live writer"
+    );
+    assert!(
+        api::suspend_recovery_write_selection(h.into(), access.session_token.clone())
+            .await
+            .is_err(),
+        "write release must not stop read authority"
+    );
+    api::suspend_recovery_write_selection(h.into(), first_write.session_token.clone())
+        .await
+        .expect("close just write scope");
+    assert!(
+        api::inspect_recovery(h.into(), access.session_token.clone())
+            .await
+            .is_ok(),
+        "read scope remains independent"
+    );
+    let dependent_write = api::authorize_recovery_write_access(
+        h.into(),
+        access.session_token.clone(),
+        "recovery-write-2".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("writer bound to read lifetime");
     let snapshot = api::inspect_recovery(h.into(), access.session_token.clone())
         .await
         .expect("actual file observations");
@@ -241,19 +314,48 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
             .await
             .is_err()
     );
+    assert!(
+        api::authorize_recovery_write_access(
+            h.into(),
+            access.session_token.clone(),
+            dependent_write.session_token,
+            root.display().to_string()
+        )
+        .await
+        .is_err(),
+        "closed parent cannot restore child write"
+    );
     let second = api::authorize_recovery_inspection(
         h.into(),
         run.run_id.clone(),
-        operation,
+        operation.clone(),
         "second-inspection".into(),
         workspace.permission_version.clone(),
         root.display().to_string(),
     )
     .await
     .expect("fresh read selection");
+    let global_write = api::authorize_recovery_write_access(
+        h.into(),
+        second.session_token.clone(),
+        "recovery-write-3".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("independent scope under workspace revocation");
+    let before_revoke = api::prepare_recovery_decision(
+        h.into(),
+        second.session_token.clone(),
+        global_write.session_token.clone(),
+        "before-global-revoke".into(),
+        "keep_current_target".into(),
+    )
+    .await
+    .expect("actual decision preview");
+    assert!(before_revoke.inspection.target.matches_result_content);
     // There is no ordinary WorkspaceSignal at this point. Global revocation
     // must still signal and drain this independently authorized read scope.
-    api::revoke_workspace(
+    let revoked = api::revoke_workspace(
         h.into(),
         workspace.workspace_id,
         workspace.permission_version,
@@ -261,9 +363,147 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
     .await
     .expect("revoke workspace without ordinary scope");
     assert!(
-        api::inspect_recovery(h.into(), second.session_token)
+        api::inspect_recovery(h.into(), second.session_token.clone())
             .await
             .is_err()
+    );
+    assert!(
+        api::approve_recovery_decision(
+            h.into(),
+            second.session_token,
+            global_write.session_token.clone(),
+            before_revoke.recovery_id,
+            before_revoke.digest
+        )
+        .await
+        .is_err(),
+        "revoked preview cannot execute"
+    );
+    api::suspend_recovery_write_selection(h.into(), global_write.session_token)
+        .await
+        .expect("workspace revoke drained writer too");
+    let outcome = api::inspect_recovery_outcome(h.into(), run.run_id.clone(), operation.clone())
+        .await
+        .expect("metadata after all file scopes revoked");
+    assert_eq!(outcome.run_id, run.run_id);
+    assert_eq!(outcome.operation_id, operation);
+    assert_eq!(outcome.original_execution_state, "unknown");
+    assert!(outcome.recovery_id.is_none() && outcome.choice.is_none());
+    assert!(
+        api::inspect_recovery_outcome(h.into(), "other-run".into(), operation.clone())
+            .await
+            .is_err()
+    );
+    let read_again = api::authorize_recovery_inspection(
+        h.into(),
+        run.run_id.clone(),
+        operation.clone(),
+        "decision-read-after-revoke".into(),
+        revoked.permission_version,
+        root.display().to_string(),
+    )
+    .await
+    .expect("new explicit recovery read consent");
+    let write_again = api::authorize_recovery_write_access(
+        h.into(),
+        read_again.session_token.clone(),
+        "decision-write-after-revoke".into(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("separate new write consent");
+    let first = api::prepare_recovery_decision(
+        h.into(),
+        read_again.session_token.clone(),
+        write_again.session_token.clone(),
+        "first-current-decision".into(),
+        "keep_current_target".into(),
+    )
+    .await
+    .expect("first review");
+    let current = api::prepare_recovery_decision(
+        h.into(),
+        read_again.session_token.clone(),
+        write_again.session_token.clone(),
+        "current-decision".into(),
+        "keep_current_target".into(),
+    )
+    .await
+    .expect("replacement review");
+    assert_eq!(
+        api::approve_recovery_decision(
+            h.into(),
+            read_again.session_token.clone(),
+            write_again.session_token.clone(),
+            first.recovery_id,
+            first.digest
+        )
+        .await
+        .expect_err("superseded view refused")
+        .code,
+        "RECOVERY_PREVIEW_CHANGED"
+    );
+    assert!(
+        api::approve_recovery_decision(
+            h.into(),
+            read_again.session_token.clone(),
+            write_again.session_token.clone(),
+            current.recovery_id.clone(),
+            "0".repeat(64)
+        )
+        .await
+        .is_err()
+    );
+    let completed = api::approve_recovery_decision(
+        h.into(),
+        read_again.session_token.clone(),
+        write_again.session_token.clone(),
+        current.recovery_id.clone(),
+        current.digest.clone(),
+    )
+    .await
+    .expect("exact current decision approval");
+    assert_eq!(
+        completed.recovery_id.as_deref(),
+        Some(current.recovery_id.as_str())
+    );
+    assert_eq!(completed.choice.as_deref(), Some("keep_current_target"));
+    assert_eq!(completed.original_execution_state, "unknown");
+    assert!(
+        api::approve_recovery_decision(
+            h.into(),
+            read_again.session_token.clone(),
+            write_again.session_token.clone(),
+            current.recovery_id.clone(),
+            current.digest
+        )
+        .await
+        .is_err(),
+        "no action replay"
+    );
+    api::suspend_recovery_inspection(h.into(), read_again.session_token)
+        .await
+        .expect("release read and write");
+    api::suspend_recovery_write_selection(h.into(), write_again.session_token)
+        .await
+        .expect("idempotent physical write release barrier");
+    let saved = api::inspect_recovery_outcome(h.into(), run.run_id.clone(), operation)
+        .await
+        .expect("lost reply reconciled without file access");
+    assert_eq!(saved.recovery_id, completed.recovery_id);
+    assert!(
+        api::list_unresolved_edits(h.into(), run.run_id.clone(), None, 10)
+            .await
+            .expect("resolved index")
+            .is_empty()
+    );
+    assert!(
+        api::list_runs(h.into(), None, None, 100)
+            .await
+            .expect("metadata")
+            .runs
+            .iter()
+            .any(|r| r.run_id == run.run_id && r.phase != "completed")
     );
     assert_eq!(model.calls.load(Ordering::SeqCst), 1);
     assert_eq!(

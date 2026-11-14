@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -28,7 +29,25 @@ abstract interface class RecoveryCommands {
   Future<void> release(String token);
 }
 
-class NativeRecoveryCommands implements RecoveryCommands {
+abstract interface class WritingRecoveryCommands {
+  Future<RecoverySelection?> chooseWrite();
+  Future<api.RecoveryWriteAccessView> authorizeWrite(
+    api.RecoveryInspectionAccessView read,
+    RecoverySelection selected,
+  );
+  Future<api.RecoveryDecisionView> prepare(
+    String reader,
+    String writer,
+    String request,
+    String choice,
+  );
+  Future<api.RecoveryOutcomeView> approve(api.RecoveryDecisionView decision);
+  Future<api.RecoveryOutcomeView> outcome(String run, String operation);
+  Future<void> releaseWrite(String token);
+}
+
+class NativeRecoveryCommands
+    implements RecoveryCommands, WritingRecoveryCommands {
   NativeRecoveryCommands(this.handle);
   final String handle;
   static const platform = MethodChannel('orange_agent/platform');
@@ -43,22 +62,77 @@ class NativeRecoveryCommands implements RecoveryCommands {
       api.listWorkspaces(handle: handle, includeRevoked: true);
   @override
   Future<RecoverySelection?> choose() async {
+    return _choose('chooseRecoveryInspectionWorkspace', release);
+  }
+
+  Future<RecoverySelection?> _choose(
+    String method,
+    Future<void> Function(String) close,
+  ) async {
     if (!Platform.isMacOS) {
       throw PlatformException(code: 'PLATFORM_NOT_VERIFIED');
     }
-    final value = await platform.invokeMapMethod<String, dynamic>(
-      'chooseRecoveryInspectionWorkspace',
-    );
+    final value = await platform.invokeMapMethod<String, dynamic>(method);
     if (value == null) return null;
     final token = value['selectionId'], directory = value['path'];
     if (token is! String || token.isEmpty) {
       throw const FormatException('Invalid native selection identity');
     }
     if (directory is! String || directory.isEmpty) {
-      await release(token);
+      await close(token);
       throw const FormatException('Invalid native selection directory');
     }
     return RecoverySelection(token, directory);
+  }
+
+  @override
+  Future<RecoverySelection?> chooseWrite() =>
+      _choose('chooseRecoveryWriteWorkspace', releaseWrite);
+  @override
+  Future<api.RecoveryWriteAccessView> authorizeWrite(
+    api.RecoveryInspectionAccessView read,
+    RecoverySelection selected,
+  ) => api.authorizeRecoveryWriteAccess(
+    handle: handle,
+    readSessionToken: read.sessionToken,
+    requestId: selected.token,
+    selectedDirectory: selected.directory,
+  );
+  @override
+  Future<api.RecoveryDecisionView> prepare(
+    String reader,
+    String writer,
+    String request,
+    String choice,
+  ) => api.prepareRecoveryDecision(
+    handle: handle,
+    readSessionToken: reader,
+    writeSessionToken: writer,
+    requestId: request,
+    choice: choice,
+  );
+  @override
+  Future<api.RecoveryOutcomeView> approve(api.RecoveryDecisionView decision) =>
+      api.approveRecoveryDecision(
+        handle: handle,
+        readSessionToken: decision.readSessionToken,
+        writeSessionToken: decision.writeSessionToken,
+        recoveryId: decision.recoveryId,
+        expectedDigest: decision.digest,
+      );
+  @override
+  Future<api.RecoveryOutcomeView> outcome(String run, String operation) =>
+      api.inspectRecoveryOutcome(
+        handle: handle,
+        runId: run,
+        operationId: operation,
+      );
+  @override
+  Future<void> releaseWrite(String token) async {
+    await api.suspendRecoveryWriteSelection(handle: handle, requestId: token);
+    await platform.invokeMethod<void>('releaseRecoveryWriteSelection', {
+      'selectionId': token,
+    });
   }
 
   @override
@@ -100,12 +174,21 @@ class RecoveryController extends ChangeNotifier {
   String? operation, nextCursor, error;
   api.RecoveryInspectionAccessView? access;
   api.RecoveryInspectionView? snapshot;
+  api.RecoveryWriteAccessView? writeAccess;
+  api.RecoveryDecisionView? decision;
+  api.RecoveryOutcomeView? outcome;
+  String? notice;
   bool busy = false, loaded = false;
   bool _disposed = false;
   int _epoch = 0;
   final _held = <String>{};
   final _seen = <String>{};
   final _releasing = <String, Future<void>>{};
+  final _heldWrites = <String>{};
+  final _releasingWrites = <String, Future<void>>{};
+  WritingRecoveryCommands? get writer => commands is WritingRecoveryCommands
+      ? commands as WritingRecoveryCommands
+      : null;
 
   bool _live(int epoch) => !_disposed && epoch == _epoch;
   void _changed() {
@@ -116,6 +199,10 @@ class RecoveryController extends ChangeNotifier {
     final epoch = ++_epoch;
     snapshot = null;
     access = null;
+    writeAccess = null;
+    decision = null;
+    outcome = null;
+    notice = null;
     error = null;
     busy = true;
     _changed();
@@ -144,13 +231,48 @@ class RecoveryController extends ChangeNotifier {
   }
 
   Future<void> _releaseAll() async {
-    await Future.wait(_held.toList().map(_release), eagerError: false);
+    Object? failure;
+    StackTrace? trace;
+    try {
+      await Future.wait(
+        _heldWrites.toList().map(_releaseWrite),
+        eagerError: false,
+      );
+    } catch (e, s) {
+      failure = e;
+      trace = s;
+    }
+    try {
+      await Future.wait(_held.toList().map(_release), eagerError: false);
+    } catch (e, s) {
+      failure ??= e;
+      trace ??= s;
+    }
+    if (failure != null) Error.throwWithStackTrace(failure, trace!);
+  }
+
+  Future<void> _releaseWrite(String token) {
+    if (!_heldWrites.contains(token)) return Future<void>.value();
+    return _releasingWrites.putIfAbsent(
+      token,
+      () => Future<void>.sync(() => writer!.releaseWrite(token))
+          .then((_) {
+            _heldWrites.remove(token);
+          })
+          .whenComplete(() {
+            _releasingWrites.remove(token);
+          }),
+    );
   }
 
   Future<void> stop() async {
     ++_epoch;
     snapshot = null;
     access = null;
+    writeAccess = null;
+    decision = null;
+    outcome = null;
+    notice = null;
     busy = false;
     error = null;
     _changed();
@@ -332,12 +454,238 @@ class RecoveryController extends ChangeNotifier {
         !file.matchesResultContent;
   }
 
+  bool _validObservation(
+    api.RecoveryInspectionView value,
+    String run,
+    String op,
+  ) =>
+      value.runId == run &&
+      value.operationId == op &&
+      value.executionState == 'unknown' &&
+      value.path.isNotEmpty &&
+      value.path.length <= 4096 &&
+      !value.path.contains('\u0000') &&
+      [value.target, value.staged, value.original].every(_validFile);
+  bool _validOutcome(api.RecoveryOutcomeView value, String run, String op) =>
+      value.runId == run &&
+      value.operationId == op &&
+      value.originalExecutionState == 'unknown' &&
+      ((value.recoveryId == null && value.choice == null) ||
+          (value.recoveryId?.isNotEmpty == true &&
+              const [
+                'keep_current_target',
+                'restore_original_to_missing_target',
+                'publish_staged_to_missing_target',
+              ].contains(value.choice)));
+  Future<void> chooseWrite() async {
+    final read = access, writeCommands = writer;
+    if (busy ||
+        read == null ||
+        snapshot == null ||
+        writeCommands == null ||
+        outcome?.recoveryId != null) {
+      return;
+    }
+    final epoch = ++_epoch;
+    busy = true;
+    error = null;
+    decision = null;
+    writeAccess = null;
+    notice = null;
+    _changed();
+    String? token;
+    bool retained = false;
+    try {
+      await Future.wait(
+        _heldWrites.toList().map(_releaseWrite),
+        eagerError: false,
+      );
+      if (!_live(epoch)) return;
+      final selected = await writeCommands.chooseWrite();
+      if (selected == null) return;
+      token = selected.token;
+      _heldWrites.add(token);
+      if (!_seen.add(token)) {
+        throw const FormatException('Reused native write selection');
+      }
+      if (!_live(epoch)) return;
+      final granted = await writeCommands.authorizeWrite(read, selected);
+      if (!_live(epoch)) return;
+      if (granted.sessionToken != token ||
+          granted.readSessionToken != read.sessionToken ||
+          granted.runId != read.runId ||
+          granted.operationId != read.operationId ||
+          granted.workspaceId != read.workspaceId) {
+        throw const FormatException('Mismatched write authority');
+      }
+      writeAccess = granted;
+      retained = true;
+    } catch (failure) {
+      if (_live(epoch)) error = _describe(failure);
+    } finally {
+      if (token != null && !retained) {
+        try {
+          await _releaseWrite(token);
+        } catch (_) {
+          error = '恢复写入权限释放尚未确认，请重试结束检查。';
+        }
+      }
+      if (_live(epoch)) busy = false;
+      _changed();
+    }
+  }
+
+  Future<void> inspectCurrent() async {
+    final read = access;
+    if (busy || read == null) return;
+    final epoch = ++_epoch;
+    busy = true;
+    snapshot = null;
+    decision = null;
+    error = null;
+    _changed();
+    try {
+      final view = await commands.inspect(read.sessionToken);
+      if (!_live(epoch)) return;
+      if (!_validObservation(view, read.runId, read.operationId)) {
+        throw const FormatException('Mismatched current observation');
+      }
+      snapshot = view;
+    } catch (failure) {
+      if (_live(epoch)) error = _describe(failure);
+    } finally {
+      if (_live(epoch)) {
+        busy = false;
+        _changed();
+      }
+    }
+  }
+
+  Future<void> prepareDecision(String choice) async {
+    final read = access, write = writeAccess, writeCommands = writer;
+    if (busy ||
+        read == null ||
+        write == null ||
+        writeCommands == null ||
+        outcome?.recoveryId != null) {
+      return;
+    }
+    final epoch = ++_epoch;
+    busy = true;
+    error = null;
+    decision = null;
+    notice = null;
+    _changed();
+    final request =
+        'recovery-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
+    try {
+      final view = await writeCommands.prepare(
+        read.sessionToken,
+        write.sessionToken,
+        request,
+        choice,
+      );
+      if (!_live(epoch)) return;
+      if (view.readSessionToken != read.sessionToken ||
+          view.writeSessionToken != write.sessionToken ||
+          view.choice != choice ||
+          view.recoveryId.isEmpty ||
+          !RegExp(r'^[0-9a-f]{64}$').hasMatch(view.digest) ||
+          !_validObservation(view.inspection, read.runId, read.operationId)) {
+        throw const FormatException('Mismatched decision preview');
+      }
+      snapshot = view.inspection;
+      decision = view;
+    } catch (failure) {
+      if (_live(epoch)) {
+        snapshot = null;
+        error = _describe(failure);
+      }
+    } finally {
+      if (_live(epoch)) {
+        busy = false;
+        _changed();
+      }
+    }
+  }
+
+  Future<void> approveDecision() async {
+    final view = decision,
+        writeCommands = writer,
+        read = access,
+        write = writeAccess;
+    if (busy ||
+        view == null ||
+        writeCommands == null ||
+        read == null ||
+        write == null) {
+      return;
+    }
+    final epoch = ++_epoch;
+    busy = true;
+    decision = null;
+    snapshot = null;
+    error = null;
+    notice = null;
+    _changed();
+    try {
+      api.RecoveryOutcomeView result;
+      try {
+        result = await writeCommands.approve(view);
+      } catch (_) {
+        if (!_live(epoch)) return;
+        // A lost reply is reconciled by metadata, never by resending approval.
+        result = await writeCommands.outcome(read.runId, read.operationId);
+      }
+      if (!_live(epoch)) return;
+      if (!_validOutcome(result, read.runId, read.operationId)) {
+        throw const FormatException('Mismatched outcome');
+      }
+      if (result.recoveryId == view.recoveryId &&
+          result.choice != view.choice) {
+        throw const FormatException('Immutable recovery decision changed');
+      }
+      if (result.recoveryId == null) {
+        error = '恢复结果尚未确认。请重新检查文件，不要重复提交旧批准。';
+        return;
+      }
+      outcome = result;
+      notice =
+          result.recoveryId == view.recoveryId && result.choice == view.choice
+          ? '本次处理已记录；原操作仍标记未确认，旧任务不会继续。'
+          : '该改动已有另一条处理记录，本次决定未确认执行。';
+      try {
+        final current = await commands.inspect(read.sessionToken);
+        if (_live(epoch) &&
+            _validObservation(current, read.runId, read.operationId)) {
+          snapshot = current;
+        }
+      } catch (_) {
+        if (_live(epoch)) error = '已有处理记录，但当前文件状态仍需核对。';
+      }
+    } catch (failure) {
+      if (_live(epoch)) error = _describe(failure);
+    } finally {
+      try {
+        await _releaseWrite(write.sessionToken);
+      } catch (_) {
+        error = '恢复写入权限释放尚未确认，请重试结束检查。';
+      }
+      if (writeAccess?.sessionToken == write.sessionToken) writeAccess = null;
+      if (_live(epoch)) busy = false;
+      _changed();
+    }
+  }
+
   @override
   void dispose() {
     _disposed = true;
     ++_epoch;
     snapshot = null;
     access = null;
+    writeAccess = null;
+    decision = null;
+    outcome = null;
     unawaited(
       _releaseAll().catchError((Object failure, StackTrace stack) {
         FlutterError.reportError(

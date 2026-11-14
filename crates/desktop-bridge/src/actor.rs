@@ -25,7 +25,10 @@ mod recovery;
 #[cfg(target_vendor = "apple")]
 pub(crate) use editing::{signal_editing_release, signal_editing_revoke};
 #[cfg(target_vendor = "apple")]
-pub(crate) use recovery::{RecoveryInspectionSignal, signal_recovery_inspection_release};
+pub(crate) use recovery::{
+    RecoveryInspectionSignal, RecoveryWriteSignal, signal_recovery_inspection_release,
+    signal_recovery_write_release,
+};
 #[cfg(target_vendor = "apple")]
 pub(crate) struct EditingSignal {
     pub workspace: String,
@@ -87,6 +90,8 @@ pub(crate) struct Signals {
     #[cfg(target_vendor = "apple")]
     pub recovery_inspections: HashMap<String, RecoveryInspectionSignal>,
     #[cfg(target_vendor = "apple")]
+    pub recovery_writes: HashMap<String, RecoveryWriteSignal>,
+    #[cfg(target_vendor = "apple")]
     pub closed_recovery_selections: HashSet<String>,
     #[cfg(target_vendor = "apple")]
     pub recovery_epochs: HashMap<String, u64>,
@@ -98,6 +103,10 @@ impl Signals {
     pub fn stop_all(&self) {
         #[cfg(target_vendor = "apple")]
         for scope in self.recovery_inspections.values() {
+            scope.suspend();
+        }
+        #[cfg(target_vendor = "apple")]
+        for scope in self.recovery_writes.values() {
             scope.suspend();
         }
         if let Some(service) = &self.service {

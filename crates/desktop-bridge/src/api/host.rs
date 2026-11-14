@@ -555,6 +555,145 @@ pub struct RecoveryInspectionView {
     pub staged: RecoveryFileStatusView,
     pub original: RecoveryFileStatusView,
 }
+#[derive(Debug, Clone)]
+pub struct RecoveryOutcomeView {
+    pub run_id: String,
+    pub operation_id: String,
+    pub original_execution_state: String,
+    pub recovery_id: Option<String>,
+    pub choice: Option<String>,
+}
+#[derive(Debug, Clone)]
+pub struct RecoveryWriteAccessView {
+    pub session_token: String,
+    pub read_session_token: String,
+    pub run_id: String,
+    pub operation_id: String,
+    pub workspace_id: String,
+    pub display_directory: String,
+}
+#[derive(Debug, Clone)]
+pub struct RecoveryDecisionView {
+    pub read_session_token: String,
+    pub write_session_token: String,
+    pub recovery_id: String,
+    pub digest: String,
+    pub choice: String,
+    pub inspection: RecoveryInspectionView,
+}
+pub async fn prepare_recovery_decision(
+    handle: String,
+    read_session_token: String,
+    write_session_token: String,
+    request_id: String,
+    choice: String,
+) -> Result<RecoveryDecisionView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::prepare_recovery_decision(
+            handle,
+            read_session_token,
+            write_session_token,
+            request_id,
+            choice,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (
+            handle,
+            read_session_token,
+            write_session_token,
+            request_id,
+            choice,
+        );
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn approve_recovery_decision(
+    handle: String,
+    read_session_token: String,
+    write_session_token: String,
+    recovery_id: String,
+    expected_digest: String,
+) -> Result<RecoveryOutcomeView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::approve_recovery_decision(
+            handle,
+            read_session_token,
+            write_session_token,
+            recovery_id,
+            expected_digest,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (
+            handle,
+            read_session_token,
+            write_session_token,
+            recovery_id,
+            expected_digest,
+        );
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+/// Trusted UI only after a separate native recovery-write selection.
+pub async fn authorize_recovery_write_access(
+    handle: String,
+    read_session_token: String,
+    request_id: String,
+    selected_directory: String,
+) -> Result<RecoveryWriteAccessView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::authorize_recovery_write_access(
+            handle,
+            read_session_token,
+            request_id,
+            selected_directory,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, read_session_token, request_id, selected_directory);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn suspend_recovery_write_selection(
+    handle: String,
+    request_id: String,
+) -> Result<(), BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::suspend_recovery_write_selection(handle, request_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, request_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+/// Metadata-only outcome reconciliation; no files or permission restoration.
+pub async fn inspect_recovery_outcome(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+) -> Result<RecoveryOutcomeView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::inspect_recovery_outcome(handle, run_id, operation_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, run_id, operation_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
 /// Trusted UI only after a separate native recovery-read directory selection.
 pub async fn authorize_recovery_inspection(
     handle: String,

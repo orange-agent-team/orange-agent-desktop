@@ -1,0 +1,52 @@
+[workspace]
+members = ["crates/domain", "crates/protocol", "crates/agent-runtime", "crates/model-runtime", "crates/platform-files"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[workspace.dependencies]
+orange-domain = { path = "crates/domain" }
+orange-protocol = { path = "crates/protocol" }
+orange-platform-files = { path = "crates/platform-files", version = "=0.1.0" }
+orange-model-runtime = { path = "crates/model-runtime", version = "=0.1.0" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.154", features = ["float_roundtrip"] }
+axum = "=0.8.9"
+tokio = { version = "=1.54.1", features = ["full"] }
+sqlx = { version = "=0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros"] }
+sha2 = "=0.11.1"
+hex = "=0.4.3"
+uuid = { version = "=1.29.0", features = ["v4"] }
+tower = { version = "=0.5.3", features = ["util"] }
+rusqlite = { version = "=0.39.0", features = ["bundled"] }
+thiserror = "=2.0.21"
+tempfile = "=3.27.0"
+openidconnect = { version = "=4.1.0", default-features = false, features = ["reqwest", "rustls-tls"] }
+time = { version = "=0.3.47", features = ["formatting", "parsing"] }
+base64 = "=0.22.1"
+regex = "=1.13.1"
+unicode-normalization = "=0.1.26"
+reqwest = { version = "=0.12.28", default-features = false, features = ["json", "rustls-tls"] }
+serde_jcs = "=0.2.0"
+jsonschema = { version = "=0.56.0", default-features = false }
+libc = "=0.2.191"
+rustix = { version = "=1.1.6", features = ["process"] }
+cap-std = "=4.0.3"
+cap-fs-ext = "=4.0.3"
+tonic = { version = "=0.14.9", features = ["tls-ring", "tls-connect-info"] }
+tonic-prost = "=0.14.9"
+tonic-prost-build = "=0.14.9"
+prost = "=0.14.4"
+prost-types = "=0.14.4"
+opendal = { version = "=0.59.5", default-features = false, features = ["services-fs", "executors-tokio"] }
+tokio-stream = { version = "=0.1.19", features = ["net"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"

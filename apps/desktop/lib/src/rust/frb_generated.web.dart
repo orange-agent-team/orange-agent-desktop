@@ -104,6 +104,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String>? dco_decode_opt_list_String(dynamic raw);
 
   @protected
+  RecoveryDecisionView dco_decode_recovery_decision_view(dynamic raw);
+
+  @protected
   RecoveryFileStatusView dco_decode_recovery_file_status_view(dynamic raw);
 
   @protected
@@ -113,6 +116,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RecoveryInspectionView dco_decode_recovery_inspection_view(dynamic raw);
+
+  @protected
+  RecoveryOutcomeView dco_decode_recovery_outcome_view(dynamic raw);
+
+  @protected
+  RecoveryWriteAccessView dco_decode_recovery_write_access_view(dynamic raw);
 
   @protected
   RunPage dco_decode_run_page(dynamic raw);
@@ -244,6 +253,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String>? sse_decode_opt_list_String(SseDeserializer deserializer);
 
   @protected
+  RecoveryDecisionView sse_decode_recovery_decision_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RecoveryFileStatusView sse_decode_recovery_file_status_view(
     SseDeserializer deserializer,
   );
@@ -255,6 +269,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RecoveryInspectionView sse_decode_recovery_inspection_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RecoveryOutcomeView sse_decode_recovery_outcome_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RecoveryWriteAccessView sse_decode_recovery_write_access_view(
     SseDeserializer deserializer,
   );
 
@@ -419,6 +443,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_list_String(List<String>? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_recovery_decision_view(
+    RecoveryDecisionView self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_recovery_file_status_view(
     RecoveryFileStatusView self,
     SseSerializer serializer,
@@ -433,6 +463,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_recovery_inspection_view(
     RecoveryInspectionView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_recovery_outcome_view(
+    RecoveryOutcomeView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_recovery_write_access_view(
+    RecoveryWriteAccessView self,
     SseSerializer serializer,
   );
 

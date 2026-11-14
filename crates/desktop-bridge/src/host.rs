@@ -22,9 +22,14 @@ pub(crate) use editing::{
     suspend_editing_selection,
 };
 #[cfg(target_vendor = "apple")]
+pub(crate) use recovery::{approve_recovery_decision, prepare_recovery_decision};
+#[cfg(target_vendor = "apple")]
 pub(crate) use recovery::{
-    authorize_recovery_inspection, inspect_recovery, suspend_recovery_inspection,
+    authorize_recovery_inspection, inspect_recovery, inspect_recovery_outcome,
+    suspend_recovery_inspection,
 };
+#[cfg(target_vendor = "apple")]
+pub(crate) use recovery::{authorize_recovery_write_access, suspend_recovery_write_selection};
 mod managed;
 pub(crate) use creation::{
     authorize_creation_access, list_creation_access, revoke_creation_access,
@@ -58,6 +63,8 @@ struct Host {
     editings: std::collections::HashMap<String, editing::EditingSession>,
     #[cfg(target_vendor = "apple")]
     recovery_inspections: std::collections::HashMap<String, recovery::InspectionSession>,
+    #[cfg(target_vendor = "apple")]
+    recovery_writes: std::collections::HashMap<String, recovery::WriteSession>,
     #[cfg(target_vendor = "apple")]
     run_edit_grants: std::collections::HashMap<
         String,
@@ -145,6 +152,8 @@ impl HostRegistry {
             editings: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             recovery_inspections: std::collections::HashMap::new(),
+            #[cfg(target_vendor = "apple")]
+            recovery_writes: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             run_edit_grants: std::collections::HashMap::new(),
             model: None,
@@ -624,7 +633,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "766ff0db8324c49539d8f2005b12434d09ff324c"
+            "64748cd25940b9bef28d1efd90488a8e8ab76684"
         );
         assert_eq!(
             registry
