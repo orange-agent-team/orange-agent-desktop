@@ -1,0 +1,11 @@
+# 写入者停止证明：消费准备
+
+固定Runtime c60c50290ea901ebeea2a4c0cb4b307d79f3cb4f/schema19已通过显式导入，257共享测试含204Runtime及严格Clippy通过，真实旧schema18 CLI迁移/非修改式拒绝通过。没有改写vendor，普通构建不读取相邻源码。
+
+新导出在目的文件效果前登记私有锁文件的原始设备/inode与绑定摘要；锁由发布线程持有。取消调用Future、关闭Journal或将记录转unknown不等于线程停止。独立检查能力下的acquire_export_quiescence只有在原始锁可独占且身份未被替换时返回不透明证明；证明必须持续持有，撤权后失效。旧记录没有绑定时拒绝，迁移不补造。
+
+消费端现有12Rust/Clippy/60widgets兼容检查通过，实际签名导出/检查与默认包验证结果见统一台账。匹配组件b456aee28340bac7bb60097cb544a43b8390f8c9c8e3c7af26a1dddd2b72044b，无测试权重。没有新的清理或删除按钮，也不暴露原始文件描述符。
+
+后续处置需要独立写权限、精确对象预览、持久派发/回执、目标对象与命名空间变化处理。缓存ExportQuiescence持有读租约；关闭时须先丢弃证明，再等待排空。不得把本应用写入者锁解释为所有外部写入者的排他保护，也不得据此直接删除或释放归档额度。
+
+macOS系统文件租约的普通进程探针返回EPERM；Apple公开XNU实现检查私有file-leases entitlement。项目不会添加或绕过这种私有权限。公开系统回收站等方案还需验证对象绑定和失败后保留；移动到回收站不能声称已擦除数据或已释放物理空间。证据与官方来源链接见services_plan/execution/macos-disposal-research.md。
