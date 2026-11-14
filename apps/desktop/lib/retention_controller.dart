@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import 'recovery_controller.dart' show RecoverySelection;
 import 'src/rust/api/host.dart' as api;
+import 'export_inspection_controller.dart';
 part 'retention_export_controller.dart';
 
 abstract interface class RetentionCommands {
@@ -110,13 +111,24 @@ class NativeRetentionCommands implements RetentionCommands {
 }
 
 class RetentionController extends ChangeNotifier {
-  RetentionController(this.commands, {ExportCommands? exportCommands})
-    : exportCommands =
-          exportCommands ??
-          (commands is NativeRetentionCommands
-              ? NativeExportCommands(commands.handle)
-              : null);
+  RetentionController(
+    this.commands, {
+    ExportCommands? exportCommands,
+    ExportInspectionCommands? inspectionCommands,
+  }) : exportCommands =
+           exportCommands ??
+           (commands is NativeRetentionCommands
+               ? NativeExportCommands(commands.handle)
+               : null),
+       exportInspection = inspectionCommands != null
+           ? ExportInspectionController(inspectionCommands)
+           : (commands is NativeRetentionCommands
+                 ? ExportInspectionController(
+                     NativeExportInspectionCommands(commands.handle),
+                   )
+                 : null);
   final ExportCommands? exportCommands;
+  final ExportInspectionController? exportInspection;
   api.ExportAccessView? exportAccess;
   api.ExportReviewView? exportReview;
   api.ExportOutcomeView? exportOutcome;
@@ -144,6 +156,7 @@ class RetentionController extends ChangeNotifier {
   }
 
   void _hide() {
+    exportInspection?.invalidate();
     exportAccess = null;
     exportReview = null;
     exportOutcome = null;
@@ -184,6 +197,13 @@ class RetentionController extends ChangeNotifier {
   }
 
   Future<void> _releaseAll() async {
+    await Future.wait([
+      _releaseDependentScopes(),
+      if (exportInspection != null) exportInspection!.close(),
+    ], eagerError: false);
+  }
+
+  Future<void> _releaseDependentScopes() async {
     Object? failure;
     StackTrace? trace;
     try {
@@ -483,6 +503,7 @@ class RetentionController extends ChangeNotifier {
         );
       }),
     );
+    exportInspection?.dispose();
     super.dispose();
   }
 }

@@ -114,6 +114,22 @@ class NativeExportCommands implements ExportCommands {
 }
 
 extension ExportFlow on RetentionController {
+  Future<void> inspectExportRecord(api.ExportOutcomeView record) async {
+    final run = selected, op = operation, inspector = exportInspection;
+    if (busy ||
+        run == null ||
+        op == null ||
+        inspector == null ||
+        !exportRecords.any(
+          (r) =>
+              r.exportId == record.exportId &&
+              r.reviewDigest == record.reviewDigest,
+        )) {
+      return;
+    }
+    await inspector.open(run.runId, op, record);
+  }
+
   bool _validExportOutcome(api.ExportOutcomeView value) =>
       value.exportId.isNotEmpty &&
       RegExp(r'^[0-9a-f]{64}$').hasMatch(value.reviewDigest) &&

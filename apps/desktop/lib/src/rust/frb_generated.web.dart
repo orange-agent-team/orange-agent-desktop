@@ -67,6 +67,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ExportFileView dco_decode_export_file_view(dynamic raw);
 
   @protected
+  ExportInspectionAccessView dco_decode_export_inspection_access_view(
+    dynamic raw,
+  );
+
+  @protected
+  ExportInspectionView dco_decode_export_inspection_view(dynamic raw);
+
+  @protected
+  ExportObservedFileView dco_decode_export_observed_file_view(dynamic raw);
+
+  @protected
   ExportOutcomeView dco_decode_export_outcome_view(dynamic raw);
 
   @protected
@@ -248,6 +259,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportFileView sse_decode_export_file_view(SseDeserializer deserializer);
+
+  @protected
+  ExportInspectionAccessView sse_decode_export_inspection_access_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ExportInspectionView sse_decode_export_inspection_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ExportObservedFileView sse_decode_export_observed_file_view(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ExportOutcomeView sse_decode_export_outcome_view(
@@ -484,6 +510,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_export_file_view(
     ExportFileView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_export_inspection_access_view(
+    ExportInspectionAccessView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_export_inspection_view(
+    ExportInspectionView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_export_observed_file_view(
+    ExportObservedFileView self,
     SseSerializer serializer,
   );
 

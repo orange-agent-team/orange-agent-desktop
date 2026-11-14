@@ -578,7 +578,7 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
     );
     assert!(before.original.matches_original_content);
     assert!(before.archived_review_id.is_none());
-    exercise_export(h, base, &access).await;
+    let completed_export_id = exercise_export(h, base, &access).await;
     assert!(
         api::authorize_recovery_write_access(
             h.into(),
@@ -742,6 +742,8 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
             .count(),
         0
     );
+    super::export_inspection::exercise(h, base, &run.run_id, &operation, &completed_export_id)
+        .await;
     assert!(
         api::inspect_retention(h.into(), access.session_token)
             .await
@@ -781,7 +783,7 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
     reopened.handle
 }
 
-async fn exercise_export(h: &str, base: &Path, access: &api::RetentionAccessView) {
+async fn exercise_export(h: &str, base: &Path, access: &api::RetentionAccessView) -> String {
     let output = base.join("retention-export-destination");
     fs::create_dir(&output).expect("owned destination");
     assert_eq!(
@@ -986,7 +988,7 @@ async fn exercise_export(h: &str, base: &Path, access: &api::RetentionAccessView
         h.into(),
         access.run_id.clone(),
         access.operation_id.clone(),
-        next.export_id,
+        next.export_id.clone(),
     )
     .await
     .expect("query without destination")
@@ -996,4 +998,5 @@ async fn exercise_export(h: &str, base: &Path, access: &api::RetentionAccessView
         fs::read_dir(output).expect("one actual artifact").count(),
         1
     );
+    next.export_id
 }

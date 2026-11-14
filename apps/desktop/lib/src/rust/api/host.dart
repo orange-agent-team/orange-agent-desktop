@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -665,6 +665,39 @@ Future<void> suspendExportDestination({
   requestId: requestId,
 );
 
+/// Independent native destination read selection; no original source permission is restored.
+Future<ExportInspectionAccessView> authorizeExportInspection({
+  required String handle,
+  required String runId,
+  required String operationId,
+  required String exportId,
+  required String requestId,
+  required String selectedDirectory,
+}) => RustLib.instance.api.crateApiHostAuthorizeExportInspection(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+  exportId: exportId,
+  requestId: requestId,
+  selectedDirectory: selectedDirectory,
+);
+
+Future<ExportInspectionView> inspectExportFiles({
+  required String handle,
+  required String sessionToken,
+}) => RustLib.instance.api.crateApiHostInspectExportFiles(
+  handle: handle,
+  sessionToken: sessionToken,
+);
+
+Future<void> suspendExportInspection({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostSuspendExportInspection(
+  handle: handle,
+  requestId: requestId,
+);
+
 class AgentRunView {
   /// Immutable Run capability; never inferred from a pending tool name.
   final String? creationConsentId;
@@ -969,6 +1002,131 @@ class ExportFileView {
           matchesReviewedOriginal == other.matchesReviewedOriginal &&
           matchesReviewedResult == other.matchesReviewedResult &&
           reviewedOriginalInode == other.reviewedOriginalInode;
+}
+
+class ExportInspectionAccessView {
+  final String sessionToken;
+  final String runId;
+  final String operationId;
+  final String exportId;
+  final String displayDirectory;
+
+  const ExportInspectionAccessView({
+    required this.sessionToken,
+    required this.runId,
+    required this.operationId,
+    required this.exportId,
+    required this.displayDirectory,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      runId.hashCode ^
+      operationId.hashCode ^
+      exportId.hashCode ^
+      displayDirectory.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExportInspectionAccessView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          exportId == other.exportId &&
+          displayDirectory == other.displayDirectory;
+}
+
+class ExportInspectionView {
+  final String sessionToken;
+  final String runId;
+  final String operationId;
+  final String exportId;
+  final String reviewDigest;
+  final String recordedState;
+  final String fileName;
+  final ExportObservedFileView target;
+  final ExportObservedFileView staged;
+
+  const ExportInspectionView({
+    required this.sessionToken,
+    required this.runId,
+    required this.operationId,
+    required this.exportId,
+    required this.reviewDigest,
+    required this.recordedState,
+    required this.fileName,
+    required this.target,
+    required this.staged,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      runId.hashCode ^
+      operationId.hashCode ^
+      exportId.hashCode ^
+      reviewDigest.hashCode ^
+      recordedState.hashCode ^
+      fileName.hashCode ^
+      target.hashCode ^
+      staged.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExportInspectionView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          exportId == other.exportId &&
+          reviewDigest == other.reviewDigest &&
+          recordedState == other.recordedState &&
+          fileName == other.fileName &&
+          target == other.target &&
+          staged == other.staged;
+}
+
+class ExportObservedFileView {
+  final String kind;
+  final String? reason;
+  final String? bytes;
+  final String? sha256;
+  final bool matchesApprovedArtifact;
+  final bool validExportDocument;
+
+  const ExportObservedFileView({
+    required this.kind,
+    this.reason,
+    this.bytes,
+    this.sha256,
+    required this.matchesApprovedArtifact,
+    required this.validExportDocument,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^
+      reason.hashCode ^
+      bytes.hashCode ^
+      sha256.hashCode ^
+      matchesApprovedArtifact.hashCode ^
+      validExportDocument.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExportObservedFileView &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          reason == other.reason &&
+          bytes == other.bytes &&
+          sha256 == other.sha256 &&
+          matchesApprovedArtifact == other.matchesApprovedArtifact &&
+          validExportDocument == other.validExportDocument;
 }
 
 class ExportOutcomeView {

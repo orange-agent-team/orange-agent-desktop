@@ -100,6 +100,7 @@ pub(super) fn other_selection_kind(controls: &crate::actor::Signals, token: &str
     controls.closed_selections.contains(token)
         || controls.retentions.contains_key(token)
         || controls.exports.contains_key(token)
+        || controls.export_checks.contains_key(token)
         || controls.closed_creation_selections.contains(token)
         || controls.closed_editing_selections.contains(token)
         || controls.closed_imports.contains(token)

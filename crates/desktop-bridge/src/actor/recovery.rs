@@ -79,6 +79,7 @@ pub(crate) fn signal_recovery_inspection_release(
     if signals.recovery_writes.contains_key(token)
         || signals.retentions.contains_key(token)
         || signals.exports.contains_key(token)
+        || signals.export_checks.contains_key(token)
     {
         return Err(failure("RECOVERY_SELECTION_CONFLICT"));
     }
@@ -120,6 +121,7 @@ pub(crate) fn signal_recovery_write_release(handle: &str, token: &str) -> Result
     if signals.recovery_inspections.contains_key(token)
         || signals.retentions.contains_key(token)
         || signals.exports.contains_key(token)
+        || signals.export_checks.contains_key(token)
     {
         return Err(failure("RECOVERY_SELECTION_CONFLICT"));
     }

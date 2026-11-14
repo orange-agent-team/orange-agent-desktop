@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'retention_controller.dart';
+import 'export_inspection_panel.dart';
 
 class ExportPanel extends StatelessWidget {
   const ExportPanel({super.key, required this.controller});
@@ -108,7 +109,18 @@ class ExportPanel extends StatelessWidget {
             ListTile(
               title: Text(record.exportId),
               subtitle: Text(state(record.state)),
+              trailing: c.exportInspection == null
+                  ? null
+                  : TextButton(
+                      key: Key('inspect-export-${record.exportId}'),
+                      onPressed: c.busy
+                          ? null
+                          : () => c.inspectExportRecord(record),
+                      child: const Text('检查位置'),
+                    ),
             ),
+          if (c.exportInspection != null)
+            ExportInspectionPanel(controller: c.exportInspection!),
           if (c.exportCursor != null)
             TextButton(
               onPressed: c.busy ? null : () => c.refreshExports(older: true),

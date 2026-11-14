@@ -13,7 +13,13 @@ mod creation;
 #[cfg(target_vendor = "apple")]
 mod editing;
 #[cfg(target_vendor = "apple")]
+mod export_inspection;
+#[cfg(target_vendor = "apple")]
 mod recovery;
+#[cfg(target_vendor = "apple")]
+pub(crate) use export_inspection::{
+    authorize_export_inspection, inspect_export_files, suspend_export_inspection,
+};
 #[cfg(target_vendor = "apple")]
 mod retention;
 #[cfg(target_vendor = "apple")]
@@ -83,6 +89,8 @@ struct Host {
     retentions: std::collections::HashMap<String, retention::RetentionSession>,
     #[cfg(target_vendor = "apple")]
     exports: std::collections::HashMap<String, retention::ExportSession>,
+    #[cfg(target_vendor = "apple")]
+    export_checks: std::collections::HashMap<String, export_inspection::InspectionSession>,
     #[cfg(target_vendor = "apple")]
     run_edit_grants: std::collections::HashMap<
         String,
@@ -176,6 +184,8 @@ impl HostRegistry {
             retentions: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             exports: std::collections::HashMap::new(),
+            #[cfg(target_vendor = "apple")]
+            export_checks: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             run_edit_grants: std::collections::HashMap::new(),
             model: None,

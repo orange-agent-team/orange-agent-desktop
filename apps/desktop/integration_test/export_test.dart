@@ -61,6 +61,8 @@ void main() {
       LocalModelFixture? fixture;
       RetentionController? controller;
       bool passed = false;
+      Directory? detachedWorkspace;
+      final inspectionReleased = Completer<void>();
       final released = Completer<void>();
       const channel = MethodChannel('orange_agent/platform');
       try {
@@ -147,6 +149,31 @@ void main() {
         tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           channel,
           (call) async {
+            if (call.method == 'chooseExportInspectionDirectory') {
+              return {
+                'selectionId': 'native-independent-export-check',
+                'path': output.path,
+              };
+            }
+            if (call.method == 'releaseExportInspectionSelection') {
+              await expectLater(
+                inspectExportFiles(
+                  handle: handle!,
+                  sessionToken: 'native-independent-export-check',
+                ),
+                throwsA(
+                  isA<BridgeError>().having(
+                    (e) => e.code,
+                    'code',
+                    'EXPORT_INSPECTION_CLOSED',
+                  ),
+                ),
+              );
+              if (!inspectionReleased.isCompleted) {
+                inspectionReleased.complete();
+              }
+              return null;
+            }
             if (call.method == 'chooseExportDestination') {
               destinationSelected = true;
               return {
@@ -386,6 +413,84 @@ void main() {
           )).runs.singleWhere((r) => r.runId == run.runId).phase,
           'completed',
         );
+        detachedWorkspace = await workspace.rename(
+          '${workspace.path}-unavailable',
+        );
+        expect(await workspace.exists(), isFalse);
+        controller = RetentionController(NativeRetentionCommands(handle));
+        await controller.refresh();
+        final reopenedRun = (await listRuns(
+          handle: handle,
+          limit: 10,
+        )).runs.singleWhere((r) => r.runId == run.runId);
+        await controller.selectRun(reopenedRun);
+        expect(controller.access, isNull);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: RetentionPanel(controller: controller, supported: true),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('保留原件管理'));
+        await tester.pumpAndSettle();
+        final checkButton = find.byKey(
+          Key('inspect-export-${uncertain.exportId}'),
+        );
+        await tester.ensureVisible(checkButton);
+        await tester.tap(checkButton);
+        await helpers.settle(tester, 'independent-export-inspection');
+        expect(controller.exportInspection!.error, isNull);
+        final check = controller.exportInspection!.view!;
+        expect(check.recordedState, 'unknown');
+        expect(check.target.matchesApprovedArtifact, isTrue);
+        expect(check.target.validExportDocument, isTrue);
+        expect(check.staged.kind, 'missing');
+        expect(find.text('记录仍待核对。匹配结果只描述当前文件。'), findsOneWidget);
+        expect(controller.access, isNull);
+        expect(controller.exportAccess, isNull);
+        expect(
+          (await listWorkspaces(
+            handle: handle,
+            includeRevoked: true,
+          )).every((w) => !w.sessionAccess),
+          isTrue,
+        );
+        expect(
+          (await inspectExportOutcome(
+            handle: handle,
+            runId: run.runId,
+            operationId: operation,
+            exportId: uncertain.exportId,
+          ))!.state,
+          'unknown',
+        );
+        await tester.ensureVisible(find.text('结束导出检查'));
+        await tester.tap(find.text('结束导出检查'));
+        await helpers.settle(tester, 'independent-export-inspection-release');
+        await inspectionReleased.future.timeout(const Duration(seconds: 5));
+        expect(controller.exportInspection!.view, isNull);
+        expect(await output.list().length, 2);
+        expect(await detachedWorkspace.list().length, 2);
+        debugPrint(
+          jsonEncode({
+            'nativeExportInspection': true,
+            'sourceUnavailable': true,
+            'sourceAccessRestored': false,
+            'unknownStillUnknown': true,
+            'actualTargetMatches': true,
+            'closedBeforeNativeRelease': true,
+            'sourceFilesRetained': 2,
+            'exportFiles': 2,
+            'modelAndPicker': 'explicit fixtures',
+          }),
+        );
+        await controller.stop();
+        await tester.pumpWidget(const SizedBox.shrink());
+        controller.dispose();
+        controller = null;
         debugPrint(
           jsonEncode({
             'nativeRetentionExport': true,
@@ -416,7 +521,7 @@ void main() {
         await fixture?.close();
         if (passed) {
           await output.delete(recursive: true);
-          await workspace.delete(recursive: true);
+          await (detachedWorkspace ?? workspace).delete(recursive: true);
           await private.delete(recursive: true);
         }
       }

@@ -1,6 +1,6 @@
 # 保留版本导出
 
-桌面固定消费 Runtime c067a3ec314936a49896d6bba318a3d926feb31d/schema18；归档和来源摘要见config/runtime.lock.json。253项共享测试（含200Runtime）通过，不隐式读取相邻仓库源码，也不新增模型工具。
+桌面固定消费 Runtime 84d797ca3f2eefdfd675e5d905664add292b713a/schema18；归档和来源摘要见config/runtime.lock.json。254项共享测试（含201Runtime）通过，不隐式读取相邻仓库源码，也不新增模型工具。
 
 ## 用户操作
 
@@ -35,4 +35,4 @@ Host只缓存不可序列化PreparedRetentionExport。它持有源与目标租�
 - `python3 scripts/check-export.py`实际签名macOS/Flutter/FRB验收通过11947（export-native-acceptance-2.log）：真实编辑→重开→单独源/目的选择→精确确认→实际包内容/SHA-256/0600核对→已有目标拒绝→真实写入后SQLite回执故障保持unknown→未批准预览不发布→目的排空后源释放→重开发现三种记录。两次批准、两次查询，无重发；原目录两份文件保持、导出两份文件存在。
 - 模型与系统选择器回调是明确替身；文件、SQLite、FRB、签名应用及撤权/排空真实执行。人工选择器、真实模型质量、其他OS和生产签名不由此认证。
 
-原有保留/恢复流程回归和默认App恢复见统一执行台账。unknown导出的位置核对及明确清理、原件删除与额度释放仍是后续独立授权功能；成功导出不等于删除授权。本功能不代替完整数据退出或G0—G6验收。
+原有保留/恢复流程回归和默认App恢复见统一执行台账。unknown导出的位置核对已支持独立只读检查，见export-inspection-preparation.md；明确清理、原件删除与额度释放仍是后续独立授权功能；成功导出不等于删除授权。本功能不代替完整数据退出或G0—G6验收。

@@ -83,6 +83,7 @@ fn conflicts(controls: &crate::actor::Signals, token: &str) -> bool {
         || controls.creations.values().any(|s| s.token == token)
         || controls.editings.values().any(|s| s.token == token)
         || controls.exports.contains_key(token)
+        || controls.export_checks.contains_key(token)
         || controls.recovery_inspections.contains_key(token)
         || controls.recovery_writes.contains_key(token)
 }
