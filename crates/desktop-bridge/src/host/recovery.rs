@@ -16,6 +16,7 @@ pub(crate) use writing::{approve_recovery_decision, prepare_recovery_decision};
 pub(crate) use writing::{authorize_recovery_write_access, suspend_recovery_write_selection};
 
 pub(super) enum RecoveryLease {
+    Export(Arc<orange_agent_runtime::workspace::patch::review::dispatch::recovery::retention::RetentionExportDestination>),
     Retention(Arc<orange_agent_runtime::workspace::patch::review::dispatch::recovery::retention::PatchRetentionGrant>),
     Read(Arc<PatchInspectionGrant>),
     Write(Arc<orange_agent_runtime::workspace::patch::review::dispatch::recovery::resolution::PatchRecoveryGrant>),
@@ -23,6 +24,7 @@ pub(super) enum RecoveryLease {
 impl RecoveryLease {
     pub(super) async fn wait_drained(&self) {
         match self {
+            Self::Export(grant) => grant.wait_drained().await,
             Self::Retention(grant) => grant.wait_drained().await,
             Self::Read(grant) => grant.wait_drained().await,
             Self::Write(grant) => grant.wait_drained().await,
@@ -97,6 +99,7 @@ fn error(value: PatchError) -> BridgeError {
 pub(super) fn other_selection_kind(controls: &crate::actor::Signals, token: &str) -> bool {
     controls.closed_selections.contains(token)
         || controls.retentions.contains_key(token)
+        || controls.exports.contains_key(token)
         || controls.closed_creation_selections.contains(token)
         || controls.closed_editing_selections.contains(token)
         || controls.closed_imports.contains(token)
@@ -352,6 +355,23 @@ impl HostRegistry {
             .collect();
         let mut leases = Vec::new();
         let mut controls = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+        let exports: Vec<_> = host
+            .exports
+            .iter()
+            .filter(|(_, s)| s.view.workspace_id == workspace)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in exports {
+            if let Some(mut scope) = host.exports.remove(&id) {
+                scope.available.store(false, Ordering::Release);
+                scope.destination.request_revoke();
+                // Drop both cached permits before anybody waits for readers.
+                scope.prepared.take();
+                leases.push(RecoveryLease::Export(scope.destination));
+            }
+            controls.closed_recovery_selections.insert(id.clone());
+            controls.exports.remove(&id);
+        }
         let retained: Vec<_> = host
             .retentions
             .iter()

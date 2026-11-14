@@ -1,6 +1,12 @@
 //! Content-free retention discovery. These entry points do not call run_context
 //! or open a filesystem capability; retained files require a separate selection.
 use super::*;
+mod exporting;
+pub(super) use exporting::ExportSession;
+pub(crate) use exporting::{
+    approve_export, authorize_export_destination, inspect_export_outcome, list_export_outcomes,
+    prepare_export, suspend_export_destination,
+};
 
 pub(crate) async fn list_retained_edits(
     handle: String,
@@ -76,6 +82,7 @@ fn conflicts(controls: &crate::actor::Signals, token: &str) -> bool {
             .any(|s| s.session_token == token)
         || controls.creations.values().any(|s| s.token == token)
         || controls.editings.values().any(|s| s.token == token)
+        || controls.exports.contains_key(token)
         || controls.recovery_inspections.contains_key(token)
         || controls.recovery_writes.contains_key(token)
 }
@@ -313,6 +320,7 @@ impl HostRegistry {
         Ok(archive.review_id)
     }
     async fn close_retention(&mut self, handle: &str, token: &str) -> Result<(), BridgeError> {
+        self.close_exports(handle, Some(token), None).await?;
         let signals = self.signals.clone();
         let host = self.current(handle)?;
         if let Some(scope) = host.retentions.get(token) {

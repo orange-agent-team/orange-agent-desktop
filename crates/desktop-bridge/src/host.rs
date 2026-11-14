@@ -34,6 +34,11 @@ pub(crate) use recovery::{
 pub(crate) use recovery::{authorize_recovery_write_access, suspend_recovery_write_selection};
 #[cfg(target_vendor = "apple")]
 pub(crate) use retention::{
+    approve_export, authorize_export_destination, inspect_export_outcome, list_export_outcomes,
+    prepare_export, suspend_export_destination,
+};
+#[cfg(target_vendor = "apple")]
+pub(crate) use retention::{
     approve_retention_archive, authorize_retention_access, inspect_retention,
     prepare_retention_archive, suspend_retention_access,
 };
@@ -76,6 +81,8 @@ struct Host {
     recovery_writes: std::collections::HashMap<String, recovery::WriteSession>,
     #[cfg(target_vendor = "apple")]
     retentions: std::collections::HashMap<String, retention::RetentionSession>,
+    #[cfg(target_vendor = "apple")]
+    exports: std::collections::HashMap<String, retention::ExportSession>,
     #[cfg(target_vendor = "apple")]
     run_edit_grants: std::collections::HashMap<
         String,
@@ -167,6 +174,8 @@ impl HostRegistry {
             recovery_writes: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             retentions: std::collections::HashMap::new(),
+            #[cfg(target_vendor = "apple")]
+            exports: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             run_edit_grants: std::collections::HashMap::new(),
             model: None,
@@ -646,7 +655,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "c414feb16843f79bf6b85ef089591e9e68825910"
+            "c067a3ec314936a49896d6bba318a3d926feb31d"
         );
         assert_eq!(
             registry

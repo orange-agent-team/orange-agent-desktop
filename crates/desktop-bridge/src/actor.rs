@@ -32,7 +32,9 @@ pub(crate) use recovery::{
     signal_recovery_write_release,
 };
 #[cfg(target_vendor = "apple")]
-pub(crate) use retention::{RetentionSignal, signal_retention_release};
+pub(crate) use retention::{
+    ExportSignal, RetentionSignal, signal_export_release, signal_retention_release,
+};
 #[cfg(target_vendor = "apple")]
 pub(crate) struct EditingSignal {
     pub workspace: String,
@@ -98,6 +100,8 @@ pub(crate) struct Signals {
     #[cfg(target_vendor = "apple")]
     pub retentions: HashMap<String, RetentionSignal>,
     #[cfg(target_vendor = "apple")]
+    pub exports: HashMap<String, ExportSignal>,
+    #[cfg(target_vendor = "apple")]
     pub closed_recovery_selections: HashSet<String>,
     #[cfg(target_vendor = "apple")]
     pub recovery_epochs: HashMap<String, u64>,
@@ -107,6 +111,10 @@ pub(crate) struct Signals {
 }
 impl Signals {
     pub fn stop_all(&self) {
+        #[cfg(target_vendor = "apple")]
+        for scope in self.exports.values() {
+            scope.suspend();
+        }
         #[cfg(target_vendor = "apple")]
         for scope in self.retentions.values() {
             scope.suspend();

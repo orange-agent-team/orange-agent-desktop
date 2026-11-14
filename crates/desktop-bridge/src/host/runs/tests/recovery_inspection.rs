@@ -578,6 +578,7 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
     );
     assert!(before.original.matches_original_content);
     assert!(before.archived_review_id.is_none());
+    exercise_export(h, base, &access).await;
     assert!(
         api::authorize_recovery_write_access(
             h.into(),
@@ -664,6 +665,25 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
     );
     assert_eq!(after.changed_since_archival, Some(false));
     assert_eq!(after.archived_review_id, Some(review_id.clone()));
+    let pending_output = base.join("export-source-close");
+    fs::create_dir(&pending_output).expect("pending destination");
+    let pending_export = api::authorize_export_destination(
+        h.into(),
+        access.session_token.clone(),
+        "export-source-close".into(),
+        pending_output.display().to_string(),
+    )
+    .await
+    .expect("destination child");
+    api::prepare_export(
+        h.into(),
+        pending_export.session_token.clone(),
+        "held-preview".into(),
+        "unpublished.orange-retained.json".into(),
+        "original".into(),
+    )
+    .await
+    .expect("cache holds both source and destination leases");
     let handle = h.to_owned();
     let token = access.session_token.clone();
     let receipt = crate::actor::call(handle.clone(), move |registry, rt| {
@@ -703,6 +723,26 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
         .expect("closing task")
         .expect("drained");
     assert!(
+        api::prepare_export(
+            h.into(),
+            pending_export.session_token.clone(),
+            "late-preview".into(),
+            "late.orange-retained.json".into(),
+            "original".into()
+        )
+        .await
+        .is_err()
+    );
+    api::suspend_export_destination(h.into(), pending_export.session_token)
+        .await
+        .expect("idempotent child release after source drain");
+    assert_eq!(
+        fs::read_dir(pending_output)
+            .expect("no preview effects")
+            .count(),
+        0
+    );
+    assert!(
         api::inspect_retention(h.into(), access.session_token)
             .await
             .is_err()
@@ -739,4 +779,221 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
         b"new\n"
     );
     reopened.handle
+}
+
+async fn exercise_export(h: &str, base: &Path, access: &api::RetentionAccessView) {
+    let output = base.join("retention-export-destination");
+    fs::create_dir(&output).expect("owned destination");
+    assert_eq!(
+        api::authorize_export_destination(
+            h.into(),
+            access.session_token.clone(),
+            access.session_token.clone(),
+            output.display().to_string()
+        )
+        .await
+        .expect_err("read token is not destination consent")
+        .code,
+        "EXPORT_SELECTION_CONFLICT"
+    );
+    api::suspend_export_destination(h.into(), "late-export".into())
+        .await
+        .expect("cancel before callback");
+    assert_eq!(
+        api::authorize_export_destination(
+            h.into(),
+            access.session_token.clone(),
+            "late-export".into(),
+            output.display().to_string()
+        )
+        .await
+        .expect_err("late callback")
+        .code,
+        "EXPORT_SELECTION_CLOSED"
+    );
+    let destination = api::authorize_export_destination(
+        h.into(),
+        access.session_token.clone(),
+        "export-destination".into(),
+        output.display().to_string(),
+    )
+    .await
+    .expect("separate destination consent");
+    assert!(
+        api::suspend_retention_access(h.into(), destination.session_token.clone())
+            .await
+            .is_err()
+    );
+    assert!(
+        api::suspend_export_destination(h.into(), access.session_token.clone())
+            .await
+            .is_err()
+    );
+    assert!(
+        api::prepare_export(
+            h.into(),
+            destination.session_token.clone(),
+            "invalid-export".into(),
+            "../escape.orange-retained.json".into(),
+            "original".into()
+        )
+        .await
+        .is_err()
+    );
+    let preview = api::prepare_export(
+        h.into(),
+        destination.session_token.clone(),
+        "first-export".into(),
+        "proof.orange-retained.json".into(),
+        "original".into(),
+    )
+    .await
+    .expect("actual preview");
+    assert_eq!(preview.source_path, "note.txt");
+    assert_eq!(preview.entries.len(), 1);
+    assert_eq!(
+        fs::read_dir(&output).expect("preview cannot write").count(),
+        0
+    );
+    assert!(
+        api::approve_export(
+            h.into(),
+            destination.session_token.clone(),
+            preview.export_id.clone(),
+            "0".repeat(64)
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        api::approve_export(
+            h.into(),
+            destination.session_token.clone(),
+            preview.export_id.clone(),
+            preview.digest.clone()
+        )
+        .await
+        .is_err(),
+        "cached preview consumed by wrong approval"
+    );
+    let next = api::prepare_export(
+        h.into(),
+        destination.session_token.clone(),
+        "confirmed-export".into(),
+        "proof.orange-retained.json".into(),
+        "original".into(),
+    )
+    .await
+    .expect("fresh preview");
+    let result = api::approve_export(
+        h.into(),
+        destination.session_token.clone(),
+        next.export_id.clone(),
+        next.digest.clone(),
+    )
+    .await
+    .expect("actual export");
+    assert_eq!(result.state, "succeeded");
+    assert_eq!(result.export_id, next.export_id);
+    assert_eq!(result.review_digest, next.digest);
+    assert!(
+        api::approve_export(
+            h.into(),
+            destination.session_token.clone(),
+            next.export_id.clone(),
+            next.digest.clone()
+        )
+        .await
+        .is_err()
+    );
+    let body = fs::read(output.join("proof.orange-retained.json")).expect("export file");
+    let verified = orange_agent_runtime::workspace::patch::review::dispatch::recovery::retention::verify_retention_export(&body).expect("portable integrity");
+    assert_eq!(verified.artifact_sha256, next.artifact_sha256);
+    assert_eq!(verified.artifact_bytes, next.artifact_bytes);
+    assert!(
+        api::prepare_export(
+            h.into(),
+            destination.session_token.clone(),
+            "no-overwrite".into(),
+            "proof.orange-retained.json".into(),
+            "original".into()
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        fs::read(output.join("proof.orange-retained.json")).expect("not overwritten"),
+        body
+    );
+    let pending = api::prepare_export(
+        h.into(),
+        destination.session_token.clone(),
+        "discard-before-close".into(),
+        "pending.orange-retained.json".into(),
+        "original".into(),
+    )
+    .await
+    .expect("held preview");
+    bounded(api::suspend_export_destination(
+        h.into(),
+        destination.session_token.clone(),
+    ))
+    .await
+    .expect("drop prepared leases before destination drain");
+    assert!(
+        api::approve_export(
+            h.into(),
+            destination.session_token,
+            pending.export_id,
+            pending.digest
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        api::inspect_retention(h.into(), access.session_token.clone())
+            .await
+            .is_ok(),
+        "closing destination preserves independent source"
+    );
+    let listed = api::list_export_outcomes(
+        h.into(),
+        access.run_id.clone(),
+        access.operation_id.clone(),
+        None,
+        100,
+    )
+    .await
+    .expect("metadata index");
+    assert_eq!(listed.len(), 3);
+    assert!(
+        listed
+            .iter()
+            .any(|r| r.export_id == next.export_id && r.state == "succeeded")
+    );
+    assert!(
+        api::list_export_outcomes(
+            h.into(),
+            "foreign-run".into(),
+            access.operation_id.clone(),
+            None,
+            10
+        )
+        .await
+        .is_err()
+    );
+    let receipt = api::inspect_export_outcome(
+        h.into(),
+        access.run_id.clone(),
+        access.operation_id.clone(),
+        next.export_id,
+    )
+    .await
+    .expect("query without destination")
+    .expect("record");
+    assert_eq!(receipt.state, "succeeded");
+    assert_eq!(
+        fs::read_dir(output).expect("one actual artifact").count(),
+        1
+    );
 }

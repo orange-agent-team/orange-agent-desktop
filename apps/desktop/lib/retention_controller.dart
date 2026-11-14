@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import 'recovery_controller.dart' show RecoverySelection;
 import 'src/rust/api/host.dart' as api;
+part 'retention_export_controller.dart';
 
 abstract interface class RetentionCommands {
   Future<api.RunPage> runs(String? before);
@@ -109,7 +110,22 @@ class NativeRetentionCommands implements RetentionCommands {
 }
 
 class RetentionController extends ChangeNotifier {
-  RetentionController(this.commands);
+  RetentionController(this.commands, {ExportCommands? exportCommands})
+    : exportCommands =
+          exportCommands ??
+          (commands is NativeRetentionCommands
+              ? NativeExportCommands(commands.handle)
+              : null);
+  final ExportCommands? exportCommands;
+  api.ExportAccessView? exportAccess;
+  api.ExportReviewView? exportReview;
+  api.ExportOutcomeView? exportOutcome;
+  List<api.ExportOutcomeView> exportRecords = [];
+  String? exportCursor, exportNotice;
+  String exportFileName = 'retained.orange-retained.json',
+      exportChoice = 'both';
+  final _heldExports = <String>{}, _seenExports = <String>{};
+  final _releasingExports = <String, Future<void>>{};
   final RetentionCommands commands;
   List<api.RunSummary> runs = [];
   List<String> operations = [];
@@ -128,6 +144,12 @@ class RetentionController extends ChangeNotifier {
   }
 
   void _hide() {
+    exportAccess = null;
+    exportReview = null;
+    exportOutcome = null;
+    exportNotice = null;
+    exportRecords = [];
+    exportCursor = null;
     access = null;
     snapshot = null;
     review = null;
@@ -135,6 +157,12 @@ class RetentionController extends ChangeNotifier {
   }
 
   String _describe(Object e) => switch (e) {
+    api.BridgeError(code: 'EXPORT_CONFLICT') => '目标文件已存在，或预览已变化。请换文件名并重新预览。',
+    api.BridgeError(code: 'INVALID_EXPORT_REQUEST') => '请检查导出文件名、所选版本和大小限制。',
+    api.BridgeError(code: 'EXPORT_SELECTION_CLOSED') => '导出授权已关闭，请重新选择目标目录。',
+    api.BridgeError(code: 'EXPORT_DIRECTORY_CHANGED') => '导出目录身份已变化，请重新选择。',
+    api.BridgeError(code: 'EXPORT_PREVIEW_CHANGED') => '导出预览已失效，请重新生成。',
+
     api.BridgeError(code: 'RETENTION_LIMIT') => '保留额度已达上限，无法登记更多归档。不会自动删除文件。',
     api.BridgeError(code: 'RETENTION_FILES_CHANGED') => '保留文件已经变化，请重新检查并生成预览。',
     api.BridgeError(code: 'WORKSPACE_CONFLICT') => '目录授权版本已变化，请重新选择。',
@@ -155,8 +183,27 @@ class RetentionController extends ChangeNotifier {
     );
   }
 
-  Future<void> _releaseAll() =>
-      Future.wait(_held.toList().map(_release), eagerError: false);
+  Future<void> _releaseAll() async {
+    Object? failure;
+    StackTrace? trace;
+    try {
+      await Future.wait(
+        _heldExports.toList().map(_releaseExport),
+        eagerError: false,
+      );
+    } catch (e, s) {
+      failure = e;
+      trace = s;
+    }
+    try {
+      await Future.wait(_held.toList().map(_release), eagerError: false);
+    } catch (e, s) {
+      failure ??= e;
+      trace ??= s;
+    }
+    if (failure != null) Error.throwWithStackTrace(failure, trace!);
+  }
+
   Future<void> stop() async {
     ++_epoch;
     _hide();
@@ -242,6 +289,7 @@ class RetentionController extends ChangeNotifier {
       operations = ids;
       operation = ids.length == 1 ? ids.single : null;
       operationCursor = ids.length == 100 ? ids.last : null;
+      await _loadExportRecords(epoch);
     } catch (e) {
       if (_live(epoch)) error = _describe(e);
     } finally {
@@ -258,6 +306,11 @@ class RetentionController extends ChangeNotifier {
     await stop();
     if (!_live(epoch)) return;
     operation = id;
+    try {
+      await _loadExportRecords(_epoch);
+    } catch (_) {
+      if (_live(epoch)) error = '导出记录读取未完成。';
+    }
     _notify();
   }
 

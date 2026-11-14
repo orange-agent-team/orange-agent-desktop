@@ -29,6 +29,9 @@ impl RecoveryInspectionSignal {
 }
 impl Signals {
     pub(crate) fn stop_recovery_workspace(&mut self, workspace: &str) {
+        for scope in self.exports.values().filter(|s| s.workspace == workspace) {
+            scope.suspend();
+        }
         for scope in self
             .retentions
             .values()
@@ -73,7 +76,10 @@ pub(crate) fn signal_recovery_inspection_release(
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
-    if signals.recovery_writes.contains_key(token) || signals.retentions.contains_key(token) {
+    if signals.recovery_writes.contains_key(token)
+        || signals.retentions.contains_key(token)
+        || signals.exports.contains_key(token)
+    {
         return Err(failure("RECOVERY_SELECTION_CONFLICT"));
     }
     if signals.closed_recovery_selections.len() < 8192
@@ -111,7 +117,10 @@ pub(crate) fn signal_recovery_write_release(handle: &str, token: &str) -> Result
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
-    if signals.recovery_inspections.contains_key(token) || signals.retentions.contains_key(token) {
+    if signals.recovery_inspections.contains_key(token)
+        || signals.retentions.contains_key(token)
+        || signals.exports.contains_key(token)
+    {
         return Err(failure("RECOVERY_SELECTION_CONFLICT"));
     }
     if signals.closed_recovery_selections.len() < 8192

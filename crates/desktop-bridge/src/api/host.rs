@@ -927,3 +927,147 @@ pub async fn suspend_retention_access(
         Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct ExportAccessView {
+    pub session_token: String,
+    pub read_session_token: String,
+    pub run_id: String,
+    pub operation_id: String,
+    pub workspace_id: String,
+    pub display_directory: String,
+}
+#[derive(Debug, Clone)]
+pub struct ExportFileView {
+    pub role: String,
+    pub bytes: String,
+    pub sha256: String,
+    pub matches_reviewed_original: bool,
+    pub matches_reviewed_result: bool,
+    pub reviewed_original_inode: bool,
+}
+#[derive(Debug, Clone)]
+pub struct ExportReviewView {
+    pub session_token: String,
+    pub read_session_token: String,
+    pub run_id: String,
+    pub operation_id: String,
+    pub export_id: String,
+    pub digest: String,
+    pub source_path: String,
+    pub file_name: String,
+    pub choice: String,
+    pub entries: Vec<ExportFileView>,
+    pub artifact_bytes: String,
+    pub artifact_sha256: String,
+    pub expires_at: i64,
+}
+#[derive(Debug, Clone)]
+pub struct ExportOutcomeView {
+    pub export_id: String,
+    pub review_digest: String,
+    pub state: String,
+}
+/// Trusted UI only after a separate native export destination selection.
+pub async fn authorize_export_destination(
+    handle: String,
+    read_session_token: String,
+    request_id: String,
+    selected_directory: String,
+) -> Result<ExportAccessView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::authorize_export_destination(
+            handle,
+            read_session_token,
+            request_id,
+            selected_directory,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, read_session_token, request_id, selected_directory);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn prepare_export(
+    handle: String,
+    session_token: String,
+    request_id: String,
+    file_name: String,
+    choice: String,
+) -> Result<ExportReviewView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::prepare_export(handle, session_token, request_id, file_name, choice).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, session_token, request_id, file_name, choice);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn approve_export(
+    handle: String,
+    session_token: String,
+    export_id: String,
+    expected_digest: String,
+) -> Result<ExportOutcomeView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::approve_export(handle, session_token, export_id, expected_digest).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, session_token, export_id, expected_digest);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn inspect_export_outcome(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    export_id: String,
+) -> Result<Option<ExportOutcomeView>, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::inspect_export_outcome(handle, run_id, operation_id, export_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, run_id, operation_id, export_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn list_export_outcomes(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    before: Option<String>,
+    limit: u16,
+) -> Result<Vec<ExportOutcomeView>, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::list_export_outcomes(handle, run_id, operation_id, before, limit).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, run_id, operation_id, before, limit);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn suspend_export_destination(
+    handle: String,
+    request_id: String,
+) -> Result<(), BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::suspend_export_destination(handle, request_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, request_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}

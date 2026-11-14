@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'retention_controller.dart';
+import 'export_panel.dart';
 import 'src/rust/api/host.dart';
 
 class RetentionPanel extends StatelessWidget {
@@ -155,6 +156,7 @@ class RetentionPanel extends StatelessWidget {
                         child: const Text('确认本次原地归档'),
                       ),
                     ],
+                    ExportPanel(controller: c),
                   ],
                 ],
               ),
