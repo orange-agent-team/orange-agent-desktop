@@ -8,6 +8,8 @@ import 'model_controller.dart';
 import 'model_panel.dart';
 import 'recovery_controller.dart';
 import 'recovery_panel.dart';
+import 'retention_controller.dart';
+import 'retention_panel.dart';
 import 'src/rust/api/host.dart';
 import 'workspaces.dart';
 
@@ -30,6 +32,7 @@ class LocalAgentShell extends StatefulWidget {
 class _LocalAgentShellState extends State<LocalAgentShell> {
   late final AgentController controller;
   late final RecoveryController recovery;
+  late final RetentionController retention;
   ModelController? models;
   List<WorkspaceView> workspaces = [];
   List<CreationAccessView> creations = [];
@@ -54,6 +57,9 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
           : () async => 'managed',
     );
     recovery = RecoveryController(NativeRecoveryCommands(widget.host.handle));
+    retention = RetentionController(
+      NativeRetentionCommands(widget.host.handle),
+    );
     models?.configure();
   }
 
@@ -62,6 +68,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
     models?.dispose();
     controller.dispose();
     recovery.dispose();
+    retention.dispose();
     super.dispose();
   }
 
@@ -73,6 +80,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
           current.single.permissionVersion != old.permissionVersion ||
           (old.sessionAccess && !current.single.sessionAccess)) {
         recovery.workspaceStopping(old.workspaceId);
+        retention.workspaceStopping(old.workspaceId);
       }
     }
     setState(() => workspaces = rows);
@@ -101,6 +109,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
         onAccessStopping: (id) {
           controller.hideContent(stoppingWorkspace: id);
           recovery.workspaceStopping(id);
+          retention.workspaceStopping(id);
         },
         onOpenRun: (run) {
           if (run.phase == 'recovery_required') {
@@ -136,6 +145,11 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
       const SizedBox(height: 16),
       RecoveryPanel(
         controller: recovery,
+        supported: widget.host.availableEditTools.contains('apply_patch'),
+      ),
+      const SizedBox(height: 16),
+      RetentionPanel(
+        controller: retention,
         supported: widget.host.availableEditTools.contains('apply_patch'),
       ),
       const SizedBox(height: 16),

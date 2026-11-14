@@ -23,12 +23,16 @@ mod editing;
 #[cfg(target_vendor = "apple")]
 mod recovery;
 #[cfg(target_vendor = "apple")]
+mod retention;
+#[cfg(target_vendor = "apple")]
 pub(crate) use editing::{signal_editing_release, signal_editing_revoke};
 #[cfg(target_vendor = "apple")]
 pub(crate) use recovery::{
     RecoveryInspectionSignal, RecoveryWriteSignal, signal_recovery_inspection_release,
     signal_recovery_write_release,
 };
+#[cfg(target_vendor = "apple")]
+pub(crate) use retention::{RetentionSignal, signal_retention_release};
 #[cfg(target_vendor = "apple")]
 pub(crate) struct EditingSignal {
     pub workspace: String,
@@ -92,6 +96,8 @@ pub(crate) struct Signals {
     #[cfg(target_vendor = "apple")]
     pub recovery_writes: HashMap<String, RecoveryWriteSignal>,
     #[cfg(target_vendor = "apple")]
+    pub retentions: HashMap<String, RetentionSignal>,
+    #[cfg(target_vendor = "apple")]
     pub closed_recovery_selections: HashSet<String>,
     #[cfg(target_vendor = "apple")]
     pub recovery_epochs: HashMap<String, u64>,
@@ -101,6 +107,10 @@ pub(crate) struct Signals {
 }
 impl Signals {
     pub fn stop_all(&self) {
+        #[cfg(target_vendor = "apple")]
+        for scope in self.retentions.values() {
+            scope.suspend();
+        }
         #[cfg(target_vendor = "apple")]
         for scope in self.recovery_inspections.values() {
             scope.suspend();
@@ -430,6 +440,14 @@ pub(crate) fn signal_revoke(
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
+    #[cfg(target_vendor = "apple")]
+    if signals.retentions.values().any(|scope| {
+        scope.workspace == workspace
+            && scope.available.load(Ordering::Acquire)
+            && scope.workspace_version != version
+    }) {
+        return Err(failure("WORKSPACE_CONFLICT"));
+    }
     #[cfg(target_vendor = "apple")]
     if signals.recovery_inspections.values().any(|scope| {
         scope.workspace == workspace

@@ -793,3 +793,137 @@ pub async fn suspend_recovery_inspection(
         Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct RetentionAccessView {
+    pub session_token: String,
+    pub run_id: String,
+    pub operation_id: String,
+    pub workspace_id: String,
+    pub display_directory: String,
+}
+#[derive(Debug, Clone)]
+pub struct RetentionInspectionView {
+    pub session_token: String,
+    pub run_id: String,
+    pub operation_id: String,
+    pub path: String,
+    pub execution_state: String,
+    pub staged: RecoveryFileStatusView,
+    pub original: RecoveryFileStatusView,
+    pub resource_active_records: i64,
+    pub resource_active_reserved_bytes: String,
+    pub owner_archive_records: i64,
+    pub owner_archive_reserved_bytes: String,
+    pub owner_archive_limit_bytes: String,
+    pub owner_archive_record_limit: i64,
+    pub archived_review_id: Option<String>,
+    pub changed_since_archival: Option<bool>,
+}
+#[derive(Debug, Clone)]
+pub struct RetentionReviewView {
+    pub session_token: String,
+    pub operation_id: String,
+    pub review_id: String,
+    pub digest: String,
+    pub path: String,
+    pub staged: RecoveryFileStatusView,
+    pub original: RecoveryFileStatusView,
+    pub archive_reserved_bytes: String,
+    pub expires_at: i64,
+}
+/// Trusted UI only after a separate native selection for retained-file management.
+pub async fn authorize_retention_access(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    request_id: String,
+    workspace_version: String,
+    selected_directory: String,
+) -> Result<RetentionAccessView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::authorize_retention_access(
+            handle,
+            run_id,
+            operation_id,
+            request_id,
+            workspace_version,
+            selected_directory,
+        )
+        .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (
+            handle,
+            run_id,
+            operation_id,
+            request_id,
+            workspace_version,
+            selected_directory,
+        );
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn inspect_retention(
+    handle: String,
+    session_token: String,
+) -> Result<RetentionInspectionView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::inspect_retention(handle, session_token).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, session_token);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn prepare_retention_archive(
+    handle: String,
+    session_token: String,
+    request_id: String,
+) -> Result<RetentionReviewView, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::prepare_retention_archive(handle, session_token, request_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, session_token, request_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+/// Explicit exact-preview confirmation; a failed reply must be queried, never blindly retried.
+pub async fn approve_retention_archive(
+    handle: String,
+    session_token: String,
+    review_id: String,
+    expected_digest: String,
+) -> Result<String, BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::approve_retention_archive(handle, session_token, review_id, expected_digest)
+            .await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, session_token, review_id, expected_digest);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}
+pub async fn suspend_retention_access(
+    handle: String,
+    request_id: String,
+) -> Result<(), BridgeError> {
+    #[cfg(target_vendor = "apple")]
+    {
+        crate::host::suspend_retention_access(handle, request_id).await
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        let _ = (handle, request_id);
+        Err(crate::host::failure("EDITING_UNAVAILABLE_ON_TARGET"))
+    }
+}

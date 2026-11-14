@@ -33,6 +33,11 @@ pub(crate) use recovery::{
 #[cfg(target_vendor = "apple")]
 pub(crate) use recovery::{authorize_recovery_write_access, suspend_recovery_write_selection};
 #[cfg(target_vendor = "apple")]
+pub(crate) use retention::{
+    approve_retention_archive, authorize_retention_access, inspect_retention,
+    prepare_retention_archive, suspend_retention_access,
+};
+#[cfg(target_vendor = "apple")]
 pub(crate) use retention::{inspect_retention_outcome, list_retained_edits};
 mod managed;
 pub(crate) use creation::{
@@ -69,6 +74,8 @@ struct Host {
     recovery_inspections: std::collections::HashMap<String, recovery::InspectionSession>,
     #[cfg(target_vendor = "apple")]
     recovery_writes: std::collections::HashMap<String, recovery::WriteSession>,
+    #[cfg(target_vendor = "apple")]
+    retentions: std::collections::HashMap<String, retention::RetentionSession>,
     #[cfg(target_vendor = "apple")]
     run_edit_grants: std::collections::HashMap<
         String,
@@ -158,6 +165,8 @@ impl HostRegistry {
             recovery_inspections: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             recovery_writes: std::collections::HashMap::new(),
+            #[cfg(target_vendor = "apple")]
+            retentions: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             run_edit_grants: std::collections::HashMap::new(),
             model: None,

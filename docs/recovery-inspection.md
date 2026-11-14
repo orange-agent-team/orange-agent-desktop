@@ -1,6 +1,6 @@
 # 中断编辑检查（候选实现）
 
-恢复功能已在64748cd主线验收；当前后续候选固定消费f0474a4a4ff79f4cd104152de0ca82ea05350bd3/schema17，尚未合并。消费证据见native-capture-consumption.md。
+恢复与原生捕获已在主线1074e1c/Runtimef0474a4验收；当前候选固定消费a2cdafb95fab90bc1ded82d4a4c061be40463d35/schema17，新增保留原件管理，见retention-management.md。候选尚未整合到主线。
 
 ## 用户流程
 

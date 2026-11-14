@@ -29,6 +29,13 @@ impl RecoveryInspectionSignal {
 }
 impl Signals {
     pub(crate) fn stop_recovery_workspace(&mut self, workspace: &str) {
+        for scope in self
+            .retentions
+            .values()
+            .filter(|s| s.workspace == workspace)
+        {
+            scope.suspend();
+        }
         // Constructors register their epoch before opening a capability, so a
         // concurrent workspace stop also fences a not-yet-published selection.
         if let Some(epoch) = self.recovery_epochs.get_mut(workspace) {
@@ -66,7 +73,7 @@ pub(crate) fn signal_recovery_inspection_release(
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
-    if signals.recovery_writes.contains_key(token) {
+    if signals.recovery_writes.contains_key(token) || signals.retentions.contains_key(token) {
         return Err(failure("RECOVERY_SELECTION_CONFLICT"));
     }
     if signals.closed_recovery_selections.len() < 8192
@@ -104,7 +111,7 @@ pub(crate) fn signal_recovery_write_release(handle: &str, token: &str) -> Result
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
-    if signals.recovery_inspections.contains_key(token) {
+    if signals.recovery_inspections.contains_key(token) || signals.retentions.contains_key(token) {
         return Err(failure("RECOVERY_SELECTION_CONFLICT"));
     }
     if signals.closed_recovery_selections.len() < 8192

@@ -33,6 +33,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  bool dco_decode_box_autoadd_bool(dynamic raw);
+
+  @protected
   RunPermissionSelection dco_decode_box_autoadd_run_permission_selection(
     dynamic raw,
   );
@@ -56,6 +59,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HostView dco_decode_host_view(dynamic raw);
+
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
@@ -91,6 +97,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
+  bool? dco_decode_opt_box_autoadd_bool(dynamic raw);
+
+  @protected
   RunPermissionSelection? dco_decode_opt_box_autoadd_run_permission_selection(
     dynamic raw,
   );
@@ -122,6 +131,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RecoveryWriteAccessView dco_decode_recovery_write_access_view(dynamic raw);
+
+  @protected
+  RetentionAccessView dco_decode_retention_access_view(dynamic raw);
+
+  @protected
+  RetentionInspectionView dco_decode_retention_inspection_view(dynamic raw);
+
+  @protected
+  RetentionReviewView dco_decode_retention_review_view(dynamic raw);
 
   @protected
   RunPage dco_decode_run_page(dynamic raw);
@@ -166,6 +184,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
   RunPermissionSelection sse_decode_box_autoadd_run_permission_selection(
     SseDeserializer deserializer,
   );
@@ -193,6 +214,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HostView sse_decode_host_view(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
@@ -240,6 +264,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
+  bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
   RunPermissionSelection? sse_decode_opt_box_autoadd_run_permission_selection(
     SseDeserializer deserializer,
   );
@@ -279,6 +306,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RecoveryWriteAccessView sse_decode_recovery_write_access_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RetentionAccessView sse_decode_retention_access_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RetentionInspectionView sse_decode_retention_inspection_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RetentionReviewView sse_decode_retention_review_view(
     SseDeserializer deserializer,
   );
 
@@ -332,6 +374,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_run_permission_selection(
     RunPermissionSelection self,
     SseSerializer serializer,
@@ -366,6 +411,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_host_view(HostView self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
@@ -428,6 +476,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_run_permission_selection(
     RunPermissionSelection? self,
     SseSerializer serializer,
@@ -475,6 +526,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_recovery_write_access_view(
     RecoveryWriteAccessView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_retention_access_view(
+    RetentionAccessView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_retention_inspection_view(
+    RetentionInspectionView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_retention_review_view(
+    RetentionReviewView self,
     SseSerializer serializer,
   );
 

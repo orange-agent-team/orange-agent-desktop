@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -532,6 +532,62 @@ Future<void> suspendRecoveryInspection({
   required String handle,
   required String requestId,
 }) => RustLib.instance.api.crateApiHostSuspendRecoveryInspection(
+  handle: handle,
+  requestId: requestId,
+);
+
+/// Trusted UI only after a separate native selection for retained-file management.
+Future<RetentionAccessView> authorizeRetentionAccess({
+  required String handle,
+  required String runId,
+  required String operationId,
+  required String requestId,
+  required String workspaceVersion,
+  required String selectedDirectory,
+}) => RustLib.instance.api.crateApiHostAuthorizeRetentionAccess(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+  requestId: requestId,
+  workspaceVersion: workspaceVersion,
+  selectedDirectory: selectedDirectory,
+);
+
+Future<RetentionInspectionView> inspectRetention({
+  required String handle,
+  required String sessionToken,
+}) => RustLib.instance.api.crateApiHostInspectRetention(
+  handle: handle,
+  sessionToken: sessionToken,
+);
+
+Future<RetentionReviewView> prepareRetentionArchive({
+  required String handle,
+  required String sessionToken,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostPrepareRetentionArchive(
+  handle: handle,
+  sessionToken: sessionToken,
+  requestId: requestId,
+);
+
+/// Explicit exact-preview confirmation; a failed reply must be queried, never blindly retried.
+Future<String> approveRetentionArchive({
+  required String handle,
+  required String sessionToken,
+  required String reviewId,
+  required String expectedDigest,
+}) => RustLib.instance.api.crateApiHostApproveRetentionArchive(
+  handle: handle,
+  sessionToken: sessionToken,
+  reviewId: reviewId,
+  expectedDigest: expectedDigest,
+);
+
+Future<void> suspendRetentionAccess({
+  required String handle,
+  required String requestId,
+}) => RustLib.instance.api.crateApiHostSuspendRetentionAccess(
   handle: handle,
   requestId: requestId,
 );
@@ -1113,6 +1169,167 @@ class RecoveryWriteAccessView {
           operationId == other.operationId &&
           workspaceId == other.workspaceId &&
           displayDirectory == other.displayDirectory;
+}
+
+class RetentionAccessView {
+  final String sessionToken;
+  final String runId;
+  final String operationId;
+  final String workspaceId;
+  final String displayDirectory;
+
+  const RetentionAccessView({
+    required this.sessionToken,
+    required this.runId,
+    required this.operationId,
+    required this.workspaceId,
+    required this.displayDirectory,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      runId.hashCode ^
+      operationId.hashCode ^
+      workspaceId.hashCode ^
+      displayDirectory.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RetentionAccessView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          workspaceId == other.workspaceId &&
+          displayDirectory == other.displayDirectory;
+}
+
+class RetentionInspectionView {
+  final String sessionToken;
+  final String runId;
+  final String operationId;
+  final String path;
+  final String executionState;
+  final RecoveryFileStatusView staged;
+  final RecoveryFileStatusView original;
+  final PlatformInt64 resourceActiveRecords;
+  final String resourceActiveReservedBytes;
+  final PlatformInt64 ownerArchiveRecords;
+  final String ownerArchiveReservedBytes;
+  final String ownerArchiveLimitBytes;
+  final PlatformInt64 ownerArchiveRecordLimit;
+  final String? archivedReviewId;
+  final bool? changedSinceArchival;
+
+  const RetentionInspectionView({
+    required this.sessionToken,
+    required this.runId,
+    required this.operationId,
+    required this.path,
+    required this.executionState,
+    required this.staged,
+    required this.original,
+    required this.resourceActiveRecords,
+    required this.resourceActiveReservedBytes,
+    required this.ownerArchiveRecords,
+    required this.ownerArchiveReservedBytes,
+    required this.ownerArchiveLimitBytes,
+    required this.ownerArchiveRecordLimit,
+    this.archivedReviewId,
+    this.changedSinceArchival,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      runId.hashCode ^
+      operationId.hashCode ^
+      path.hashCode ^
+      executionState.hashCode ^
+      staged.hashCode ^
+      original.hashCode ^
+      resourceActiveRecords.hashCode ^
+      resourceActiveReservedBytes.hashCode ^
+      ownerArchiveRecords.hashCode ^
+      ownerArchiveReservedBytes.hashCode ^
+      ownerArchiveLimitBytes.hashCode ^
+      ownerArchiveRecordLimit.hashCode ^
+      archivedReviewId.hashCode ^
+      changedSinceArchival.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RetentionInspectionView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          runId == other.runId &&
+          operationId == other.operationId &&
+          path == other.path &&
+          executionState == other.executionState &&
+          staged == other.staged &&
+          original == other.original &&
+          resourceActiveRecords == other.resourceActiveRecords &&
+          resourceActiveReservedBytes == other.resourceActiveReservedBytes &&
+          ownerArchiveRecords == other.ownerArchiveRecords &&
+          ownerArchiveReservedBytes == other.ownerArchiveReservedBytes &&
+          ownerArchiveLimitBytes == other.ownerArchiveLimitBytes &&
+          ownerArchiveRecordLimit == other.ownerArchiveRecordLimit &&
+          archivedReviewId == other.archivedReviewId &&
+          changedSinceArchival == other.changedSinceArchival;
+}
+
+class RetentionReviewView {
+  final String sessionToken;
+  final String operationId;
+  final String reviewId;
+  final String digest;
+  final String path;
+  final RecoveryFileStatusView staged;
+  final RecoveryFileStatusView original;
+  final String archiveReservedBytes;
+  final PlatformInt64 expiresAt;
+
+  const RetentionReviewView({
+    required this.sessionToken,
+    required this.operationId,
+    required this.reviewId,
+    required this.digest,
+    required this.path,
+    required this.staged,
+    required this.original,
+    required this.archiveReservedBytes,
+    required this.expiresAt,
+  });
+
+  @override
+  int get hashCode =>
+      sessionToken.hashCode ^
+      operationId.hashCode ^
+      reviewId.hashCode ^
+      digest.hashCode ^
+      path.hashCode ^
+      staged.hashCode ^
+      original.hashCode ^
+      archiveReservedBytes.hashCode ^
+      expiresAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RetentionReviewView &&
+          runtimeType == other.runtimeType &&
+          sessionToken == other.sessionToken &&
+          operationId == other.operationId &&
+          reviewId == other.reviewId &&
+          digest == other.digest &&
+          path == other.path &&
+          staged == other.staged &&
+          original == other.original &&
+          archiveReservedBytes == other.archiveReservedBytes &&
+          expiresAt == other.expiresAt;
 }
 
 class RunPage {

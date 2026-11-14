@@ -16,12 +16,14 @@ pub(crate) use writing::{approve_recovery_decision, prepare_recovery_decision};
 pub(crate) use writing::{authorize_recovery_write_access, suspend_recovery_write_selection};
 
 pub(super) enum RecoveryLease {
+    Retention(Arc<orange_agent_runtime::workspace::patch::review::dispatch::recovery::retention::PatchRetentionGrant>),
     Read(Arc<PatchInspectionGrant>),
     Write(Arc<orange_agent_runtime::workspace::patch::review::dispatch::recovery::resolution::PatchRecoveryGrant>),
 }
 impl RecoveryLease {
     pub(super) async fn wait_drained(&self) {
         match self {
+            Self::Retention(grant) => grant.wait_drained().await,
             Self::Read(grant) => grant.wait_drained().await,
             Self::Write(grant) => grant.wait_drained().await,
         }
@@ -92,8 +94,9 @@ fn error(value: PatchError) -> BridgeError {
         _ => "RECOVERY_STORAGE_UNAVAILABLE",
     })
 }
-fn other_selection_kind(controls: &crate::actor::Signals, token: &str) -> bool {
+pub(super) fn other_selection_kind(controls: &crate::actor::Signals, token: &str) -> bool {
     controls.closed_selections.contains(token)
+        || controls.retentions.contains_key(token)
         || controls.closed_creation_selections.contains(token)
         || controls.closed_editing_selections.contains(token)
         || controls.closed_imports.contains(token)
@@ -105,7 +108,7 @@ fn other_selection_kind(controls: &crate::actor::Signals, token: &str) -> bool {
         || controls.creations.values().any(|s| s.token == token)
         || controls.editings.values().any(|s| s.token == token)
 }
-fn file(value: &RecoveryFileObservation) -> RecoveryFileStatusView {
+pub(super) fn file(value: &RecoveryFileObservation) -> RecoveryFileStatusView {
     let mut view = RecoveryFileStatusView {
         kind: "missing".into(),
         refusal: None,
@@ -349,6 +352,21 @@ impl HostRegistry {
             .collect();
         let mut leases = Vec::new();
         let mut controls = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+        let retained: Vec<_> = host
+            .retentions
+            .iter()
+            .filter(|(_, s)| s.view.workspace_id == workspace)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in retained {
+            if let Some(scope) = host.retentions.remove(&id) {
+                scope.available.store(false, Ordering::Release);
+                scope.grant.request_revoke();
+                leases.push(RecoveryLease::Retention(scope.grant));
+            }
+            controls.closed_recovery_selections.insert(id.clone());
+            controls.retentions.remove(&id);
+        }
         let writes: Vec<_> = host
             .recovery_writes
             .iter()

@@ -405,7 +405,7 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
         run.run_id.clone(),
         operation.clone(),
         "decision-read-after-revoke".into(),
-        revoked.permission_version,
+        revoked.permission_version.clone(),
         root.display().to_string(),
     )
     .await
@@ -530,33 +530,183 @@ pub(super) async fn exercise(h: &str, base: &Path) -> String {
             .expect("not archived")
             .is_none()
     );
-    // Test-only trusted-host selection/approval. Production native selection
-    // and retention UI are a separate implementation, not simulated here.
+    api::suspend_retention_access(h.into(), "late-retention".into())
+        .await
+        .expect("cancel selection first");
+    assert_eq!(
+        api::authorize_retention_access(
+            h.into(),
+            run.run_id.clone(),
+            operation.clone(),
+            "late-retention".into(),
+            revoked.permission_version.clone(),
+            root.display().to_string()
+        )
+        .await
+        .expect_err("late native callback refused")
+        .code,
+        "RETENTION_SELECTION_CLOSED"
+    );
+    assert!(
+        api::authorize_retention_access(
+            h.into(),
+            run.run_id.clone(),
+            operation.clone(),
+            "wrong-version-retention".into(),
+            "999".into(),
+            root.display().to_string()
+        )
+        .await
+        .is_err()
+    );
+    let access = api::authorize_retention_access(
+        h.into(),
+        run.run_id.clone(),
+        operation.clone(),
+        "retention-reader".into(),
+        revoked.permission_version.clone(),
+        root.display().to_string(),
+    )
+    .await
+    .expect("separate read selection for management");
+    let before = api::inspect_retention(h.into(), access.session_token.clone())
+        .await
+        .expect("actual retained observation and reservations");
+    assert_eq!(
+        (before.resource_active_records, before.owner_archive_records),
+        (1, 0)
+    );
+    assert!(before.original.matches_original_content);
+    assert!(before.archived_review_id.is_none());
+    assert!(
+        api::authorize_recovery_write_access(
+            h.into(),
+            access.session_token.clone(),
+            "not-a-writer".into(),
+            root.display().to_string()
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        api::suspend_recovery_inspection(h.into(), access.session_token.clone())
+            .await
+            .is_err()
+    );
+    let old = api::prepare_retention_archive(
+        h.into(),
+        access.session_token.clone(),
+        "old-retention-review".into(),
+    )
+    .await
+    .expect("first preview");
+    let replacement = api::prepare_retention_archive(
+        h.into(),
+        access.session_token.clone(),
+        "replacement-retention-review".into(),
+    )
+    .await
+    .expect("replacement preview");
+    assert!(
+        api::approve_retention_archive(
+            h.into(),
+            access.session_token.clone(),
+            old.review_id,
+            old.digest
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        api::approve_retention_archive(
+            h.into(),
+            access.session_token.clone(),
+            replacement.review_id,
+            replacement.digest
+        )
+        .await
+        .is_err(),
+        "attempt consumes the displayed preview"
+    );
+    let preview = api::prepare_retention_archive(
+        h.into(),
+        access.session_token.clone(),
+        "exact-retention-review".into(),
+    )
+    .await
+    .expect("fresh preview");
+    let review_id = api::approve_retention_archive(
+        h.into(),
+        access.session_token.clone(),
+        preview.review_id.clone(),
+        preview.digest.clone(),
+    )
+    .await
+    .expect("explicit exact archive confirmation");
+    assert_eq!(review_id, preview.review_id);
+    assert!(
+        api::approve_retention_archive(
+            h.into(),
+            access.session_token.clone(),
+            preview.review_id,
+            preview.digest
+        )
+        .await
+        .is_err(),
+        "bridge does not replay an approval"
+    );
+    let after = api::inspect_retention(h.into(), access.session_token.clone())
+        .await
+        .expect("archived observation");
+    assert_eq!(
+        (after.resource_active_records, after.owner_archive_records),
+        (0, 1)
+    );
+    assert_eq!(after.changed_since_archival, Some(false));
+    assert_eq!(after.archived_review_id, Some(review_id.clone()));
     let handle = h.to_owned();
-    let retained_run = run.run_id.clone();
-    let retained_operation = operation.clone();
-    let retained_root = root.clone();
-    let review_id = crate::actor::call(handle.clone(), move |registry, rt| {
-        let journal = &mut registry.current(&handle)?.journal;
-        let grant = journal
-            .authorize_patch_retention(
-                LOCAL_OWNER,
-                &retained_run,
-                &retained_operation,
-                &retained_root,
-            )
-            .expect("test-owned native selection");
-        let review = rt
-            .block_on(journal.prepare_selected_retention(&grant, "bridge-retention-fixture"))
-            .expect("actual preview");
-        rt.block_on(journal.approve_selected_retention(&grant, &review.review_id, &review.digest))
-            .expect("actual archive transaction");
-        grant.request_revoke();
-        rt.block_on(grant.wait_drained());
-        Ok(review.review_id)
+    let token = access.session_token.clone();
+    let receipt = crate::actor::call(handle.clone(), move |registry, rt| {
+        let grant = registry
+            .signals
+            .lock()
+            .map_err(|_| failure("HOST_INTERNAL"))?
+            .retentions[&token]
+            .grant
+            .clone();
+        rt.block_on(
+            registry
+                .current(&handle)?
+                .journal
+                .inspect_selected_retention(&grant),
+        )
+        .map_err(|_| failure("TEST_RETENTION_FAILED"))
     })
     .await
-    .expect("owned fixture transaction");
+    .expect("hold real read lease");
+    let handle = h.to_owned();
+    let token = access.session_token.clone();
+    let closing = tokio::spawn(async move { api::suspend_retention_access(handle, token).await });
+    bounded(async {
+        while receipt.snapshot().is_ok() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await;
+    assert!(
+        !closing.is_finished(),
+        "native release waits for retention read lease"
+    );
+    drop(receipt);
+    bounded(closing)
+        .await
+        .expect("closing task")
+        .expect("drained");
+    assert!(
+        api::inspect_retention(h.into(), access.session_token)
+            .await
+            .is_err()
+    );
     assert_eq!(
         api::inspect_retention_outcome(h.into(), run.run_id.clone(), operation.clone())
             .await

@@ -69,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1965807892;
+  int get rustContentHash => 991473736;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -117,6 +117,13 @@ abstract class RustLibApi extends BaseApi {
     required String expectedDigest,
   });
 
+  Future<String> crateApiHostApproveRetentionArchive({
+    required String handle,
+    required String sessionToken,
+    required String reviewId,
+    required String expectedDigest,
+  });
+
   Future<AgentRunView> crateApiHostApproveTool({
     required String handle,
     required String runId,
@@ -151,6 +158,15 @@ abstract class RustLibApi extends BaseApi {
     required String handle,
     required String readSessionToken,
     required String requestId,
+    required String selectedDirectory,
+  });
+
+  Future<RetentionAccessView> crateApiHostAuthorizeRetentionAccess({
+    required String handle,
+    required String runId,
+    required String operationId,
+    required String requestId,
+    required String workspaceVersion,
     required String selectedDirectory,
   });
 
@@ -224,6 +240,11 @@ abstract class RustLibApi extends BaseApi {
     required String operationId,
   });
 
+  Future<RetentionInspectionView> crateApiHostInspectRetention({
+    required String handle,
+    required String sessionToken,
+  });
+
   Future<String?> crateApiHostInspectRetentionOutcome({
     required String handle,
     required String runId,
@@ -277,6 +298,12 @@ abstract class RustLibApi extends BaseApi {
     required String writeSessionToken,
     required String requestId,
     required String choice,
+  });
+
+  Future<RetentionReviewView> crateApiHostPrepareRetentionArchive({
+    required String handle,
+    required String sessionToken,
+    required String requestId,
   });
 
   Future<EditPreviewView> crateApiHostPreviewEditingTool({
@@ -368,6 +395,11 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<void> crateApiHostSuspendRecoveryWriteSelection({
+    required String handle,
+    required String requestId,
+  });
+
+  Future<void> crateApiHostSuspendRetentionAccess({
     required String handle,
     required String requestId,
   });
@@ -612,6 +644,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<String> crateApiHostApproveRetentionArchive({
+    required String handle,
+    required String sessionToken,
+    required String reviewId,
+    required String expectedDigest,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(sessionToken, serializer);
+          sse_encode_String(reviewId, serializer);
+          sse_encode_String(expectedDigest, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostApproveRetentionArchiveConstMeta,
+        argValues: [handle, sessionToken, reviewId, expectedDigest],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostApproveRetentionArchiveConstMeta =>
+      const TaskConstMeta(
+        debugName: "approve_retention_archive",
+        argNames: ["handle", "sessionToken", "reviewId", "expectedDigest"],
+      );
+
+  @override
   Future<AgentRunView> crateApiHostApproveTool({
     required String handle,
     required String runId,
@@ -629,7 +700,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 7,
             port: port_,
           );
         },
@@ -667,7 +738,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 8,
             port: port_,
           );
         },
@@ -706,7 +777,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 9,
             port: port_,
           );
         },
@@ -749,7 +820,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 10,
             port: port_,
           );
         },
@@ -802,7 +873,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 11,
             port: port_,
           );
         },
@@ -829,6 +900,63 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<RetentionAccessView> crateApiHostAuthorizeRetentionAccess({
+    required String handle,
+    required String runId,
+    required String operationId,
+    required String requestId,
+    required String workspaceVersion,
+    required String selectedDirectory,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(runId, serializer);
+          sse_encode_String(operationId, serializer);
+          sse_encode_String(requestId, serializer);
+          sse_encode_String(workspaceVersion, serializer);
+          sse_encode_String(selectedDirectory, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 12,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_retention_access_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostAuthorizeRetentionAccessConstMeta,
+        argValues: [
+          handle,
+          runId,
+          operationId,
+          requestId,
+          workspaceVersion,
+          selectedDirectory,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostAuthorizeRetentionAccessConstMeta =>
+      const TaskConstMeta(
+        debugName: "authorize_retention_access",
+        argNames: [
+          "handle",
+          "runId",
+          "operationId",
+          "requestId",
+          "workspaceVersion",
+          "selectedDirectory",
+        ],
+      );
+
+  @override
   Future<WorkspaceView> crateApiHostAuthorizeWorkspace({
     required String handle,
     required String requestId,
@@ -844,7 +972,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 13,
             port: port_,
           );
         },
@@ -879,7 +1007,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 14,
             port: port_,
           );
         },
@@ -914,7 +1042,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 15,
             port: port_,
           );
         },
@@ -944,7 +1072,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 16,
             port: port_,
           );
         },
@@ -976,7 +1104,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 17,
             port: port_,
           );
         },
@@ -1015,7 +1143,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 18,
             port: port_,
           );
         },
@@ -1050,7 +1178,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 19,
             port: port_,
           );
         },
@@ -1083,7 +1211,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 20,
             port: port_,
           );
         },
@@ -1114,7 +1242,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 21,
             port: port_,
           );
         },
@@ -1151,7 +1279,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1180,7 +1308,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1210,7 +1338,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1240,7 +1368,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1270,7 +1398,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1305,7 +1433,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1342,7 +1470,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1364,6 +1492,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<RetentionInspectionView> crateApiHostInspectRetention({
+    required String handle,
+    required String sessionToken,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(sessionToken, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 29,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_retention_inspection_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostInspectRetentionConstMeta,
+        argValues: [handle, sessionToken],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostInspectRetentionConstMeta =>
+      const TaskConstMeta(
+        debugName: "inspect_retention",
+        argNames: ["handle", "sessionToken"],
+      );
+
+  @override
   Future<String?> crateApiHostInspectRetentionOutcome({
     required String handle,
     required String runId,
@@ -1379,7 +1542,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1414,7 +1577,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1448,7 +1611,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 32,
             port: port_,
           );
         },
@@ -1483,7 +1646,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1522,7 +1685,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1561,7 +1724,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1599,7 +1762,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1634,7 +1797,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1674,7 +1837,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1708,6 +1871,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<RetentionReviewView> crateApiHostPrepareRetentionArchive({
+    required String handle,
+    required String sessionToken,
+    required String requestId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(sessionToken, serializer);
+          sse_encode_String(requestId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 39,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_retention_review_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostPrepareRetentionArchiveConstMeta,
+        argValues: [handle, sessionToken, requestId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostPrepareRetentionArchiveConstMeta =>
+      const TaskConstMeta(
+        debugName: "prepare_retention_archive",
+        argNames: ["handle", "sessionToken", "requestId"],
+      );
+
+  @override
   Future<EditPreviewView> crateApiHostPreviewEditingTool({
     required String handle,
     required String runId,
@@ -1723,7 +1923,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1758,7 +1958,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1795,7 +1995,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1832,7 +2032,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1869,7 +2069,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1914,7 +2114,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1978,7 +2178,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 46,
             port: port_,
           );
         },
@@ -2033,7 +2233,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 47,
             port: port_,
           );
         },
@@ -2068,7 +2268,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 48,
             port: port_,
           );
         },
@@ -2107,7 +2307,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 45,
+            funcId: 49,
             port: port_,
           );
         },
@@ -2141,7 +2341,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 46,
+            funcId: 50,
             port: port_,
           );
         },
@@ -2176,7 +2376,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 47,
+            funcId: 51,
             port: port_,
           );
         },
@@ -2211,7 +2411,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 48,
+            funcId: 52,
             port: port_,
           );
         },
@@ -2246,7 +2446,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 49,
+            funcId: 53,
             port: port_,
           );
         },
@@ -2281,7 +2481,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 50,
+            funcId: 54,
             port: port_,
           );
         },
@@ -2303,6 +2503,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiHostSuspendRetentionAccess({
+    required String handle,
+    required String requestId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(requestId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 55,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiHostSuspendRetentionAccessConstMeta,
+        argValues: [handle, requestId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHostSuspendRetentionAccessConstMeta =>
+      const TaskConstMeta(
+        debugName: "suspend_retention_access",
+        argNames: ["handle", "requestId"],
+      );
+
+  @override
   Future<WorkspaceView> crateApiHostSuspendWorkspaceAccess({
     required String handle,
     required String workspaceId,
@@ -2318,7 +2553,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 51,
+            funcId: 56,
             port: port_,
           );
         },
@@ -2353,7 +2588,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 52,
+            funcId: 57,
             port: port_,
           );
         },
@@ -2388,7 +2623,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 53,
+            funcId: 58,
             port: port_,
           );
         },
@@ -2441,6 +2676,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   bool dco_decode_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
+  }
+
+  @protected
+  bool dco_decode_box_autoadd_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as bool;
   }
@@ -2544,6 +2785,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeI64(raw);
+  }
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_String).toList();
@@ -2625,6 +2872,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   String? dco_decode_opt_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
+  bool? dco_decode_opt_box_autoadd_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_bool(raw);
   }
 
   @protected
@@ -2750,6 +3003,65 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       operationId: dco_decode_String(arr[3]),
       workspaceId: dco_decode_String(arr[4]),
       displayDirectory: dco_decode_String(arr[5]),
+    );
+  }
+
+  @protected
+  RetentionAccessView dco_decode_retention_access_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return RetentionAccessView(
+      sessionToken: dco_decode_String(arr[0]),
+      runId: dco_decode_String(arr[1]),
+      operationId: dco_decode_String(arr[2]),
+      workspaceId: dco_decode_String(arr[3]),
+      displayDirectory: dco_decode_String(arr[4]),
+    );
+  }
+
+  @protected
+  RetentionInspectionView dco_decode_retention_inspection_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 15)
+      throw Exception('unexpected arr length: expect 15 but see ${arr.length}');
+    return RetentionInspectionView(
+      sessionToken: dco_decode_String(arr[0]),
+      runId: dco_decode_String(arr[1]),
+      operationId: dco_decode_String(arr[2]),
+      path: dco_decode_String(arr[3]),
+      executionState: dco_decode_String(arr[4]),
+      staged: dco_decode_recovery_file_status_view(arr[5]),
+      original: dco_decode_recovery_file_status_view(arr[6]),
+      resourceActiveRecords: dco_decode_i_64(arr[7]),
+      resourceActiveReservedBytes: dco_decode_String(arr[8]),
+      ownerArchiveRecords: dco_decode_i_64(arr[9]),
+      ownerArchiveReservedBytes: dco_decode_String(arr[10]),
+      ownerArchiveLimitBytes: dco_decode_String(arr[11]),
+      ownerArchiveRecordLimit: dco_decode_i_64(arr[12]),
+      archivedReviewId: dco_decode_opt_String(arr[13]),
+      changedSinceArchival: dco_decode_opt_box_autoadd_bool(arr[14]),
+    );
+  }
+
+  @protected
+  RetentionReviewView dco_decode_retention_review_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return RetentionReviewView(
+      sessionToken: dco_decode_String(arr[0]),
+      operationId: dco_decode_String(arr[1]),
+      reviewId: dco_decode_String(arr[2]),
+      digest: dco_decode_String(arr[3]),
+      path: dco_decode_String(arr[4]),
+      staged: dco_decode_recovery_file_status_view(arr[5]),
+      original: dco_decode_recovery_file_status_view(arr[6]),
+      archiveReservedBytes: dco_decode_String(arr[7]),
+      expiresAt: dco_decode_i_64(arr[8]),
     );
   }
 
@@ -2921,6 +3233,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool sse_decode_box_autoadd_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_bool(deserializer));
+  }
+
+  @protected
   RunPermissionSelection sse_decode_box_autoadd_run_permission_selection(
     SseDeserializer deserializer,
   ) {
@@ -3034,6 +3352,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       availableReadTools: var_availableReadTools,
       availableEditTools: var_availableEditTools,
     );
+  }
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getPlatformInt64();
   }
 
   @protected
@@ -3179,6 +3503,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_bool(deserializer));
     } else {
       return null;
     }
@@ -3352,6 +3687,93 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RetentionAccessView sse_decode_retention_access_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_sessionToken = sse_decode_String(deserializer);
+    var var_runId = sse_decode_String(deserializer);
+    var var_operationId = sse_decode_String(deserializer);
+    var var_workspaceId = sse_decode_String(deserializer);
+    var var_displayDirectory = sse_decode_String(deserializer);
+    return RetentionAccessView(
+      sessionToken: var_sessionToken,
+      runId: var_runId,
+      operationId: var_operationId,
+      workspaceId: var_workspaceId,
+      displayDirectory: var_displayDirectory,
+    );
+  }
+
+  @protected
+  RetentionInspectionView sse_decode_retention_inspection_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_sessionToken = sse_decode_String(deserializer);
+    var var_runId = sse_decode_String(deserializer);
+    var var_operationId = sse_decode_String(deserializer);
+    var var_path = sse_decode_String(deserializer);
+    var var_executionState = sse_decode_String(deserializer);
+    var var_staged = sse_decode_recovery_file_status_view(deserializer);
+    var var_original = sse_decode_recovery_file_status_view(deserializer);
+    var var_resourceActiveRecords = sse_decode_i_64(deserializer);
+    var var_resourceActiveReservedBytes = sse_decode_String(deserializer);
+    var var_ownerArchiveRecords = sse_decode_i_64(deserializer);
+    var var_ownerArchiveReservedBytes = sse_decode_String(deserializer);
+    var var_ownerArchiveLimitBytes = sse_decode_String(deserializer);
+    var var_ownerArchiveRecordLimit = sse_decode_i_64(deserializer);
+    var var_archivedReviewId = sse_decode_opt_String(deserializer);
+    var var_changedSinceArchival = sse_decode_opt_box_autoadd_bool(
+      deserializer,
+    );
+    return RetentionInspectionView(
+      sessionToken: var_sessionToken,
+      runId: var_runId,
+      operationId: var_operationId,
+      path: var_path,
+      executionState: var_executionState,
+      staged: var_staged,
+      original: var_original,
+      resourceActiveRecords: var_resourceActiveRecords,
+      resourceActiveReservedBytes: var_resourceActiveReservedBytes,
+      ownerArchiveRecords: var_ownerArchiveRecords,
+      ownerArchiveReservedBytes: var_ownerArchiveReservedBytes,
+      ownerArchiveLimitBytes: var_ownerArchiveLimitBytes,
+      ownerArchiveRecordLimit: var_ownerArchiveRecordLimit,
+      archivedReviewId: var_archivedReviewId,
+      changedSinceArchival: var_changedSinceArchival,
+    );
+  }
+
+  @protected
+  RetentionReviewView sse_decode_retention_review_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_sessionToken = sse_decode_String(deserializer);
+    var var_operationId = sse_decode_String(deserializer);
+    var var_reviewId = sse_decode_String(deserializer);
+    var var_digest = sse_decode_String(deserializer);
+    var var_path = sse_decode_String(deserializer);
+    var var_staged = sse_decode_recovery_file_status_view(deserializer);
+    var var_original = sse_decode_recovery_file_status_view(deserializer);
+    var var_archiveReservedBytes = sse_decode_String(deserializer);
+    var var_expiresAt = sse_decode_i_64(deserializer);
+    return RetentionReviewView(
+      sessionToken: var_sessionToken,
+      operationId: var_operationId,
+      reviewId: var_reviewId,
+      digest: var_digest,
+      path: var_path,
+      staged: var_staged,
+      original: var_original,
+      archiveReservedBytes: var_archiveReservedBytes,
+      expiresAt: var_expiresAt,
+    );
+  }
+
+  @protected
   RunPage sse_decode_run_page(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_runs = sse_decode_list_run_summary(deserializer);
@@ -3511,6 +3933,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_run_permission_selection(
     RunPermissionSelection self,
     SseSerializer serializer,
@@ -3592,6 +4020,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.runtimeSourceCommit, serializer);
     sse_encode_list_String(self.availableReadTools, serializer);
     sse_encode_list_String(self.availableEditTools, serializer);
+  }
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putPlatformInt64(self);
   }
 
   @protected
@@ -3722,6 +4156,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_bool(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_run_permission_selection(
     RunPermissionSelection? self,
     SseSerializer serializer,
@@ -3844,6 +4288,59 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.operationId, serializer);
     sse_encode_String(self.workspaceId, serializer);
     sse_encode_String(self.displayDirectory, serializer);
+  }
+
+  @protected
+  void sse_encode_retention_access_view(
+    RetentionAccessView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.sessionToken, serializer);
+    sse_encode_String(self.runId, serializer);
+    sse_encode_String(self.operationId, serializer);
+    sse_encode_String(self.workspaceId, serializer);
+    sse_encode_String(self.displayDirectory, serializer);
+  }
+
+  @protected
+  void sse_encode_retention_inspection_view(
+    RetentionInspectionView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.sessionToken, serializer);
+    sse_encode_String(self.runId, serializer);
+    sse_encode_String(self.operationId, serializer);
+    sse_encode_String(self.path, serializer);
+    sse_encode_String(self.executionState, serializer);
+    sse_encode_recovery_file_status_view(self.staged, serializer);
+    sse_encode_recovery_file_status_view(self.original, serializer);
+    sse_encode_i_64(self.resourceActiveRecords, serializer);
+    sse_encode_String(self.resourceActiveReservedBytes, serializer);
+    sse_encode_i_64(self.ownerArchiveRecords, serializer);
+    sse_encode_String(self.ownerArchiveReservedBytes, serializer);
+    sse_encode_String(self.ownerArchiveLimitBytes, serializer);
+    sse_encode_i_64(self.ownerArchiveRecordLimit, serializer);
+    sse_encode_opt_String(self.archivedReviewId, serializer);
+    sse_encode_opt_box_autoadd_bool(self.changedSinceArchival, serializer);
+  }
+
+  @protected
+  void sse_encode_retention_review_view(
+    RetentionReviewView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.sessionToken, serializer);
+    sse_encode_String(self.operationId, serializer);
+    sse_encode_String(self.reviewId, serializer);
+    sse_encode_String(self.digest, serializer);
+    sse_encode_String(self.path, serializer);
+    sse_encode_recovery_file_status_view(self.staged, serializer);
+    sse_encode_recovery_file_status_view(self.original, serializer);
+    sse_encode_String(self.archiveReservedBytes, serializer);
+    sse_encode_i_64(self.expiresAt, serializer);
   }
 
   @protected
