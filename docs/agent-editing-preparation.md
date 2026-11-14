@@ -33,6 +33,6 @@
 
 旧 Runtime216ca3d 的9项 Rust 宿主测试、严格 Clippy、21个组件测试与静态分析通过；原生6场景中5通过、编辑效果场景失败。独立签名沙盒探针已验证上述修复，服务端189 Runtime、7元数据测试与240共享制品测试通过。
 
-新固定版本的成对 FRB 已重新生成；模型组件清单为 `716511eb6796e1b2e3a19cc86682ab1ad2d84e53194d158418f684d5228c88f6`，开发签名、CPU、最低 macOS27.2、无测试权重。新固定版本完整桌面回归已通过：9项 Rust、严格 Clippy、21个组件测试、6项 macOS 原生场景，包含真实精确编辑和撤权排空。日志 desktop-edit-native-fixed.log，验证会话94984 exit0。实际托管模型流程仍在执行，随后需恢复默认 lib/main.dart 包。
+新固定版本的成对 FRB 已重新生成；模型组件清单为 `716511eb6796e1b2e3a19cc86682ab1ad2d84e53194d158418f684d5228c88f6`，开发签名、CPU、最低 macOS27.2、无测试权重。新固定版本完整桌面回归已通过：9项 Rust、严格 Clippy、21个组件测试、6项 macOS 原生场景，包含真实精确编辑和撤权排空。日志 desktop-edit-native-fixed.log，验证会话94984 exit0。实际固定0.5B托管模型的2项测试也通过：导入/启动/35秒空闲心跳、批准后真实读取与搜索、删除源后清除上下文、停止与Host关闭清理。默认 lib/main.dart 开发包已恢复，严格签名和嵌入组件校验通过，实际包内0个GGUF。日志 desktop-edit-managed-model.log 和 desktop-edit-default-restoration.log，分别18107/21333 exit0。
 
 native 测试的模型 HTTP 和选择器回调是明确夹具；实际 Rust/FRB、SQLite、沙盒文件效果是真实运行。组件测试证明状态和交互，不能证明 OS 选择器或真实推理。已有服务端7B精确编辑证据属于上一固定 Runtime 的单次任务，不等于新版本全面模型准入、桌面实际7B流程或 GPU 认证。
