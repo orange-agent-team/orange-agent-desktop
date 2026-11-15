@@ -6,6 +6,8 @@ import 'creation_panel.dart';
 import 'editing_panel.dart';
 import 'model_controller.dart';
 import 'model_panel.dart';
+import 'memory_controller.dart';
+import 'memory_panel.dart';
 import 'recovery_controller.dart';
 import 'recovery_panel.dart';
 import 'retention_controller.dart';
@@ -33,6 +35,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
   late final AgentController controller;
   late final RecoveryController recovery;
   late final RetentionController retention;
+  late final MemoryController memory;
   ModelController? models;
   List<WorkspaceView> workspaces = [];
   List<CreationAccessView> creations = [];
@@ -60,6 +63,8 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
     retention = RetentionController(
       NativeRetentionCommands(widget.host.handle),
     );
+    memory = MemoryController(NativeMemoryCommands(widget.host.handle));
+    memory.refresh();
     models?.configure();
   }
 
@@ -69,6 +74,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
     controller.dispose();
     recovery.dispose();
     retention.dispose();
+    memory.dispose();
     super.dispose();
   }
 
@@ -81,6 +87,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
           (old.sessionAccess && !current.single.sessionAccess)) {
         recovery.workspaceStopping(old.workspaceId);
         retention.workspaceStopping(old.workspaceId);
+        memory.workspaceStopping(old.workspaceId);
       }
     }
     setState(() => workspaces = rows);
@@ -110,6 +117,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
           controller.hideContent(stoppingWorkspace: id);
           recovery.workspaceStopping(id);
           retention.workspaceStopping(id);
+          memory.workspaceStopping(id);
         },
         onOpenRun: (run) {
           if (run.phase == 'recovery_required') {
@@ -152,6 +160,8 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
         controller: retention,
         supported: widget.host.availableEditTools.contains('apply_patch'),
       ),
+      const SizedBox(height: 16),
+      MemoryPanel(controller: memory, workspaces: workspaces),
       const SizedBox(height: 16),
       AgentPanel(
         controller: controller,
