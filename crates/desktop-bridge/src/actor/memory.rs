@@ -65,11 +65,9 @@ pub(crate) fn change(
             return Err(failure("MEMORY_FORBIDDEN"));
         }
         current.suspend();
-        if new_token.is_none()
-            && let Some(revoker) = &current.revoker
-        {
-            revoker.request_revoke();
-        }
+        // The selected session wakes this Host's in-flight work immediately.
+        // Scope-wide withdrawal happens after the owner mutation succeeds in
+        // Journal; a rejected quota/CAS request must not poison a live revision.
     }
     Ok(())
 }

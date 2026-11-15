@@ -392,6 +392,83 @@ pub(super) async fn exercise(h: &str) {
             .iter()
             .any(|m| m.principal == "collaborator" && m.access == "revoked")
     );
+    let mut full = mem::list_scopes(h.clone(), None, 100)
+        .await
+        .expect("shared metadata")
+        .scopes
+        .into_iter()
+        .find(|v| v.scope_id == "shared-memory")
+        .expect("shared");
+    for n in 0..62 {
+        full = mem::set_member(
+            h.clone(),
+            full.scope_id.clone(),
+            full.revision,
+            format!("member-{n}"),
+            "read".into(),
+        )
+        .await
+        .expect("fill owned ACL fixture");
+    }
+    let selected = mem::authorize_scope(
+        h.clone(),
+        full.scope_id.clone(),
+        full.revision.clone(),
+        "before-quota-failure".into(),
+        true,
+    )
+    .await
+    .expect("selected shared scope");
+    assert_eq!(
+        mem::set_member(
+            h.clone(),
+            full.scope_id.clone(),
+            full.revision.clone(),
+            "overflow-member".into(),
+            "read".into()
+        )
+        .await
+        .expect_err("quota refusal")
+        .code,
+        "MEMORY_LIMIT"
+    );
+    let restored = mem::authorize_scope(
+        h.clone(),
+        full.scope_id.clone(),
+        full.revision.clone(),
+        "after-quota-failure".into(),
+        true,
+    )
+    .await
+    .expect("rejected mutation does not poison durable revision");
+    assert_ne!(restored.session_token, selected.session_token);
+    let before = crate::actor::memory::capture(
+        &h,
+        &mem::MemorySelection {
+            scope_id: full.scope_id.clone(),
+            session_token: restored.session_token.clone(),
+            sources: mem::MemorySources {
+                workspace_ids: vec![],
+                memory_tokens: vec![],
+            },
+        },
+    )
+    .expect("live grant");
+    assert!(
+        mem::set_member(
+            h.clone(),
+            full.scope_id,
+            full.revision,
+            LOCAL_OWNER.into(),
+            "revoked".into()
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        before.check().is_ok(),
+        "invalid self-removal cannot revoke selection"
+    );
     let scopes = mem::list_scopes(h, None, 100).await.expect("directory");
     assert!(
         scopes

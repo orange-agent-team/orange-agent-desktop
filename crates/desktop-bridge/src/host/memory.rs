@@ -467,6 +467,9 @@ pub(crate) async fn set_member(
     principal: String,
     permission: String,
 ) -> Result<api::MemoryScopeView, BridgeError> {
+    if !orange_protocol::valid_id(&principal) || principal == LOCAL_OWNER {
+        return Err(failure("INVALID_MEMORY_REQUEST"));
+    }
     let access = match permission.as_str() {
         "read" => store::MemoryAccess::Read,
         "write" => store::MemoryAccess::Write,
