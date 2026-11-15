@@ -7,9 +7,15 @@ from pathlib import Path
 import subprocess
 import sys
 from environment import ROOT,APP,tool_environment
+from bridge_surface import verify_surface
 parser=argparse.ArgumentParser();parser.add_argument('--native',action='store_true');args=parser.parse_args()
 subprocess.run([sys.executable,str(ROOT/'scripts/import-runtime.py'),'--verify'],check=True)
 manifest=json.loads((ROOT/'config/generated-bridge.lock.json').read_text())
+verify_surface(ROOT,APP,json.loads((ROOT/'config/bridge-tools.lock.json').read_text()))
+subprocess.run([sys.executable,str(ROOT/'scripts/check-bridge-surface.py')],check=True)
+actual_api={str(p.relative_to(ROOT)) for p in (ROOT/'crates/desktop-bridge/src/api').rglob('*.rs')}
+recorded_api={name for name in manifest['source_sha256'] if name.startswith('crates/desktop-bridge/src/api/')}
+if actual_api!=recorded_api:raise SystemExit('Stale bridge API input inventory')
 for group in ['source_sha256','generated_sha256']:
     for name,sha in manifest[group].items():
         if hashlib.sha256((ROOT/name).read_bytes()).hexdigest()!=sha:raise SystemExit('Stale bridge generation: '+name)

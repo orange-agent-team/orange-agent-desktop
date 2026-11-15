@@ -1,0 +1,41 @@
+# E03 内部文件安全属性包
+
+`orange-platform-files` 是 Agent Runtime 的内部支持库，不是新服务、核心工程或仓库。服务端 Cargo workspace 由 6 个 package 增加到 7 个；共享 Runtime 源码制品由 4 个 package 增加到 5 个。11 个核心工程的产品划分不变。新增的本地 package 必须出现在 Cargo.lock、共享源码清单和消费者锁定成员中；未引入新的第三方包身份。
+
+## 已实现边界
+
+只接受已打开、借用期间保持有效的文件描述符，不打开环境路径，不执行命令，不授予文件权限。读取 owner/group/mode、扩展属性和 macOS ACL/flags，生成有长度分隔的 SHA-256 摘要。属性名总长 16 KiB，单值 64 KiB，总值及名称 256 KiB，最多 128 项，ACL 64 KiB；超限、权限拒绝、读取错误和可观察到的并发变化均返回错误。
+
+`copy_security_metadata` 要求不同的单链接普通文件。调用方只能把目标设为尚未发布的自有暂存文件；失败可能已修改暂存文件的部分属性，不能将其视作可发布结果。文件内容不复制。完成后比较源与目标的全部已建模属性；不一致则拒绝。调用方写入内容后仍须重新验证，不能将一次成功视作永久保证，也不能把这个函数当作文件内容原子 CAS。
+
+`copy_publication_metadata` 是显式的暂存发布政策，严格复制 API 的逐字节语义不变。它保留沙盒为新文件生成的较新 quarantine 时间戳，仅接受已识别的四字段标签格式，安全标记、隔离应用及事件标识必须原样相等，时间不能倒退或在未来。owner/group/mode/flags/ACL 和所有其他 xattr 仍须精确一致。源文件的完整快照必须未变；返回的是目标的真实完整快照，其摘要绑定后续发布与恢复，绝不把源摘要冒充为目标摘要。对于无标签源，只允许保留复制前已观察到的原生暂存标签；移除、改写、未知格式或安全位变化均拒绝。仍不能声称所有macOS文件属性均受支持。
+
+2026-11-14 的独立签名 App Sandbox 探针复现：`fcopyfile(SECURITY|XATTR)` 后只有 quarantine 时间戳改变，直接原样设置被系统以 EPERM 拒绝。实现保留系统结果，不调用属性删除或改写作为补救。Apple 的 [时间戳定义](https://developer.apple.com/documentation/coreservices/klsquarantinetimestampkey?language=objc)、[Launch Services 属性说明](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/LaunchServicesKeys.html)及 [copyfile 源码](https://github.com/apple-oss-distributions/copyfile/blob/main/copyfile.c)支持对时间信息和安全标记分别处理；四字段编码的兼容范围由本机探针与严格解析限定，未宣称它是 Apple 保证永不变化的公开格式。
+
+macOS 使用公开 `fcopyfile` 的 SECURITY/XATTR 标志，通过独占 RAII 状态调用，不设置 DATA。ACL 只在极小的 Apple FFI 模块内读取；缓冲区按 C long 对齐、限制容量，native allocation 在所有返回路径释放。包默认 deny unsafe，只有该模块允许逐处说明的 unsafe；其他 workspace 包保持 forbid unsafe。
+
+Darwin 的 `acl_get_fd` 在 FILESEC_ACL 属性不存在时可返回 ENOENT。仅在该 fd API 返回 ENOENT 且同一个借用 fd 再次 fstat 成功时表示无扩展 ACL；其他 errno 原样报错，路径 API 不适用此规则。依据是 Apple 的 [acl_file.c](https://github.com/apple-oss-distributions/Libc/blob/main/posix1e/acl_file.c) 与 [filesec.c](https://github.com/apple-oss-distributions/Libc/blob/main/gen/filesec.c)，于 2026-11-08 查阅；仅使用公开 ABI 和行为，未复制实现代码。
+
+## Runtime / 发行集成
+
+现有文件编辑预览绑定 security_digest；重验时 owner/group/mode、ACL 或 xattr 变化都会使旧预览不可复用。此包只处理属性；E03 的独立 Apple publisher 已在真实临时文件上验证发布和保留旧 inode。Runtime 已有独立恢复决策、受限原件归档、源版本转换及普通 Agent 编辑调用；桌面恢复批准已在主线64748cd的消费者接入；原件管理和完整数据退出仍待完成。这里的属性复制成功不代表上述产品流程已全部验收。
+
+共享导出只从不可变 Git 提交提取此包，并以明确成员形式记录；旧提交无此包时仍导出原四成员。消费者必须锁定新归档及清单摘要，普通构建不能引用相邻仓库源码。
+
+## 证据与限制
+
+本机 macOS 实际临时文件覆盖：普通/扩展 ACL、mode/xattr 复制但内容不复制、同 inode 拒绝、硬链接目标拒绝、超限拒绝且目标不变、无 ACL 的已 unlink 但仍打开文件、ACL/xattr 摘要变化。Runtime 另外验证安全属性改变后旧预览拒绝。
+
+Linux 路径有 fd ownership/xattr/mode 实现，尚未做目标编译或运行验证；尚未覆盖 Linux inode flags、文件能力等完整发布政策，因此不能据此开放 Linux 编辑发布。Windows 尚无此包后端。macOS immutable/append-only flags 等若不能精确保留则拒绝，未以该路径宣称这些 flags 可复制。继承 ACL 不一致也拒绝。各文件系统的并发一致性、配额、断电持久性和跨设备发布保证不由本包提供。
+
+## 外部源文件与原件捕获见证（schema17候选）
+
+发布复制保留新暂存复制前已存在的quarantine标签；源与所有其他安全属性严格一致，删除初始标签不会因为让两边快照相等而通过。完整沙盒实测还发现rename原件时OS也会添加标签，所以Runtime在捕获前持久化NativeCaptureWitness，并在捕获后记录实际安全摘要。
+
+见证只含已批准源安全摘要、原生标签权限字段摘要与时间下界，不存属性明文；它不是读写能力。源原本有标签时不能生成“新增标签”见证。验证要求当前对象移除新增标签后的完整安全摘要等于原源摘要，标签flags/agent/event身份摘要匹配，时间不倒退或位于未来。inode、内容、mtime等由Runtime既有身份校验继续约束。
+
+schema17的不可变表把见证与stage2原子提交、把实际保留原件摘要与stage4原子提交。版本边同时绑定实际原件身份；恢复和历史重验均使用同一证据，不能忽略quarantine。stage3后中断、尚无stage4时仍可凭先存见证识别原件；缺证据或其他安全属性变化则拒绝。恢复发布暂存也要求安全摘要等于stage2记录，不以内容匹配替代权限校验。
+
+194项Runtime、9项metadata及严格Clippy通过。实际签名沙盒CLI覆盖六场景，包括连续编辑/重开、读取权限不升级、撤权、实际效果后回执失败不重放、捕获后立刻中断不自动恢复。模型HTTP为明确替身；专用测试容器中的源文件由沙盒外驱动创建，无原生标签。仍需固定制品导出、桌面消费及目标环境验证，未声称人工系统选择器或所有文件系统兼容。
+
+参照[Apple隔离属性说明](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/LaunchServicesKeys.html#//apple_ref/doc/uid/20001431-113253)。实现没有关闭沙盒、设置隔离排除路径或删除/重写安全标签。

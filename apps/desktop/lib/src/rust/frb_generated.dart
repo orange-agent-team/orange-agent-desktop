@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/host.dart';
+import 'api/memory.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -69,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -579676043;
+  int get rustContentHash => -1444186705;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -100,6 +101,13 @@ abstract class RustLibApi extends BaseApi {
     required String runId,
     required String operationId,
     required String expectedDigest,
+  });
+
+  Future<MemoryOutcome> crateApiMemoryApproveEdit({
+    required String handle,
+    required MemorySelection selection,
+    required String draftId,
+    required String approvalDigest,
   });
 
   Future<AgentRunView> crateApiHostApproveEditingTool({
@@ -221,6 +229,14 @@ abstract class RustLibApi extends BaseApi {
     required String selectedDirectory,
   });
 
+  Future<MemoryAccessView> crateApiMemoryAuthorizeScope({
+    required String handle,
+    required String scopeId,
+    required String revision,
+    required String requestId,
+    required bool write,
+  });
+
   Future<WorkspaceView> crateApiHostAuthorizeWorkspace({
     required String handle,
     required String requestId,
@@ -256,6 +272,12 @@ abstract class RustLibApi extends BaseApi {
     required String selectedDirectory,
   });
 
+  Future<MemoryScopeView> crateApiMemoryCreateScope({
+    required String handle,
+    required String scopeId,
+    required bool shared,
+  });
+
   Future<ModelConnectionView> crateApiHostCurrentModelConnection({
     required String handle,
   });
@@ -272,6 +294,12 @@ abstract class RustLibApi extends BaseApi {
 
   Future<HostView> crateApiHostInitializeHost({
     required String applicationDataDirectory,
+  });
+
+  Future<MemoryOutcome?> crateApiMemoryInspectEdit({
+    required String handle,
+    required String scopeId,
+    required String requestId,
   });
 
   Future<ExportInspectionView> crateApiHostInspectExportFiles({
@@ -341,6 +369,14 @@ abstract class RustLibApi extends BaseApi {
     required String workspaceId,
   });
 
+  Future<MemoryPage> crateApiMemoryListEntries({
+    required String handle,
+    required MemorySelection selection,
+    String? cursor,
+    required int limit,
+    required bool includeDisabled,
+  });
+
   Future<List<ExportOutcomeView>> crateApiHostListExportOutcomes({
     required String handle,
     required String runId,
@@ -368,6 +404,14 @@ abstract class RustLibApi extends BaseApi {
     required int limit,
   });
 
+  Future<MemoryMemberPage> crateApiMemoryListMembers({
+    required String handle,
+    required String scopeId,
+    required String revision,
+    String? cursor,
+    required int limit,
+  });
+
   Future<List<String>> crateApiHostListRetainedEdits({
     required String handle,
     required String runId,
@@ -382,6 +426,12 @@ abstract class RustLibApi extends BaseApi {
     required int limit,
   });
 
+  Future<MemoryScopePage> crateApiMemoryListScopes({
+    required String handle,
+    String? cursor,
+    required int limit,
+  });
+
   Future<List<String>> crateApiHostListUnresolvedEdits({
     required String handle,
     required String runId,
@@ -392,6 +442,12 @@ abstract class RustLibApi extends BaseApi {
   Future<List<WorkspaceView>> crateApiHostListWorkspaces({
     required String handle,
     required bool includeRevoked,
+  });
+
+  Future<MemoryReview> crateApiMemoryPrepareEdit({
+    required String handle,
+    required MemorySelection selection,
+    required MemoryEdit edit,
   });
 
   Future<ExportReviewView> crateApiHostPrepareExport({
@@ -437,9 +493,25 @@ abstract class RustLibApi extends BaseApi {
     required String operationId,
   });
 
+  Future<MemoryEntry> crateApiMemoryReadEntry({
+    required String handle,
+    required MemorySelection selection,
+    required String entryId,
+    String? expectedVersion,
+    required int startByte,
+    required int maxBytes,
+    required bool includeDisabled,
+  });
+
   Future<WorkspaceView> crateApiHostRestoreWorkspaceAccess({
     required String handle,
     required String workspaceId,
+  });
+
+  Future<MemoryReview> crateApiMemoryReviewEdit({
+    required String handle,
+    required MemorySelection selection,
+    required String draftId,
   });
 
   Future<void> crateApiHostRevokeCreationAccess({
@@ -458,6 +530,21 @@ abstract class RustLibApi extends BaseApi {
     required String handle,
     required String workspaceId,
     required String expectedVersion,
+  });
+
+  Future<MemoryScopeView> crateApiMemorySetMember({
+    required String handle,
+    required String scopeId,
+    required String revision,
+    required String principal,
+    required String access,
+  });
+
+  Future<MemoryScopeView> crateApiMemorySetScopeEnabled({
+    required String handle,
+    required String scopeId,
+    required String revision,
+    required bool enabled,
   });
 
   Future<AgentRunView> crateApiHostStartCreationRun({
@@ -502,6 +589,11 @@ abstract class RustLibApi extends BaseApi {
   Future<ModelServiceView> crateApiHostStopModelService({
     required String handle,
     required String instanceId,
+  });
+
+  Future<void> crateApiMemorySuspendAccess({
+    required String handle,
+    required String requestId,
   });
 
   Future<void> crateApiHostSuspendCreationSelection({
@@ -697,6 +789,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<MemoryOutcome> crateApiMemoryApproveEdit({
+    required String handle,
+    required MemorySelection selection,
+    required String draftId,
+    required String approvalDigest,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_box_autoadd_memory_selection(selection, serializer);
+          sse_encode_String(draftId, serializer);
+          sse_encode_String(approvalDigest, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_outcome,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryApproveEditConstMeta,
+        argValues: [handle, selection, draftId, approvalDigest],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryApproveEditConstMeta => const TaskConstMeta(
+    debugName: "approve_edit",
+    argNames: ["handle", "selection", "draftId", "approvalDigest"],
+  );
+
+  @override
   Future<AgentRunView> crateApiHostApproveEditingTool({
     required String handle,
     required String runId,
@@ -714,7 +844,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 5,
             port: port_,
           );
         },
@@ -753,7 +883,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 6,
             port: port_,
           );
         },
@@ -791,7 +921,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 7,
             port: port_,
           );
         },
@@ -830,7 +960,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 8,
             port: port_,
           );
         },
@@ -871,7 +1001,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 9,
             port: port_,
           );
         },
@@ -922,7 +1052,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 10,
             port: port_,
           );
         },
@@ -961,7 +1091,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 11,
             port: port_,
           );
         },
@@ -999,7 +1129,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 12,
             port: port_,
           );
         },
@@ -1038,7 +1168,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 13,
             port: port_,
           );
         },
@@ -1077,7 +1207,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 14,
             port: port_,
           );
         },
@@ -1125,7 +1255,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 15,
             port: port_,
           );
         },
@@ -1178,7 +1308,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 16,
             port: port_,
           );
         },
@@ -1222,7 +1352,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 17,
             port: port_,
           );
         },
@@ -1270,7 +1400,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 18,
             port: port_,
           );
         },
@@ -1323,7 +1453,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 19,
             port: port_,
           );
         },
@@ -1371,7 +1501,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 20,
             port: port_,
           );
         },
@@ -1407,6 +1537,47 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<MemoryAccessView> crateApiMemoryAuthorizeScope({
+    required String handle,
+    required String scopeId,
+    required String revision,
+    required String requestId,
+    required bool write,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(scopeId, serializer);
+          sse_encode_String(revision, serializer);
+          sse_encode_String(requestId, serializer);
+          sse_encode_bool(write, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_access_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryAuthorizeScopeConstMeta,
+        argValues: [handle, scopeId, revision, requestId, write],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryAuthorizeScopeConstMeta =>
+      const TaskConstMeta(
+        debugName: "authorize_scope",
+        argNames: ["handle", "scopeId", "revision", "requestId", "write"],
+      );
+
+  @override
   Future<WorkspaceView> crateApiHostAuthorizeWorkspace({
     required String handle,
     required String requestId,
@@ -1422,7 +1593,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1457,7 +1628,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1492,7 +1663,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1522,7 +1693,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1554,7 +1725,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1593,7 +1764,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1628,7 +1799,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1650,6 +1821,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<MemoryScopeView> crateApiMemoryCreateScope({
+    required String handle,
+    required String scopeId,
+    required bool shared,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(scopeId, serializer);
+          sse_encode_bool(shared, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 29,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_scope_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryCreateScopeConstMeta,
+        argValues: [handle, scopeId, shared],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryCreateScopeConstMeta => const TaskConstMeta(
+    debugName: "create_scope",
+    argNames: ["handle", "scopeId", "shared"],
+  );
+
+  @override
   Future<ModelConnectionView> crateApiHostCurrentModelConnection({
     required String handle,
   }) {
@@ -1661,7 +1868,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1692,7 +1899,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1729,7 +1936,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 32,
             port: port_,
           );
         },
@@ -1758,7 +1965,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1788,7 +1995,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1809,6 +2016,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<MemoryOutcome?> crateApiMemoryInspectEdit({
+    required String handle,
+    required String scopeId,
+    required String requestId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(scopeId, serializer);
+          sse_encode_String(requestId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 35,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_memory_outcome,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryInspectEditConstMeta,
+        argValues: [handle, scopeId, requestId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryInspectEditConstMeta => const TaskConstMeta(
+    debugName: "inspect_edit",
+    argNames: ["handle", "scopeId", "requestId"],
+  );
+
+  @override
   Future<ExportInspectionView> crateApiHostInspectExportFiles({
     required String handle,
     required String sessionToken,
@@ -1822,7 +2065,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1861,7 +2104,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1898,7 +2141,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1935,7 +2178,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1966,7 +2209,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1996,7 +2239,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 41,
             port: port_,
           );
         },
@@ -2031,7 +2274,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 42,
             port: port_,
           );
         },
@@ -2068,7 +2311,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 43,
             port: port_,
           );
         },
@@ -2103,7 +2346,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 44,
             port: port_,
           );
         },
@@ -2140,7 +2383,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 45,
             port: port_,
           );
         },
@@ -2175,7 +2418,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 46,
             port: port_,
           );
         },
@@ -2209,7 +2452,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 47,
             port: port_,
           );
         },
@@ -2244,7 +2487,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 48,
             port: port_,
           );
         },
@@ -2266,6 +2509,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<MemoryPage> crateApiMemoryListEntries({
+    required String handle,
+    required MemorySelection selection,
+    String? cursor,
+    required int limit,
+    required bool includeDisabled,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_box_autoadd_memory_selection(selection, serializer);
+          sse_encode_opt_String(cursor, serializer);
+          sse_encode_u_16(limit, serializer);
+          sse_encode_bool(includeDisabled, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 49,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_page,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryListEntriesConstMeta,
+        argValues: [handle, selection, cursor, limit, includeDisabled],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryListEntriesConstMeta => const TaskConstMeta(
+    debugName: "list_entries",
+    argNames: ["handle", "selection", "cursor", "limit", "includeDisabled"],
+  );
+
+  @override
   Future<List<ExportOutcomeView>> crateApiHostListExportOutcomes({
     required String handle,
     required String runId,
@@ -2285,7 +2568,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 45,
+            funcId: 50,
             port: port_,
           );
         },
@@ -2329,7 +2612,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 46,
+            funcId: 51,
             port: port_,
           );
         },
@@ -2379,7 +2662,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 47,
+            funcId: 52,
             port: port_,
           );
         },
@@ -2408,6 +2691,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<MemoryMemberPage> crateApiMemoryListMembers({
+    required String handle,
+    required String scopeId,
+    required String revision,
+    String? cursor,
+    required int limit,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(scopeId, serializer);
+          sse_encode_String(revision, serializer);
+          sse_encode_opt_String(cursor, serializer);
+          sse_encode_u_16(limit, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 53,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_member_page,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryListMembersConstMeta,
+        argValues: [handle, scopeId, revision, cursor, limit],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryListMembersConstMeta => const TaskConstMeta(
+    debugName: "list_members",
+    argNames: ["handle", "scopeId", "revision", "cursor", "limit"],
+  );
+
+  @override
   Future<List<String>> crateApiHostListRetainedEdits({
     required String handle,
     required String runId,
@@ -2425,7 +2748,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 48,
+            funcId: 54,
             port: port_,
           );
         },
@@ -2464,7 +2787,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 49,
+            funcId: 55,
             port: port_,
           );
         },
@@ -2485,6 +2808,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<MemoryScopePage> crateApiMemoryListScopes({
+    required String handle,
+    String? cursor,
+    required int limit,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_opt_String(cursor, serializer);
+          sse_encode_u_16(limit, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 56,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_scope_page,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryListScopesConstMeta,
+        argValues: [handle, cursor, limit],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryListScopesConstMeta => const TaskConstMeta(
+    debugName: "list_scopes",
+    argNames: ["handle", "cursor", "limit"],
+  );
+
+  @override
   Future<List<String>> crateApiHostListUnresolvedEdits({
     required String handle,
     required String runId,
@@ -2502,7 +2861,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 50,
+            funcId: 57,
             port: port_,
           );
         },
@@ -2537,7 +2896,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 51,
+            funcId: 58,
             port: port_,
           );
         },
@@ -2555,6 +2914,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiHostListWorkspacesConstMeta => const TaskConstMeta(
     debugName: "list_workspaces",
     argNames: ["handle", "includeRevoked"],
+  );
+
+  @override
+  Future<MemoryReview> crateApiMemoryPrepareEdit({
+    required String handle,
+    required MemorySelection selection,
+    required MemoryEdit edit,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_box_autoadd_memory_selection(selection, serializer);
+          sse_encode_box_autoadd_memory_edit(edit, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 59,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_review,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryPrepareEditConstMeta,
+        argValues: [handle, selection, edit],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryPrepareEditConstMeta => const TaskConstMeta(
+    debugName: "prepare_edit",
+    argNames: ["handle", "selection", "edit"],
   );
 
   @override
@@ -2577,7 +2972,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 52,
+            funcId: 60,
             port: port_,
           );
         },
@@ -2617,7 +3012,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 53,
+            funcId: 61,
             port: port_,
           );
         },
@@ -2662,7 +3057,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 54,
+            funcId: 62,
             port: port_,
           );
         },
@@ -2703,7 +3098,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 55,
+            funcId: 63,
             port: port_,
           );
         },
@@ -2752,7 +3147,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 56,
+            funcId: 64,
             port: port_,
           );
         },
@@ -2789,7 +3184,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 57,
+            funcId: 65,
             port: port_,
           );
         },
@@ -2811,6 +3206,66 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<MemoryEntry> crateApiMemoryReadEntry({
+    required String handle,
+    required MemorySelection selection,
+    required String entryId,
+    String? expectedVersion,
+    required int startByte,
+    required int maxBytes,
+    required bool includeDisabled,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_box_autoadd_memory_selection(selection, serializer);
+          sse_encode_String(entryId, serializer);
+          sse_encode_opt_String(expectedVersion, serializer);
+          sse_encode_u_32(startByte, serializer);
+          sse_encode_u_32(maxBytes, serializer);
+          sse_encode_bool(includeDisabled, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 66,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_entry,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryReadEntryConstMeta,
+        argValues: [
+          handle,
+          selection,
+          entryId,
+          expectedVersion,
+          startByte,
+          maxBytes,
+          includeDisabled,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryReadEntryConstMeta => const TaskConstMeta(
+    debugName: "read_entry",
+    argNames: [
+      "handle",
+      "selection",
+      "entryId",
+      "expectedVersion",
+      "startByte",
+      "maxBytes",
+      "includeDisabled",
+    ],
+  );
+
+  @override
   Future<WorkspaceView> crateApiHostRestoreWorkspaceAccess({
     required String handle,
     required String workspaceId,
@@ -2824,7 +3279,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 58,
+            funcId: 67,
             port: port_,
           );
         },
@@ -2846,6 +3301,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<MemoryReview> crateApiMemoryReviewEdit({
+    required String handle,
+    required MemorySelection selection,
+    required String draftId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_box_autoadd_memory_selection(selection, serializer);
+          sse_encode_String(draftId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 68,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_review,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemoryReviewEditConstMeta,
+        argValues: [handle, selection, draftId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemoryReviewEditConstMeta => const TaskConstMeta(
+    debugName: "review_edit",
+    argNames: ["handle", "selection", "draftId"],
+  );
+
+  @override
   Future<void> crateApiHostRevokeCreationAccess({
     required String handle,
     required String consentId,
@@ -2861,7 +3352,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 59,
+            funcId: 69,
             port: port_,
           );
         },
@@ -2898,7 +3389,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 60,
+            funcId: 70,
             port: port_,
           );
         },
@@ -2935,7 +3426,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 61,
+            funcId: 71,
             port: port_,
           );
         },
@@ -2954,6 +3445,85 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: "revoke_workspace",
         argNames: ["handle", "workspaceId", "expectedVersion"],
+      );
+
+  @override
+  Future<MemoryScopeView> crateApiMemorySetMember({
+    required String handle,
+    required String scopeId,
+    required String revision,
+    required String principal,
+    required String access,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(scopeId, serializer);
+          sse_encode_String(revision, serializer);
+          sse_encode_String(principal, serializer);
+          sse_encode_String(access, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 72,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_scope_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemorySetMemberConstMeta,
+        argValues: [handle, scopeId, revision, principal, access],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemorySetMemberConstMeta => const TaskConstMeta(
+    debugName: "set_member",
+    argNames: ["handle", "scopeId", "revision", "principal", "access"],
+  );
+
+  @override
+  Future<MemoryScopeView> crateApiMemorySetScopeEnabled({
+    required String handle,
+    required String scopeId,
+    required String revision,
+    required bool enabled,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(scopeId, serializer);
+          sse_encode_String(revision, serializer);
+          sse_encode_bool(enabled, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 73,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_scope_view,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemorySetScopeEnabledConstMeta,
+        argValues: [handle, scopeId, revision, enabled],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemorySetScopeEnabledConstMeta =>
+      const TaskConstMeta(
+        debugName: "set_scope_enabled",
+        argNames: ["handle", "scopeId", "revision", "enabled"],
       );
 
   @override
@@ -2980,7 +3550,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 62,
+            funcId: 74,
             port: port_,
           );
         },
@@ -3044,7 +3614,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 63,
+            funcId: 75,
             port: port_,
           );
         },
@@ -3099,7 +3669,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 64,
+            funcId: 76,
             port: port_,
           );
         },
@@ -3134,7 +3704,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 65,
+            funcId: 77,
             port: port_,
           );
         },
@@ -3173,7 +3743,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 66,
+            funcId: 78,
             port: port_,
           );
         },
@@ -3207,7 +3777,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 67,
+            funcId: 79,
             port: port_,
           );
         },
@@ -3229,6 +3799,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiMemorySuspendAccess({
+    required String handle,
+    required String requestId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(handle, serializer);
+          sse_encode_String(requestId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 80,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_bridge_error,
+        ),
+        constMeta: kCrateApiMemorySuspendAccessConstMeta,
+        argValues: [handle, requestId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMemorySuspendAccessConstMeta =>
+      const TaskConstMeta(
+        debugName: "suspend_access",
+        argNames: ["handle", "requestId"],
+      );
+
+  @override
   Future<void> crateApiHostSuspendCreationSelection({
     required String handle,
     required String requestId,
@@ -3242,7 +3847,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 68,
+            funcId: 81,
             port: port_,
           );
         },
@@ -3277,7 +3882,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 69,
+            funcId: 82,
             port: port_,
           );
         },
@@ -3312,7 +3917,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 70,
+            funcId: 83,
             port: port_,
           );
         },
@@ -3347,7 +3952,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 71,
+            funcId: 84,
             port: port_,
           );
         },
@@ -3382,7 +3987,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 72,
+            funcId: 85,
             port: port_,
           );
         },
@@ -3417,7 +4022,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 73,
+            funcId: 86,
             port: port_,
           );
         },
@@ -3452,7 +4057,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 74,
+            funcId: 87,
             port: port_,
           );
         },
@@ -3487,7 +4092,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 75,
+            funcId: 88,
             port: port_,
           );
         },
@@ -3522,7 +4127,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 76,
+            funcId: 89,
             port: port_,
           );
         },
@@ -3559,7 +4164,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 77,
+            funcId: 90,
             port: port_,
           );
         },
@@ -3594,7 +4199,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 78,
+            funcId: 91,
             port: port_,
           );
         },
@@ -3629,7 +4234,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 79,
+            funcId: 92,
             port: port_,
           );
         },
@@ -3704,6 +4309,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ExportOutcomeView dco_decode_box_autoadd_export_outcome_view(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_export_outcome_view(raw);
+  }
+
+  @protected
+  MemoryEdit dco_decode_box_autoadd_memory_edit(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_memory_edit(raw);
+  }
+
+  @protected
+  MemoryEntry dco_decode_box_autoadd_memory_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_memory_entry(raw);
+  }
+
+  @protected
+  MemoryOutcome dco_decode_box_autoadd_memory_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_memory_outcome(raw);
+  }
+
+  @protected
+  MemorySelection dco_decode_box_autoadd_memory_selection(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_memory_selection(raw);
   }
 
   @protected
@@ -4128,6 +4757,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<MemoryMemberView> dco_decode_list_memory_member_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_memory_member_view).toList();
+  }
+
+  @protected
+  List<MemoryScopeView> dco_decode_list_memory_scope_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_memory_scope_view).toList();
+  }
+
+  @protected
+  List<MemorySummary> dco_decode_list_memory_summary(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_memory_summary).toList();
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
@@ -4155,6 +4802,210 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<WorkspaceView> dco_decode_list_workspace_view(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_workspace_view).toList();
+  }
+
+  @protected
+  MemoryAccessView dco_decode_memory_access_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return MemoryAccessView(
+      scopeId: dco_decode_String(arr[0]),
+      revision: dco_decode_String(arr[1]),
+      sessionToken: dco_decode_String(arr[2]),
+      write: dco_decode_bool(arr[3]),
+    );
+  }
+
+  @protected
+  MemoryEdit dco_decode_memory_edit(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return MemoryEdit(
+      requestId: dco_decode_String(arr[0]),
+      entryId: dco_decode_String(arr[1]),
+      expectedVersion: dco_decode_opt_String(arr[2]),
+      delete: dco_decode_bool(arr[3]),
+      title: dco_decode_opt_String(arr[4]),
+      content: dco_decode_opt_String(arr[5]),
+      enabled: dco_decode_opt_box_autoadd_bool(arr[6]),
+    );
+  }
+
+  @protected
+  MemoryEntry dco_decode_memory_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    return MemoryEntry(
+      scopeId: dco_decode_String(arr[0]),
+      entryId: dco_decode_String(arr[1]),
+      version: dco_decode_String(arr[2]),
+      title: dco_decode_String(arr[3]),
+      content: dco_decode_String(arr[4]),
+      enabled: dco_decode_bool(arr[5]),
+      origin: dco_decode_String(arr[6]),
+      sourceActor: dco_decode_String(arr[7]),
+      sourceRun: dco_decode_String(arr[8]),
+      totalBytes: dco_decode_String(arr[9]),
+      startByte: dco_decode_String(arr[10]),
+      nextByte: dco_decode_opt_String(arr[11]),
+    );
+  }
+
+  @protected
+  MemoryMemberPage dco_decode_memory_member_page(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return MemoryMemberPage(
+      scopeId: dco_decode_String(arr[0]),
+      revision: dco_decode_String(arr[1]),
+      members: dco_decode_list_memory_member_view(arr[2]),
+      nextCursor: dco_decode_opt_String(arr[3]),
+    );
+  }
+
+  @protected
+  MemoryMemberView dco_decode_memory_member_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return MemoryMemberView(
+      principal: dco_decode_String(arr[0]),
+      access: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  MemoryOutcome dco_decode_memory_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return MemoryOutcome(
+      draftId: dco_decode_String(arr[0]),
+      scopeId: dco_decode_String(arr[1]),
+      entryId: dco_decode_String(arr[2]),
+      digest: dco_decode_String(arr[3]),
+      state: dco_decode_String(arr[4]),
+      resultVersion: dco_decode_opt_String(arr[5]),
+    );
+  }
+
+  @protected
+  MemoryPage dco_decode_memory_page(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return MemoryPage(
+      scopeId: dco_decode_String(arr[0]),
+      entries: dco_decode_list_memory_summary(arr[1]),
+      nextCursor: dco_decode_opt_String(arr[2]),
+      omittedUnavailable: dco_decode_bool(arr[3]),
+      scanLimited: dco_decode_bool(arr[4]),
+    );
+  }
+
+  @protected
+  MemoryReview dco_decode_memory_review(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    return MemoryReview(
+      draftId: dco_decode_String(arr[0]),
+      scopeId: dco_decode_String(arr[1]),
+      entryId: dco_decode_String(arr[2]),
+      expectedVersion: dco_decode_opt_String(arr[3]),
+      approvalDigest: dco_decode_String(arr[4]),
+      sourceRun: dco_decode_String(arr[5]),
+      title: dco_decode_opt_String(arr[6]),
+      content: dco_decode_opt_String(arr[7]),
+      enabled: dco_decode_opt_box_autoadd_bool(arr[8]),
+      delete: dco_decode_bool(arr[9]),
+      expiresAt: dco_decode_String(arr[10]),
+      prior: dco_decode_opt_box_autoadd_memory_entry(arr[11]),
+    );
+  }
+
+  @protected
+  MemoryScopePage dco_decode_memory_scope_page(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return MemoryScopePage(
+      scopes: dco_decode_list_memory_scope_view(arr[0]),
+      nextCursor: dco_decode_opt_String(arr[1]),
+    );
+  }
+
+  @protected
+  MemoryScopeView dco_decode_memory_scope_view(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return MemoryScopeView(
+      scopeId: dco_decode_String(arr[0]),
+      owner: dco_decode_String(arr[1]),
+      shared: dco_decode_bool(arr[2]),
+      revision: dco_decode_String(arr[3]),
+      enabled: dco_decode_bool(arr[4]),
+      access: dco_decode_String(arr[5]),
+      canAdminister: dco_decode_bool(arr[6]),
+      sessionToken: dco_decode_opt_String(arr[7]),
+      sessionWrite: dco_decode_bool(arr[8]),
+    );
+  }
+
+  @protected
+  MemorySelection dco_decode_memory_selection(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return MemorySelection(
+      scopeId: dco_decode_String(arr[0]),
+      sessionToken: dco_decode_String(arr[1]),
+      sources: dco_decode_memory_sources(arr[2]),
+    );
+  }
+
+  @protected
+  MemorySources dco_decode_memory_sources(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return MemorySources(
+      workspaceIds: dco_decode_list_String(arr[0]),
+      memoryTokens: dco_decode_list_String(arr[1]),
+    );
+  }
+
+  @protected
+  MemorySummary dco_decode_memory_summary(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return MemorySummary(
+      entryId: dco_decode_String(arr[0]),
+      version: dco_decode_String(arr[1]),
+      title: dco_decode_String(arr[2]),
+      enabled: dco_decode_bool(arr[3]),
+      origin: dco_decode_String(arr[4]),
+      contentBytes: dco_decode_String(arr[5]),
+    );
   }
 
   @protected
@@ -4215,6 +5066,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_export_outcome_view(raw);
+  }
+
+  @protected
+  MemoryEntry? dco_decode_opt_box_autoadd_memory_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_memory_entry(raw);
+  }
+
+  @protected
+  MemoryOutcome? dco_decode_opt_box_autoadd_memory_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_memory_outcome(raw);
   }
 
   @protected
@@ -4589,6 +5452,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_export_outcome_view(deserializer));
+  }
+
+  @protected
+  MemoryEdit sse_decode_box_autoadd_memory_edit(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_memory_edit(deserializer));
+  }
+
+  @protected
+  MemoryEntry sse_decode_box_autoadd_memory_entry(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_memory_entry(deserializer));
+  }
+
+  @protected
+  MemoryOutcome sse_decode_box_autoadd_memory_outcome(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_memory_outcome(deserializer));
+  }
+
+  @protected
+  MemorySelection sse_decode_box_autoadd_memory_selection(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_memory_selection(deserializer));
   }
 
   @protected
@@ -5143,6 +6036,48 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<MemoryMemberView> sse_decode_list_memory_member_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <MemoryMemberView>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_memory_member_view(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<MemoryScopeView> sse_decode_list_memory_scope_view(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <MemoryScopeView>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_memory_scope_view(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<MemorySummary> sse_decode_list_memory_summary(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <MemorySummary>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_memory_summary(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
@@ -5201,6 +6136,239 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       ans_.add(sse_decode_workspace_view(deserializer));
     }
     return ans_;
+  }
+
+  @protected
+  MemoryAccessView sse_decode_memory_access_view(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_scopeId = sse_decode_String(deserializer);
+    var var_revision = sse_decode_String(deserializer);
+    var var_sessionToken = sse_decode_String(deserializer);
+    var var_write = sse_decode_bool(deserializer);
+    return MemoryAccessView(
+      scopeId: var_scopeId,
+      revision: var_revision,
+      sessionToken: var_sessionToken,
+      write: var_write,
+    );
+  }
+
+  @protected
+  MemoryEdit sse_decode_memory_edit(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_requestId = sse_decode_String(deserializer);
+    var var_entryId = sse_decode_String(deserializer);
+    var var_expectedVersion = sse_decode_opt_String(deserializer);
+    var var_delete = sse_decode_bool(deserializer);
+    var var_title = sse_decode_opt_String(deserializer);
+    var var_content = sse_decode_opt_String(deserializer);
+    var var_enabled = sse_decode_opt_box_autoadd_bool(deserializer);
+    return MemoryEdit(
+      requestId: var_requestId,
+      entryId: var_entryId,
+      expectedVersion: var_expectedVersion,
+      delete: var_delete,
+      title: var_title,
+      content: var_content,
+      enabled: var_enabled,
+    );
+  }
+
+  @protected
+  MemoryEntry sse_decode_memory_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_scopeId = sse_decode_String(deserializer);
+    var var_entryId = sse_decode_String(deserializer);
+    var var_version = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_content = sse_decode_String(deserializer);
+    var var_enabled = sse_decode_bool(deserializer);
+    var var_origin = sse_decode_String(deserializer);
+    var var_sourceActor = sse_decode_String(deserializer);
+    var var_sourceRun = sse_decode_String(deserializer);
+    var var_totalBytes = sse_decode_String(deserializer);
+    var var_startByte = sse_decode_String(deserializer);
+    var var_nextByte = sse_decode_opt_String(deserializer);
+    return MemoryEntry(
+      scopeId: var_scopeId,
+      entryId: var_entryId,
+      version: var_version,
+      title: var_title,
+      content: var_content,
+      enabled: var_enabled,
+      origin: var_origin,
+      sourceActor: var_sourceActor,
+      sourceRun: var_sourceRun,
+      totalBytes: var_totalBytes,
+      startByte: var_startByte,
+      nextByte: var_nextByte,
+    );
+  }
+
+  @protected
+  MemoryMemberPage sse_decode_memory_member_page(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_scopeId = sse_decode_String(deserializer);
+    var var_revision = sse_decode_String(deserializer);
+    var var_members = sse_decode_list_memory_member_view(deserializer);
+    var var_nextCursor = sse_decode_opt_String(deserializer);
+    return MemoryMemberPage(
+      scopeId: var_scopeId,
+      revision: var_revision,
+      members: var_members,
+      nextCursor: var_nextCursor,
+    );
+  }
+
+  @protected
+  MemoryMemberView sse_decode_memory_member_view(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_principal = sse_decode_String(deserializer);
+    var var_access = sse_decode_String(deserializer);
+    return MemoryMemberView(principal: var_principal, access: var_access);
+  }
+
+  @protected
+  MemoryOutcome sse_decode_memory_outcome(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_draftId = sse_decode_String(deserializer);
+    var var_scopeId = sse_decode_String(deserializer);
+    var var_entryId = sse_decode_String(deserializer);
+    var var_digest = sse_decode_String(deserializer);
+    var var_state = sse_decode_String(deserializer);
+    var var_resultVersion = sse_decode_opt_String(deserializer);
+    return MemoryOutcome(
+      draftId: var_draftId,
+      scopeId: var_scopeId,
+      entryId: var_entryId,
+      digest: var_digest,
+      state: var_state,
+      resultVersion: var_resultVersion,
+    );
+  }
+
+  @protected
+  MemoryPage sse_decode_memory_page(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_scopeId = sse_decode_String(deserializer);
+    var var_entries = sse_decode_list_memory_summary(deserializer);
+    var var_nextCursor = sse_decode_opt_String(deserializer);
+    var var_omittedUnavailable = sse_decode_bool(deserializer);
+    var var_scanLimited = sse_decode_bool(deserializer);
+    return MemoryPage(
+      scopeId: var_scopeId,
+      entries: var_entries,
+      nextCursor: var_nextCursor,
+      omittedUnavailable: var_omittedUnavailable,
+      scanLimited: var_scanLimited,
+    );
+  }
+
+  @protected
+  MemoryReview sse_decode_memory_review(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_draftId = sse_decode_String(deserializer);
+    var var_scopeId = sse_decode_String(deserializer);
+    var var_entryId = sse_decode_String(deserializer);
+    var var_expectedVersion = sse_decode_opt_String(deserializer);
+    var var_approvalDigest = sse_decode_String(deserializer);
+    var var_sourceRun = sse_decode_String(deserializer);
+    var var_title = sse_decode_opt_String(deserializer);
+    var var_content = sse_decode_opt_String(deserializer);
+    var var_enabled = sse_decode_opt_box_autoadd_bool(deserializer);
+    var var_delete = sse_decode_bool(deserializer);
+    var var_expiresAt = sse_decode_String(deserializer);
+    var var_prior = sse_decode_opt_box_autoadd_memory_entry(deserializer);
+    return MemoryReview(
+      draftId: var_draftId,
+      scopeId: var_scopeId,
+      entryId: var_entryId,
+      expectedVersion: var_expectedVersion,
+      approvalDigest: var_approvalDigest,
+      sourceRun: var_sourceRun,
+      title: var_title,
+      content: var_content,
+      enabled: var_enabled,
+      delete: var_delete,
+      expiresAt: var_expiresAt,
+      prior: var_prior,
+    );
+  }
+
+  @protected
+  MemoryScopePage sse_decode_memory_scope_page(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_scopes = sse_decode_list_memory_scope_view(deserializer);
+    var var_nextCursor = sse_decode_opt_String(deserializer);
+    return MemoryScopePage(scopes: var_scopes, nextCursor: var_nextCursor);
+  }
+
+  @protected
+  MemoryScopeView sse_decode_memory_scope_view(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_scopeId = sse_decode_String(deserializer);
+    var var_owner = sse_decode_String(deserializer);
+    var var_shared = sse_decode_bool(deserializer);
+    var var_revision = sse_decode_String(deserializer);
+    var var_enabled = sse_decode_bool(deserializer);
+    var var_access = sse_decode_String(deserializer);
+    var var_canAdminister = sse_decode_bool(deserializer);
+    var var_sessionToken = sse_decode_opt_String(deserializer);
+    var var_sessionWrite = sse_decode_bool(deserializer);
+    return MemoryScopeView(
+      scopeId: var_scopeId,
+      owner: var_owner,
+      shared: var_shared,
+      revision: var_revision,
+      enabled: var_enabled,
+      access: var_access,
+      canAdminister: var_canAdminister,
+      sessionToken: var_sessionToken,
+      sessionWrite: var_sessionWrite,
+    );
+  }
+
+  @protected
+  MemorySelection sse_decode_memory_selection(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_scopeId = sse_decode_String(deserializer);
+    var var_sessionToken = sse_decode_String(deserializer);
+    var var_sources = sse_decode_memory_sources(deserializer);
+    return MemorySelection(
+      scopeId: var_scopeId,
+      sessionToken: var_sessionToken,
+      sources: var_sources,
+    );
+  }
+
+  @protected
+  MemorySources sse_decode_memory_sources(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_workspaceIds = sse_decode_list_String(deserializer);
+    var var_memoryTokens = sse_decode_list_String(deserializer);
+    return MemorySources(
+      workspaceIds: var_workspaceIds,
+      memoryTokens: var_memoryTokens,
+    );
+  }
+
+  @protected
+  MemorySummary sse_decode_memory_summary(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_entryId = sse_decode_String(deserializer);
+    var var_version = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_enabled = sse_decode_bool(deserializer);
+    var var_origin = sse_decode_String(deserializer);
+    var var_contentBytes = sse_decode_String(deserializer);
+    return MemorySummary(
+      entryId: var_entryId,
+      version: var_version,
+      title: var_title,
+      enabled: var_enabled,
+      origin: var_origin,
+      contentBytes: var_contentBytes,
+    );
   }
 
   @protected
@@ -5282,6 +6450,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_export_outcome_view(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  MemoryEntry? sse_decode_opt_box_autoadd_memory_entry(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_memory_entry(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  MemoryOutcome? sse_decode_opt_box_autoadd_memory_outcome(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_memory_outcome(deserializer));
     } else {
       return null;
     }
@@ -5725,6 +6919,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_memory_edit(
+    MemoryEdit self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_memory_edit(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_memory_entry(
+    MemoryEntry self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_memory_entry(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_memory_outcome(
+    MemoryOutcome self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_memory_outcome(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_memory_selection(
+    MemorySelection self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_memory_selection(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_run_permission_selection(
     RunPermissionSelection self,
     SseSerializer serializer,
@@ -6120,6 +7350,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_memory_member_view(
+    List<MemoryMemberView> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_memory_member_view(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_memory_scope_view(
+    List<MemoryScopeView> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_memory_scope_view(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_memory_summary(
+    List<MemorySummary> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_memory_summary(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -6175,6 +7441,163 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     for (final item in self) {
       sse_encode_workspace_view(item, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_memory_access_view(
+    MemoryAccessView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.scopeId, serializer);
+    sse_encode_String(self.revision, serializer);
+    sse_encode_String(self.sessionToken, serializer);
+    sse_encode_bool(self.write, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_edit(MemoryEdit self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.requestId, serializer);
+    sse_encode_String(self.entryId, serializer);
+    sse_encode_opt_String(self.expectedVersion, serializer);
+    sse_encode_bool(self.delete, serializer);
+    sse_encode_opt_String(self.title, serializer);
+    sse_encode_opt_String(self.content, serializer);
+    sse_encode_opt_box_autoadd_bool(self.enabled, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_entry(MemoryEntry self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.scopeId, serializer);
+    sse_encode_String(self.entryId, serializer);
+    sse_encode_String(self.version, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.content, serializer);
+    sse_encode_bool(self.enabled, serializer);
+    sse_encode_String(self.origin, serializer);
+    sse_encode_String(self.sourceActor, serializer);
+    sse_encode_String(self.sourceRun, serializer);
+    sse_encode_String(self.totalBytes, serializer);
+    sse_encode_String(self.startByte, serializer);
+    sse_encode_opt_String(self.nextByte, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_member_page(
+    MemoryMemberPage self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.scopeId, serializer);
+    sse_encode_String(self.revision, serializer);
+    sse_encode_list_memory_member_view(self.members, serializer);
+    sse_encode_opt_String(self.nextCursor, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_member_view(
+    MemoryMemberView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.principal, serializer);
+    sse_encode_String(self.access, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_outcome(MemoryOutcome self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.draftId, serializer);
+    sse_encode_String(self.scopeId, serializer);
+    sse_encode_String(self.entryId, serializer);
+    sse_encode_String(self.digest, serializer);
+    sse_encode_String(self.state, serializer);
+    sse_encode_opt_String(self.resultVersion, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_page(MemoryPage self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.scopeId, serializer);
+    sse_encode_list_memory_summary(self.entries, serializer);
+    sse_encode_opt_String(self.nextCursor, serializer);
+    sse_encode_bool(self.omittedUnavailable, serializer);
+    sse_encode_bool(self.scanLimited, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_review(MemoryReview self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.draftId, serializer);
+    sse_encode_String(self.scopeId, serializer);
+    sse_encode_String(self.entryId, serializer);
+    sse_encode_opt_String(self.expectedVersion, serializer);
+    sse_encode_String(self.approvalDigest, serializer);
+    sse_encode_String(self.sourceRun, serializer);
+    sse_encode_opt_String(self.title, serializer);
+    sse_encode_opt_String(self.content, serializer);
+    sse_encode_opt_box_autoadd_bool(self.enabled, serializer);
+    sse_encode_bool(self.delete, serializer);
+    sse_encode_String(self.expiresAt, serializer);
+    sse_encode_opt_box_autoadd_memory_entry(self.prior, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_scope_page(
+    MemoryScopePage self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_memory_scope_view(self.scopes, serializer);
+    sse_encode_opt_String(self.nextCursor, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_scope_view(
+    MemoryScopeView self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.scopeId, serializer);
+    sse_encode_String(self.owner, serializer);
+    sse_encode_bool(self.shared, serializer);
+    sse_encode_String(self.revision, serializer);
+    sse_encode_bool(self.enabled, serializer);
+    sse_encode_String(self.access, serializer);
+    sse_encode_bool(self.canAdminister, serializer);
+    sse_encode_opt_String(self.sessionToken, serializer);
+    sse_encode_bool(self.sessionWrite, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_selection(
+    MemorySelection self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.scopeId, serializer);
+    sse_encode_String(self.sessionToken, serializer);
+    sse_encode_memory_sources(self.sources, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_sources(MemorySources self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_String(self.workspaceIds, serializer);
+    sse_encode_list_String(self.memoryTokens, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_summary(MemorySummary self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.entryId, serializer);
+    sse_encode_String(self.version, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_bool(self.enabled, serializer);
+    sse_encode_String(self.origin, serializer);
+    sse_encode_String(self.contentBytes, serializer);
   }
 
   @protected
@@ -6246,6 +7669,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_export_outcome_view(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_memory_entry(
+    MemoryEntry? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_memory_entry(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_memory_outcome(
+    MemoryOutcome? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_memory_outcome(self, serializer);
     }
   }
 

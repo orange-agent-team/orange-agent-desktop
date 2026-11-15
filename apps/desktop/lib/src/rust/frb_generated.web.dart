@@ -7,6 +7,7 @@
 // ignore_for_file: argument_type_not_assignable
 
 import 'api/host.dart';
+import 'api/memory.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -42,6 +43,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportOutcomeView dco_decode_box_autoadd_export_outcome_view(dynamic raw);
+
+  @protected
+  MemoryEdit dco_decode_box_autoadd_memory_edit(dynamic raw);
+
+  @protected
+  MemoryEntry dco_decode_box_autoadd_memory_entry(dynamic raw);
+
+  @protected
+  MemoryOutcome dco_decode_box_autoadd_memory_outcome(dynamic raw);
+
+  @protected
+  MemorySelection dco_decode_box_autoadd_memory_selection(dynamic raw);
 
   @protected
   RunPermissionSelection dco_decode_box_autoadd_run_permission_selection(
@@ -158,6 +171,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_list_export_retirement_outcome_view(dynamic raw);
 
   @protected
+  List<MemoryMemberView> dco_decode_list_memory_member_view(dynamic raw);
+
+  @protected
+  List<MemoryScopeView> dco_decode_list_memory_scope_view(dynamic raw);
+
+  @protected
+  List<MemorySummary> dco_decode_list_memory_summary(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
@@ -171,6 +193,45 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<WorkspaceView> dco_decode_list_workspace_view(dynamic raw);
+
+  @protected
+  MemoryAccessView dco_decode_memory_access_view(dynamic raw);
+
+  @protected
+  MemoryEdit dco_decode_memory_edit(dynamic raw);
+
+  @protected
+  MemoryEntry dco_decode_memory_entry(dynamic raw);
+
+  @protected
+  MemoryMemberPage dco_decode_memory_member_page(dynamic raw);
+
+  @protected
+  MemoryMemberView dco_decode_memory_member_view(dynamic raw);
+
+  @protected
+  MemoryOutcome dco_decode_memory_outcome(dynamic raw);
+
+  @protected
+  MemoryPage dco_decode_memory_page(dynamic raw);
+
+  @protected
+  MemoryReview dco_decode_memory_review(dynamic raw);
+
+  @protected
+  MemoryScopePage dco_decode_memory_scope_page(dynamic raw);
+
+  @protected
+  MemoryScopeView dco_decode_memory_scope_view(dynamic raw);
+
+  @protected
+  MemorySelection dco_decode_memory_selection(dynamic raw);
+
+  @protected
+  MemorySources dco_decode_memory_sources(dynamic raw);
+
+  @protected
+  MemorySummary dco_decode_memory_summary(dynamic raw);
 
   @protected
   ModelConnectionView dco_decode_model_connection_view(dynamic raw);
@@ -193,6 +254,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ExportOutcomeView? dco_decode_opt_box_autoadd_export_outcome_view(
     dynamic raw,
   );
+
+  @protected
+  MemoryEntry? dco_decode_opt_box_autoadd_memory_entry(dynamic raw);
+
+  @protected
+  MemoryOutcome? dco_decode_opt_box_autoadd_memory_outcome(dynamic raw);
 
   @protected
   RunPermissionSelection? dco_decode_opt_box_autoadd_run_permission_selection(
@@ -288,6 +355,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportOutcomeView sse_decode_box_autoadd_export_outcome_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  MemoryEdit sse_decode_box_autoadd_memory_edit(SseDeserializer deserializer);
+
+  @protected
+  MemoryEntry sse_decode_box_autoadd_memory_entry(SseDeserializer deserializer);
+
+  @protected
+  MemoryOutcome sse_decode_box_autoadd_memory_outcome(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  MemorySelection sse_decode_box_autoadd_memory_selection(
     SseDeserializer deserializer,
   );
 
@@ -424,6 +507,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   sse_decode_list_export_retirement_outcome_view(SseDeserializer deserializer);
 
   @protected
+  List<MemoryMemberView> sse_decode_list_memory_member_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<MemoryScopeView> sse_decode_list_memory_scope_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<MemorySummary> sse_decode_list_memory_summary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
@@ -443,6 +541,45 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<WorkspaceView> sse_decode_list_workspace_view(
     SseDeserializer deserializer,
   );
+
+  @protected
+  MemoryAccessView sse_decode_memory_access_view(SseDeserializer deserializer);
+
+  @protected
+  MemoryEdit sse_decode_memory_edit(SseDeserializer deserializer);
+
+  @protected
+  MemoryEntry sse_decode_memory_entry(SseDeserializer deserializer);
+
+  @protected
+  MemoryMemberPage sse_decode_memory_member_page(SseDeserializer deserializer);
+
+  @protected
+  MemoryMemberView sse_decode_memory_member_view(SseDeserializer deserializer);
+
+  @protected
+  MemoryOutcome sse_decode_memory_outcome(SseDeserializer deserializer);
+
+  @protected
+  MemoryPage sse_decode_memory_page(SseDeserializer deserializer);
+
+  @protected
+  MemoryReview sse_decode_memory_review(SseDeserializer deserializer);
+
+  @protected
+  MemoryScopePage sse_decode_memory_scope_page(SseDeserializer deserializer);
+
+  @protected
+  MemoryScopeView sse_decode_memory_scope_view(SseDeserializer deserializer);
+
+  @protected
+  MemorySelection sse_decode_memory_selection(SseDeserializer deserializer);
+
+  @protected
+  MemorySources sse_decode_memory_sources(SseDeserializer deserializer);
+
+  @protected
+  MemorySummary sse_decode_memory_summary(SseDeserializer deserializer);
 
   @protected
   ModelConnectionView sse_decode_model_connection_view(
@@ -465,6 +602,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportOutcomeView? sse_decode_opt_box_autoadd_export_outcome_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  MemoryEntry? sse_decode_opt_box_autoadd_memory_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  MemoryOutcome? sse_decode_opt_box_autoadd_memory_outcome(
     SseDeserializer deserializer,
   );
 
@@ -587,6 +734,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_export_outcome_view(
     ExportOutcomeView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_memory_edit(
+    MemoryEdit self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_memory_entry(
+    MemoryEntry self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_memory_outcome(
+    MemoryOutcome self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_memory_selection(
+    MemorySelection self,
     SseSerializer serializer,
   );
 
@@ -759,6 +930,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_memory_member_view(
+    List<MemoryMemberView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_memory_scope_view(
+    List<MemoryScopeView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_memory_summary(
+    List<MemorySummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -789,6 +978,63 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_memory_access_view(
+    MemoryAccessView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_memory_edit(MemoryEdit self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_memory_entry(MemoryEntry self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_memory_member_page(
+    MemoryMemberPage self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_memory_member_view(
+    MemoryMemberView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_memory_outcome(MemoryOutcome self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_memory_page(MemoryPage self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_memory_review(MemoryReview self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_memory_scope_page(
+    MemoryScopePage self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_memory_scope_view(
+    MemoryScopeView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_memory_selection(
+    MemorySelection self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_memory_sources(MemorySources self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_memory_summary(MemorySummary self, SseSerializer serializer);
+
+  @protected
   void sse_encode_model_connection_view(
     ModelConnectionView self,
     SseSerializer serializer,
@@ -815,6 +1061,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_export_outcome_view(
     ExportOutcomeView? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_memory_entry(
+    MemoryEntry? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_memory_outcome(
+    MemoryOutcome? self,
     SseSerializer serializer,
   );
 

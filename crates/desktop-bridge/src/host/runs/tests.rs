@@ -5,6 +5,7 @@ mod export_inspection;
 mod export_restoration;
 #[cfg(target_vendor = "apple")]
 mod export_retirement;
+mod memory_management;
 #[cfg(target_vendor = "apple")]
 mod recovery_inspection;
 use crate::api::host as api;
@@ -659,6 +660,7 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
             .iter()
             .all(|g| !g.session_access)
     );
+    memory_management::exercise(&reopened.handle).await;
     exercise_creation_actor(&reopened.handle, temporary.path()).await;
     #[cfg(target_vendor = "apple")]
     exercise_editing_actor(&reopened.handle, temporary.path()).await;

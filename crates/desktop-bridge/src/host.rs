@@ -18,6 +18,7 @@ mod export_inspection;
 mod export_restoration;
 #[cfg(target_vendor = "apple")]
 mod export_retirement;
+pub(crate) mod memory;
 #[cfg(target_vendor = "apple")]
 pub(crate) use export_restoration::*;
 #[cfg(target_vendor = "apple")]
@@ -87,6 +88,7 @@ struct Host {
     grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
     access_tokens: std::collections::HashMap<String, String>,
     creations: std::collections::HashMap<String, creation::CreationSession>,
+    memories: std::collections::HashMap<String, memory::MemorySession>,
     #[cfg(target_vendor = "apple")]
     editings: std::collections::HashMap<String, editing::EditingSession>,
     #[cfg(target_vendor = "apple")]
@@ -186,6 +188,7 @@ impl HostRegistry {
             grants: std::collections::HashMap::new(),
             access_tokens: std::collections::HashMap::new(),
             creations: std::collections::HashMap::new(),
+            memories: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
             editings: std::collections::HashMap::new(),
             #[cfg(target_vendor = "apple")]
@@ -681,7 +684,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "48a7aae275c2467ef865a9301135945a889d7f2d"
+            "fb69ea634f67e6ec6d624f9efb566ce89759c39d"
         );
         assert_eq!(
             registry

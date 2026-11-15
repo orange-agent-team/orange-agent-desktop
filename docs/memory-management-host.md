@@ -1,0 +1,29 @@
+# 桌面记忆管理Host候选
+
+此切片导入固定Runtime fb69ea6/schema27，并提供经过审核的Memory API、Host/Actor及生成的FRB绑定。Flutter管理界面、Agent Run的记忆授权选择和实际模型记忆闭环尚未接入；已有测试通过不代表这些功能已交付。
+
+## 权限与选择
+
+api/memory.rs只暴露有界DTO与13个管理命令。actor、policy和UserDeclaration来源由本地Host固定，不接受模型提供身份。scope目录显示真实成员权限，临时MemoryAccessView单独表示此次选择的read/write能力。一个授权token绑定scope、revision和模式，不能复用token升级权限或换scope。
+
+关闭未完成的授权请求先记录token，后到的授权回调拒绝。关闭已有选择先signal，串行Journal工作返回并释放真实读取/来源lease后才确认。scope启停或成员修改使用精确revision和owner权限；新revision不自动恢复旧选择。Host关闭会撤销全部记忆选择。
+
+MemorySelection的证明来源只引用用户已恢复的工作区和明确已授权的记忆token。额外证明权限不扩大模型可调用scope。数据返回还经过选择快照的撤销标记检查，标记不持有lease，因此不会阻塞关闭。Flutter接入时仍须使用请求代次，并在权限关闭、来源变化、选择变更时清空正文/预览，丢弃迟到结果。
+
+## 数据与批准
+
+列表/读取全部调用来源感知Core API，原始Store不作为派生正文旁路。用户新增/编辑/删除经prepare_user_memory_write的版本与来源预览，再按复合approval_digest明确批准。旧条目的来源在提交时重新验证；迟到权限丢失回滚。返回的scope元数据不授予读写权限，scope整体停用后正文访问继续拒绝。
+
+丢失回复用scope与原request_id查询无正文回执，不能自动重新执行或恢复Grant。每个人类命令的审计source身份由Host按scope/request生成；不将其注册为Agent模型任务。
+
+## FRB与构建
+
+固定代码生成器生成api/memory.dart及配对Rust/Dart绑定。bridge-tools.lock.json显式列出新增模块、DTO、命令；bridge_surface.py同时检查所有生成模块和Rust API输入清单。生成指纹包含全部API源；额外NativeGrant模块/DTO/API文件的隔离负例测试属于check-bridge.py门槛。
+
+新Runtime导入后旧模型服务包的版本指纹校验按预期拒绝Flutter Native Assets构建。使用已固定、已验证的CPU llama.cpp二进制和Git许可源重建候选bundle，保持指纹检查与开发签名要求；没有下载新模型、调用付费模型或发布制品。
+
+## 验证范围
+
+既有单例Actor测试新增真实SQLite管理流程：只读不能写、先预览后精确批准、错误摘要与重复批准拒绝、启停条目及scope、明确删除、成员revision与revoked记录、无正文回执查询。实际读取凭据被测试暂停时，关闭信号先于排队工作到达，wait_drained仍等待凭据释放，迟到响应标记失效。
+
+Rust Host/Clippy、FRB导出完整性、Dart分析和既有Flutter组件测试覆盖兼容性。尚无记忆管理组件测试或实际Flutter记忆交互证明。全scope禁用状态下正文的专用管理授权、其他OS、真实模型和完整应用验收保持未完成。

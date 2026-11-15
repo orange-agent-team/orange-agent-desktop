@@ -26,6 +26,7 @@ mod export_inspection;
 mod export_restoration;
 #[cfg(target_vendor = "apple")]
 mod export_retirement;
+pub(crate) mod memory;
 #[cfg(target_vendor = "apple")]
 pub(crate) use export_restoration::{ExportRestorationSignal, signal_export_restoration_release};
 #[cfg(target_vendor = "apple")]
@@ -100,6 +101,8 @@ pub(crate) struct Signals {
     pub runs: HashMap<String, RunSignal>,
     pub closed_selections: HashSet<String>,
     pub creations: HashMap<String, CreationSignal>,
+    pub memories: HashMap<String, memory::MemorySignal>,
+    pub closed_memory_selections: HashSet<String>,
     pub closed_creation_selections: HashSet<String>,
     #[cfg(target_vendor = "apple")]
     pub editings: HashMap<String, EditingSignal>,
@@ -129,6 +132,9 @@ pub(crate) struct Signals {
 }
 impl Signals {
     pub fn stop_all(&self) {
+        for memory in self.memories.values() {
+            memory.suspend();
+        }
         #[cfg(target_vendor = "apple")]
         for scope in self.export_restorations.values() {
             scope.suspend();

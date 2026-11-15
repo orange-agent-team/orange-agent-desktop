@@ -123,5 +123,39 @@
     "listExportRestorations",
     "inspectExportRestoration",
     "suspendExportRestoration"
-  ]
+  ],
+  "additional_public_modules": {
+    "memory": {
+      "classes": [
+        "MemoryAccessView",
+        "MemoryEdit",
+        "MemoryEntry",
+        "MemoryMemberPage",
+        "MemoryMemberView",
+        "MemoryOutcome",
+        "MemoryPage",
+        "MemoryReview",
+        "MemoryScopePage",
+        "MemoryScopeView",
+        "MemorySelection",
+        "MemorySources",
+        "MemorySummary"
+      ],
+      "functions": [
+        "approveEdit",
+        "authorizeScope",
+        "createScope",
+        "inspectEdit",
+        "listEntries",
+        "listMembers",
+        "listScopes",
+        "prepareEdit",
+        "readEntry",
+        "reviewEdit",
+        "setMember",
+        "setScopeEnabled",
+        "suspendAccess"
+      ]
+    }
+  }
 }
