@@ -221,7 +221,7 @@ async fn accept_memory(
         editing: None,
     };
     let id = uuid::Uuid::new_v4().to_string();
-    let mut view=start_memory_run(handle.into(),workspace.into(),id.clone(),r#"Read my saved verification code. Call memory_read with exactly {"mode":"entry","scope_id":"personal","entry_id":"proof"}. The code is only in the entry body. Return the value of its content field verbatim."#.into(),task(parent.session_token),false).await?;
+    let mut view=start_memory_run(handle.into(),workspace.into(),id.clone(),"Read the body of entry proof in the personal memory scope. Reply with the exact verification code stored in its content.".into(),task(parent.session_token),false).await?;
     let mut approvals = 0;
     let mut entry_requested = false;
     for _ in 0..12 {
@@ -343,7 +343,8 @@ async fn accept_memory_write(
     let id = uuid::Uuid::new_v4().to_string();
     let args = serde_json::json!({"scope_id":"personal","mutation":"put","payload":{"title":"Verification code","content":config.sentinel,"enabled":true}});
     let prompt = format!(
-        "Remember my verification code. Call memory_write with exactly these arguments: {args}. After the tool result, confirm the save."
+        "Create a new enabled memory in my personal scope titled Verification code. Store this exact code as its content: {}. Confirm the save after approval.",
+        config.sentinel
     );
     let mut view =
         start_memory_run(h.into(), workspace.into(), id.clone(), prompt, task, false).await?;

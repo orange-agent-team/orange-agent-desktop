@@ -130,7 +130,9 @@ class LocalModelFixture {
               .where((m) => m['role'] == 'tool')
               .toList();
           if (calls == 1 || calls == 2) {
-            final name = calls == 1 ? 'memory_write' : 'memory_read';
+            final name = calls == 1
+                ? 'memory_create_entry'
+                : 'memory_read_entry';
             if (!(input['tools'] as List).any(
               (tool) => tool['function']['name'] == name,
             )) {
@@ -139,12 +141,9 @@ class LocalModelFixture {
             final args = <String, dynamic>{'scope_id': 'personal'};
             if (calls == 1) {
               args.addAll({
-                'mutation': 'put',
-                'payload': {
-                  'title': 'Preference',
-                  'content': expected,
-                  'enabled': true,
-                },
+                'title': 'Preference',
+                'content': expected,
+                'enabled': true,
               });
             } else {
               final receipt = jsonDecode(history.single['content'] as String);
@@ -152,11 +151,7 @@ class LocalModelFixture {
                   receipt['data']['state'] != 'approved') {
                 throw StateError('Missing approved write receipt');
               }
-              args.addAll({
-                'mode': 'entry',
-                'entry_id': receipt['data']['entry_id'],
-                'expected_version': '1',
-              });
+              args.addAll({'entry_id': receipt['data']['entry_id']});
             }
             delta = {
               'tool_calls': [

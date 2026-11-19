@@ -64,6 +64,7 @@ pub(crate) use creation::{
     authorize_creation_access, list_creation_access, revoke_creation_access,
     suspend_creation_selection,
 };
+mod llama_memory;
 mod runs;
 mod task_memory;
 pub(crate) use managed::{

@@ -23,7 +23,9 @@ def invalidate_hook():
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--model',type=Path,required=True)
     parser.add_argument('--ui-search-only',action='store_true',help='Target only the real UI search case; does not certify the separate lifecycle case')
+    parser.add_argument('--ui-memory-only',action='store_true',help='Verify real packaged model read/write and explicit memory approval')
     args=parser.parse_args()
+    if args.ui_search_only and args.ui_memory_only:parser.error('Choose one targeted scenario')
     original=verify_bundle(STAGED);regular(args.model)
     if args.model.stat().st_size!=original['model']['bytes'] or digest(args.model)!=original['model']['sha256']:
         raise RuntimeError('Explicit fixed test model differs from catalog')
@@ -40,7 +42,13 @@ def main():
     try:
         environment,tools=tool_environment()
         command=[str(tools['flutter']),'--suppress-analytics','test','integration_test/managed_model_test.dart','-d','macos','--no-pub']
-        if args.ui_search_only:
+        if args.ui_memory_only:
+            command[3]='integration_test/managed_task_memory_test.dart'
+            result=subprocess.run(command,cwd=APP,env=environment,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=900)
+            print(result.stdout,end='',flush=True);result.check_returncode()
+            if '"actualModelRead":true' not in result.stdout or '"actualModelWrite":true' not in result.stdout or 'All tests passed!' not in result.stdout:
+                raise RuntimeError('Packaged model memory verification did not finish')
+        elif args.ui_search_only:
             command+=['--plain-name','production model buttons import and start a real packaged model before explicit Agent tool approval']
             result=subprocess.run(command,cwd=APP,env=environment,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=900)
             print(result.stdout,end='',flush=True);result.check_returncode()
@@ -54,7 +62,9 @@ def main():
         verify_bundle(STAGED)
         if digest(STAGED/'manifest.json')!=expected:raise RuntimeError('Test bundle changed unexpectedly; original retained at '+str(backup))
         shutil.rmtree(STAGED);os.replace(backup,STAGED);invalidate_hook();shutil.rmtree(temporary)
-    if args.ui_search_only:
+    if args.ui_memory_only:
+        print('PASS real packaged CPU inference, separate memory read/write approvals, SQLite commit and parent withdrawal')
+    elif args.ui_search_only:
         print('PASS actual packaged model UI read/text-search approval and source-deletion clearing; explicit owned selector fixtures. Separate lifecycle/35-second heartbeat case was not run by this targeted invocation')
     else:
         print('PASS actual packaged sandbox model import/start/35-second idle heartbeat and product UI approved file/text search with deleted-source clearing, instance fencing, Host-close cleanup, durable replay/cancel and unowned-process refusal. Native picker selections are explicit fixtures; no production signing, orphan reconciliation or broad hardware certificate')

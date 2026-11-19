@@ -148,6 +148,8 @@ def main():
                     with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as db:
                         report['events'] = [row[0] for row in db.execute('SELECT kind FROM events ORDER BY rowid DESC LIMIT 20')]
                         report['tool_states'] = db.execute('SELECT tool_version,state FROM operations LIMIT 20').fetchall()
+                        if args.memory:
+                            report['read_arguments'] = db.execute('''SELECT json_extract(request_json,'$.arguments.mode'),json_extract(request_json,'$.arguments.start_byte'),json_extract(request_json,'$.arguments.max_bytes'),json_extract(request_json,'$.arguments.expected_version'),error_code FROM operations WHERE tool_version='memory_read.v2' LIMIT 20''').fetchall()
                 raise
             finally:
                 if child is not None and child.poll() is None:

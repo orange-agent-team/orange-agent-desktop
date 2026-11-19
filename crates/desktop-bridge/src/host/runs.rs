@@ -78,13 +78,21 @@ impl ModelGateway for LocalGateway {
             }
             let mut request = request.clone();
             request.model_version = self.alias.clone();
-            self.client
-                .generate(&request, cancel)
-                .await
-                .map_err(|kind| {
-                    eprintln!("Local model request failed ({kind:?})");
-                    GatewayFailure
-                })
+            let projection =
+                llama_memory::Projection::for_request(&request).map_err(|_| GatewayFailure)?;
+            let wire = projection.as_ref().map_or(&request, |p| &p.request);
+            let result =
+                self.client
+                    .generate(wire, cancel)
+                    .await
+                    .and_then(|answer| match projection {
+                        Some(mapping) => mapping.decode(&request, answer),
+                        None => Ok(answer),
+                    });
+            result.map_err(|kind| {
+                eprintln!("Local model request failed ({kind:?})");
+                GatewayFailure
+            })
         })
     }
 }
@@ -512,7 +520,7 @@ impl HostRegistry {
         };
         let mut messages = Vec::new();
         if selection.memory.is_some() {
-            messages.push(Message::plain(Role::System, task_memory::TOOL_GUIDE.into()));
+            messages.push(Message::plain(Role::System, llama_memory::guide()));
         }
         messages.push(Message::plain(Role::User, prompt.into()));
         let create = if let Some((id, version)) = selection.creation {
