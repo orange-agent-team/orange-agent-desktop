@@ -12,5 +12,5 @@ for line in r.stdout.replace('\r','\n').splitlines():
     if marker in line:records.append(json.JSONDecoder().raw_decode(line[line.index(marker):])[0])
 if len(records)!=1 or 'All tests passed!' not in r.stdout:raise SystemExit('Native memory acceptance did not complete')
 v=records[0]
-if any(v.get(k) is not True for k in ['nativeMemory','typedFrb','explicitUiApproval','closedSelectionRejected','reopenRequiredExplicitGrant','persistedAfterReopen','readonlyWriteRejected']) or v.get('modelInference') is not False or v.get('fullUnicodeBytes',0)<=4096:raise SystemExit('Native memory evidence is incomplete')
+if any(v.get(k) is not True for k in ['nativeMemory','typedFrb','explicitUiApproval','closedSelectionRejected','reopenRequiredExplicitGrant','persistedAfterReopen','draftDiscoveredAndDiscardedAfterReopen','readonlyWriteRejected']) or v.get('modelInference') is not False or v.get('fullUnicodeBytes',0)<=4096:raise SystemExit('Native memory evidence is incomplete')
 print('PASS actual native manual memory creation/approval/complete Unicode read/close/reopen/readonly rejection; no model inference or other-platform certificate')

@@ -141,6 +141,11 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
           if (run.phase == 'recovery_required') {
             controller.hideContent();
             recovery.selectRun(run);
+            controller.load(
+              run.runId,
+              reopen: true,
+              expectedWorkspace: run.workspaceId,
+            );
           } else {
             controller.load(
               run.runId,

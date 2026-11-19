@@ -689,3 +689,100 @@ pub(crate) async fn inspect_edit(
     })
     .await
 }
+
+impl HostRegistry {
+    pub(crate) fn pending_user_drafts(
+        &mut self,
+        handle: &str,
+        scope: &str,
+        after: Option<&str>,
+        limit: u16,
+    ) -> Result<Vec<api::MemoryOutcome>, BridgeError> {
+        self.current(handle)?
+            .journal
+            .pending_user_memory_drafts(LOCAL_OWNER, scope, after, limit)
+            .map(|rows| rows.into_iter().map(outcome).collect())
+            .map_err(runs::engine_error)
+    }
+    pub(crate) fn discard_user_draft(
+        &mut self,
+        handle: &str,
+        scope: &str,
+        id: &str,
+        digest: &str,
+    ) -> Result<api::MemoryOutcome, BridgeError> {
+        self.current(handle)?
+            .journal
+            .discard_user_memory_draft(LOCAL_OWNER, scope, id, digest)
+            .map(outcome)
+            .map_err(runs::engine_error)
+    }
+    pub(crate) fn uncertain_task_writes(
+        &mut self,
+        handle: &str,
+        run: &str,
+        after: Option<&str>,
+        limit: u16,
+    ) -> Result<Vec<api::UncertainMemoryWrite>, BridgeError> {
+        let journal = &self.current(handle)?.journal;
+        let ids = journal
+            .unresolved_memory_operations(LOCAL_OWNER, run, after, limit)
+            .map_err(runs::engine_error)?;
+        ids.into_iter()
+            .map(|id| {
+                let receipt = journal
+                    .agent_memory_metadata(LOCAL_OWNER, run, &id)
+                    .map_err(runs::engine_error)?
+                    .ok_or_else(|| failure("RUN_RECOVERY_REQUIRED"))?;
+                Ok(api::UncertainMemoryWrite {
+                    operation_id: id,
+                    outcome: outcome(receipt),
+                })
+            })
+            .collect()
+    }
+    pub(crate) async fn reconcile_task_write(
+        &mut self,
+        handle: &str,
+        run: &str,
+        op: &str,
+        digest: &str,
+        applied: bool,
+        resume: bool,
+    ) -> Result<(), BridgeError> {
+        use orange_agent_runtime::engine::MemoryRecovery;
+        if resume {
+            let (_, _, read, _) = self.run_context(handle, run)?;
+            let host = self.current(handle)?;
+            let task = host
+                .task_memory
+                .get(run)
+                .ok_or_else(|| failure("MEMORY_SESSION_ACCESS_REQUIRED"))?;
+            let authority = task.authority(&read);
+            let decision = if applied {
+                MemoryRecovery::ConfirmAppliedAndContinue(authority)
+            } else {
+                MemoryRecovery::ConfirmNotAppliedAndContinue(authority)
+            };
+            host.journal
+                .reconcile_agent_memory(LOCAL_OWNER, run, op, digest, decision)
+                .await
+                .map_err(runs::engine_error)?;
+        } else {
+            let host = self.current(handle)?;
+            let decision = if applied {
+                MemoryRecovery::ConfirmAppliedAndStop
+            } else {
+                MemoryRecovery::ConfirmNotAppliedAndStop
+            };
+            host.journal
+                .reconcile_agent_memory(LOCAL_OWNER, run, op, digest, decision)
+                .await
+                .map_err(runs::engine_error)?;
+            if let Some(task) = host.task_memory.remove(run) {
+                task.revoke();
+            }
+        }
+        Ok(())
+    }
+}

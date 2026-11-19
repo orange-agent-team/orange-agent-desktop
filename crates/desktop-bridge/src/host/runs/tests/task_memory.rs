@@ -45,7 +45,7 @@ pub(super) async fn exercise(handle: &str, base: &Path) {
     let id = "task-memory-writer".to_owned();
     let run = memory::start_memory_run(
         h.clone(),
-        workspace.workspace_id,
+        workspace.workspace_id.clone(),
         id.clone(),
         "Remember my preference after review".into(),
         select(true),
@@ -114,9 +114,76 @@ pub(super) async fn exercise(handle: &str, base: &Path) {
             .is_err(),
         "immutable run mode"
     );
+    let row = workspace.workspace_id;
+    install_tool(&h,false,"memory_write",serde_json::json!({"scope_id":"task-personal","mutation":"put","payload":{"title":"Lost reply","content":"Only once","enabled":true}}),"approved").await;
+    let uncertain_id = "uncertain-memory-run".to_owned();
+    let started = memory::start_memory_run(
+        h.clone(),
+        row,
+        uncertain_id.clone(),
+        "Propose one fact".into(),
+        select(true),
+        false,
+    )
+    .await
+    .expect("start uncertain fixture");
+    let view = step(&h, &started).await.expect("propose");
+    let op = view.pending[0].operation_id.clone();
+    let preview = memory::preview_run_memory(h.clone(), uncertain_id.clone(), op.clone())
+        .await
+        .expect("preview");
+    let approved = memory::approve_run_memory(
+        h.clone(),
+        uncertain_id.clone(),
+        op.clone(),
+        preview.approval_digest,
+    )
+    .await
+    .expect("approve");
+    let connection =
+        rusqlite::Connection::open(base.join("private/host.sqlite")).expect("owned host database");
+    connection.execute_batch("CREATE TRIGGER lose_task_receipt BEFORE UPDATE ON operations WHEN NEW.state='succeeded' AND NEW.tool_version='memory_write.v1' BEGIN SELECT RAISE(ABORT,'owned receipt fault');END;").expect("inject");
+    assert!(step(&h, &approved).await.is_err());
+    connection
+        .execute_batch("DROP TRIGGER lose_task_receipt")
+        .expect("remove");
+    let found = memory::uncertain_task_writes(h.clone(), uncertain_id.clone(), None, 10)
+        .await
+        .expect("discover");
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].operation_id, op);
+    assert_eq!(found[0].outcome.state, "approved");
+    assert!(
+        memory::reconcile_task_write(
+            h.clone(),
+            uncertain_id.clone(),
+            op.clone(),
+            found[0].outcome.digest.clone(),
+            false,
+            false
+        )
+        .await
+        .is_err()
+    );
     memory::suspend_access(h.clone(), access.session_token)
         .await
         .expect("revoke parent");
+    memory::reconcile_task_write(
+        h.clone(),
+        uncertain_id.clone(),
+        op,
+        found[0].outcome.digest.clone(),
+        true,
+        false,
+    )
+    .await
+    .expect("stop by receipt after withdrawal");
+    assert!(
+        memory::uncertain_task_writes(h.clone(), uncertain_id, None, 10)
+            .await
+            .expect("resolved")
+            .is_empty()
+    );
     assert!(
         api::inspect_run(h, id).await.is_err(),
         "no cached final text"

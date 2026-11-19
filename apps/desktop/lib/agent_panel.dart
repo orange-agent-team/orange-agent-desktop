@@ -370,6 +370,41 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                   child: const Text('使用已选空间恢复任务访问'),
                 ),
               ],
+              if (controller.usesMemory &&
+                  controller.runId != null &&
+                  (controller.view == null ||
+                      controller.view?.phase == 'recovery_required' ||
+                      controller.view?.phase == 'tools_pending')) ...[
+                TextButton(
+                  onPressed: busy ? null : controller.inspectUncertainWrites,
+                  child: const Text('核对未确认的记忆写入'),
+                ),
+                for (final item in controller.uncertainWrites)
+                  ListTile(
+                    title: Text(item.outcome.entryId),
+                    subtitle: Text(
+                      item.outcome.state == 'approved'
+                          ? '已提交到版本 ${item.outcome.resultVersion}'
+                          : '草稿回执显示尚未提交',
+                    ),
+                    trailing: Wrap(
+                      children: [
+                        TextButton(
+                          onPressed: busy
+                              ? null
+                              : () => controller.resolveMemory(item, false),
+                          child: const Text('按回执结束'),
+                        ),
+                        TextButton(
+                          onPressed: busy
+                              ? null
+                              : () => controller.resolveMemory(item, true),
+                          child: const Text('按回执恢复'),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
               if (controller.error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),

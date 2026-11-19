@@ -177,6 +177,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<MemoryMemberView> dco_decode_list_memory_member_view(dynamic raw);
 
   @protected
+  List<MemoryOutcome> dco_decode_list_memory_outcome(dynamic raw);
+
+  @protected
   List<MemoryScopeView> dco_decode_list_memory_scope_view(dynamic raw);
 
   @protected
@@ -198,6 +201,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ToolApprovalView> dco_decode_list_tool_approval_view(dynamic raw);
+
+  @protected
+  List<UncertainMemoryWrite> dco_decode_list_uncertain_memory_write(
+    dynamic raw,
+  );
 
   @protected
   List<UserQuestionView> dco_decode_list_user_question_view(dynamic raw);
@@ -346,6 +354,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int dco_decode_u_8(dynamic raw);
+
+  @protected
+  UncertainMemoryWrite dco_decode_uncertain_memory_write(dynamic raw);
 
   @protected
   void dco_decode_unit(dynamic raw);
@@ -540,6 +551,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<MemoryOutcome> sse_decode_list_memory_outcome(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<MemoryScopeView> sse_decode_list_memory_scope_view(
     SseDeserializer deserializer,
   );
@@ -567,6 +583,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ToolApprovalView> sse_decode_list_tool_approval_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<UncertainMemoryWrite> sse_decode_list_uncertain_memory_write(
     SseDeserializer deserializer,
   );
 
@@ -749,6 +770,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
+
+  @protected
+  UncertainMemoryWrite sse_decode_uncertain_memory_write(
+    SseDeserializer deserializer,
+  );
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
@@ -996,6 +1022,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_memory_outcome(
+    List<MemoryOutcome> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_memory_scope_view(
     List<MemoryScopeView> self,
     SseSerializer serializer,
@@ -1034,6 +1066,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_tool_approval_view(
     List<ToolApprovalView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_uncertain_memory_write(
+    List<UncertainMemoryWrite> self,
     SseSerializer serializer,
   );
 
@@ -1267,6 +1305,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_uncertain_memory_write(
+    UncertainMemoryWrite self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);

@@ -8,7 +8,7 @@ import 'host.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<MemoryScopePage> listScopes({
   required String handle,
@@ -220,6 +220,58 @@ Future<List<TaskMemoryRequirement>> runMemoryRequirements({
 }) => RustLib.instance.api.crateApiMemoryRunMemoryRequirements(
   handle: handle,
   runId: runId,
+);
+
+Future<List<MemoryOutcome>> pendingUserDrafts({
+  required String handle,
+  required String scopeId,
+  String? after,
+  required int limit,
+}) => RustLib.instance.api.crateApiMemoryPendingUserDrafts(
+  handle: handle,
+  scopeId: scopeId,
+  after: after,
+  limit: limit,
+);
+
+Future<MemoryOutcome> discardUserDraft({
+  required String handle,
+  required String scopeId,
+  required String draftId,
+  required String digest,
+}) => RustLib.instance.api.crateApiMemoryDiscardUserDraft(
+  handle: handle,
+  scopeId: scopeId,
+  draftId: draftId,
+  digest: digest,
+);
+
+Future<List<UncertainMemoryWrite>> uncertainTaskWrites({
+  required String handle,
+  required String runId,
+  String? after,
+  required int limit,
+}) => RustLib.instance.api.crateApiMemoryUncertainTaskWrites(
+  handle: handle,
+  runId: runId,
+  after: after,
+  limit: limit,
+);
+
+Future<void> reconcileTaskWrite({
+  required String handle,
+  required String runId,
+  required String operationId,
+  required String digest,
+  required bool applied,
+  required bool resume,
+}) => RustLib.instance.api.crateApiMemoryReconcileTaskWrite(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+  digest: digest,
+  applied: applied,
+  resume: resume,
 );
 
 class MemoryAccessView {
@@ -806,4 +858,25 @@ class TaskMemorySelection {
           editing == other.editing &&
           scopes == other.scopes &&
           sources == other.sources;
+}
+
+class UncertainMemoryWrite {
+  final String operationId;
+  final MemoryOutcome outcome;
+
+  const UncertainMemoryWrite({
+    required this.operationId,
+    required this.outcome,
+  });
+
+  @override
+  int get hashCode => operationId.hashCode ^ outcome.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UncertainMemoryWrite &&
+          runtimeType == other.runtimeType &&
+          operationId == other.operationId &&
+          outcome == other.outcome;
 }

@@ -74,10 +74,39 @@ abstract interface class MemoryAgentCommands {
   );
 }
 
+abstract interface class MemoryRecoveryCommands {
+  Future<List<mem.UncertainMemoryWrite>> uncertain(String run);
+  Future<void> reconcile(
+    String run,
+    mem.UncertainMemoryWrite item,
+    bool resume,
+  );
+}
+
 class NativeAgentCommands
-    implements AgentCommands, EditingAgentCommands, MemoryAgentCommands {
+    implements
+        AgentCommands,
+        EditingAgentCommands,
+        MemoryAgentCommands,
+        MemoryRecoveryCommands {
   NativeAgentCommands(this.handle);
   final String handle;
+  @override
+  Future<List<mem.UncertainMemoryWrite>> uncertain(String run) =>
+      mem.uncertainTaskWrites(handle: handle, runId: run, limit: 100);
+  @override
+  Future<void> reconcile(
+    String run,
+    mem.UncertainMemoryWrite item,
+    bool resume,
+  ) => mem.reconcileTaskWrite(
+    handle: handle,
+    runId: run,
+    operationId: item.operationId,
+    digest: item.outcome.digest,
+    applied: item.outcome.state == 'approved',
+    resume: resume,
+  );
   @override
   Future<List<mem.TaskMemoryRequirement>> requirements(String run) =>
       mem.runMemoryRequirements(handle: handle, runId: run);
@@ -315,6 +344,74 @@ class AgentController extends ChangeNotifier {
   mem.TaskMemoryReview? memoryReview;
   List<mem.TaskMemoryRequirement> memoryRequirements = [];
   bool usesMemory = false;
+  List<mem.UncertainMemoryWrite> uncertainWrites = [];
+  Future<void> inspectUncertainWrites() async {
+    final id = runId, transport = commands;
+    if (id == null ||
+        busy ||
+        cancelling ||
+        transport is! MemoryRecoveryCommands) {
+      return;
+    }
+    final epoch = ++_epoch;
+    busy = true;
+    error = null;
+    _changed();
+    try {
+      final items = await (transport as MemoryRecoveryCommands).uncertain(id);
+      if (_current(epoch)) {
+        uncertainWrites = items;
+        notice = items.isEmpty ? '没有待核对的记忆写入。' : null;
+      }
+    } catch (e) {
+      if (_current(epoch)) _failed(e);
+    } finally {
+      if (_current(epoch)) {
+        busy = false;
+        _changed();
+      }
+    }
+  }
+
+  Future<void> resolveMemory(mem.UncertainMemoryWrite item, bool resume) async {
+    final id = runId, transport = commands;
+    if (id == null ||
+        busy ||
+        cancelling ||
+        !uncertainWrites.contains(item) ||
+        transport is! MemoryRecoveryCommands) {
+      return;
+    }
+    final epoch = ++_epoch;
+    busy = true;
+    error = null;
+    _changed();
+    try {
+      await (transport as MemoryRecoveryCommands).reconcile(id, item, resume);
+      if (!_current(epoch)) return;
+      uncertainWrites = uncertainWrites
+          .where((v) => v.operationId != item.operationId)
+          .toList();
+      view = null;
+      notice = resume ? '已按回执恢复，可继续会话。' : '已按回执结束会话。';
+      if (resume) {
+        final current = await commands.inspect(id);
+        if (_current(epoch)) view = current;
+      } else {
+        runId = null;
+        usesMemory = false;
+        memoryRequirements = [];
+      }
+    } catch (e) {
+      if (_current(epoch)) _failed(e);
+    } finally {
+      if (_current(epoch)) {
+        busy = false;
+        _changed();
+      }
+    }
+  }
+
   Future<void> restoreMemory(mem.MemorySelection selected) async {
     final id = runId, transport = commands;
     if (id == null ||
@@ -551,6 +648,7 @@ class AgentController extends ChangeNotifier {
     );
     workspaceId = workspace;
     runId = id;
+    uncertainWrites = [];
     await retryStart();
   }
 
@@ -764,6 +862,7 @@ class AgentController extends ChangeNotifier {
     if (busy || cancelling || (reopen && active && id != runId)) return;
     final epoch = ++_epoch;
     runId = id;
+    uncertainWrites = [];
     workspaceId = expectedWorkspace ?? workspaceId;
     view = null;
     busy = true;

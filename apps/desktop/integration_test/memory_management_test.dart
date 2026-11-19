@@ -128,6 +128,18 @@ void main() {
         screenshot = '${visual.path}/memory-manager.png';
         await File(screenshot).writeAsBytes(png!.buffer.asUint8List());
         final old = controller.selection!;
+        final abandoned = await api.prepareEdit(
+          handle: handle,
+          selection: old,
+          edit: const api.MemoryEdit(
+            requestId: 'abandoned',
+            entryId: 'unsaved',
+            delete: false,
+            title: 'Draft',
+            content: 'unpublished draft content',
+            enabled: true,
+          ),
+        );
         await tap(tester, find.text('关闭访问'));
         expect(controller.entry, isNull);
         expect(controller.preview, isNull);
@@ -157,6 +169,18 @@ void main() {
         await controller.chooseScope('native-memory');
         await tester.pumpWidget(app(controller));
         await settle(tester);
+        await tap(tester, find.text('查找我的待确认草稿'));
+        expect(controller.drafts.single.draftId, abandoned.draftId);
+        expect(find.text('unpublished draft content'), findsNothing);
+        await tap(tester, find.text('作废'));
+        await tap(tester, find.text('确认作废'));
+        final discarded = await api.inspectEdit(
+          handle: handle,
+          scopeId: 'native-memory',
+          requestId: 'abandoned',
+        );
+        expect(discarded!.state, 'invalidated');
+        expect(controller.access, isNull);
         await tap(tester, find.text('打开只读访问'));
         expect(controller.canWrite, isFalse);
         await tap(tester, find.byKey(ValueKey('memory-entry-$id')));
@@ -187,6 +211,7 @@ void main() {
             'closedSelectionRejected': true,
             'reopenRequiredExplicitGrant': true,
             'persistedAfterReopen': true,
+            'draftDiscoveredAndDiscardedAfterReopen': true,
             'readonlyWriteRejected': true,
             'modelInference': false,
             'screenshot': screenshot,

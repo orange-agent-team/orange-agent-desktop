@@ -143,27 +143,32 @@
         "TaskMemoryRequirement",
         "TaskMemoryReview",
         "TaskMemoryScope",
-        "TaskMemorySelection"
+        "TaskMemorySelection",
+        "UncertainMemoryWrite"
       ],
       "functions": [
         "approveEdit",
         "approveRunMemory",
         "authorizeScope",
         "createScope",
+        "discardUserDraft",
         "inspectEdit",
         "listEntries",
         "listMembers",
         "listScopes",
+        "pendingUserDrafts",
         "prepareEdit",
         "previewRunMemory",
         "readEntry",
+        "reconcileTaskWrite",
         "restoreRunMemory",
         "reviewEdit",
         "runMemoryRequirements",
         "setMember",
         "setScopeEnabled",
         "startMemoryRun",
-        "suspendAccess"
+        "suspendAccess",
+        "uncertainTaskWrites"
       ]
     }
   }

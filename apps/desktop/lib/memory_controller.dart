@@ -49,9 +49,30 @@ abstract interface class MemoryCommands {
   Future<api.MemoryOutcome?> outcome(String scope, String request);
 }
 
-class NativeMemoryCommands implements MemoryCommands {
+abstract interface class MemoryDraftDirectory {
+  Future<List<api.MemoryOutcome>> pendingDrafts(String scope, String? after);
+  Future<api.MemoryOutcome> discardDraft(api.MemoryOutcome receipt);
+}
+
+class NativeMemoryCommands implements MemoryCommands, MemoryDraftDirectory {
   NativeMemoryCommands(this.handle);
   final String handle;
+  @override
+  Future<List<api.MemoryOutcome>> pendingDrafts(String scope, String? after) =>
+      api.pendingUserDrafts(
+        handle: handle,
+        scopeId: scope,
+        after: after,
+        limit: 30,
+      );
+  @override
+  Future<api.MemoryOutcome> discardDraft(api.MemoryOutcome receipt) =>
+      api.discardUserDraft(
+        handle: handle,
+        scopeId: receipt.scopeId,
+        draftId: receipt.draftId,
+        digest: receipt.digest,
+      );
   @override
   Future<api.MemoryScopePage> scopes(String? cursor) =>
       api.listScopes(handle: handle, cursor: cursor, limit: 100);
@@ -220,6 +241,8 @@ class MemoryController extends ChangeNotifier {
 
   void _hide() {
     visibilityEpoch++;
+    drafts = [];
+    draftAfter = null;
     entries = [];
     entryCursor = null;
     entry = null;
@@ -634,6 +657,44 @@ class MemoryController extends ChangeNotifier {
     receipt = value;
     notice = review.delete ? '删除已确认。' : '保存已确认。';
     await _entries(n, false);
+  });
+  List<api.MemoryOutcome> drafts = [];
+  String? draftAfter;
+  Future<void> discoverDrafts({bool more = false}) => _run((n) async {
+    final id = selectedScope, directory = commands;
+    if (id == null || directory is! MemoryDraftDirectory) return;
+    final rows = await (directory as MemoryDraftDirectory).pendingDrafts(
+      id,
+      more ? draftAfter : null,
+    );
+    if (!_live(n)) return;
+    drafts = more ? [...drafts, ...rows] : rows;
+    draftAfter = rows.length == 30 ? rows.last.draftId : null;
+    notice = drafts.isEmpty ? '当前空间没有待确认草稿。' : null;
+  });
+  Future<void> openDraft(api.MemoryOutcome draft) async {
+    if (draft.scopeId != selectedScope || !canWrite || busy) return;
+    receipt = draft;
+    await reviewPending();
+  }
+
+  Future<void> discardDraft(api.MemoryOutcome draft) => _run((n) async {
+    final directory = commands;
+    if (draft.scopeId != selectedScope || directory is! MemoryDraftDirectory) {
+      return;
+    }
+    final result = await (directory as MemoryDraftDirectory).discardDraft(
+      draft,
+    );
+    if (!_live(n)) return;
+    if (result.state != 'invalidated' ||
+        result.digest != draft.digest ||
+        result.draftId != draft.draftId) {
+      throw const FormatException('Discard receipt changed');
+    }
+    _hide();
+    receipt = result;
+    notice = '草稿已作废。';
   });
   Future<void> inspectPending() => _run((n) async {
     final request = pendingRequest, id = pendingScope;

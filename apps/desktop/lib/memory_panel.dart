@@ -502,6 +502,65 @@ class _MemoryPanelState extends State<MemoryPanel> {
                 ),
               ],
             ],
+            if (scope != null && c.commands is MemoryDraftDirectory) ...[
+              TextButton(
+                onPressed: c.busy ? null : () => unawaited(c.discoverDrafts()),
+                child: const Text('查找我的待确认草稿'),
+              ),
+              for (final draft in c.drafts)
+                ListTile(
+                  title: Text('待确认条目 ${draft.entryId}'),
+                  subtitle: Text(draft.draftId),
+                  trailing: Wrap(
+                    children: [
+                      TextButton(
+                        onPressed: c.busy || !c.canWrite
+                            ? null
+                            : () => unawaited(c.openDraft(draft)),
+                        child: const Text('重新审阅'),
+                      ),
+                      TextButton(
+                        onPressed: c.busy
+                            ? null
+                            : () async {
+                                final yes = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('作废这份草稿？'),
+                                    content: Text(
+                                      '条目 ${draft.entryId} 的待确认内容将被清除。',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, false),
+                                        child: const Text('返回'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, true),
+                                        child: const Text('确认作废'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (yes == true && mounted) {
+                                  await c.discardDraft(draft);
+                                }
+                              },
+                        child: const Text('作废'),
+                      ),
+                    ],
+                  ),
+                ),
+              if (c.draftAfter != null)
+                TextButton(
+                  onPressed: c.busy
+                      ? null
+                      : () => unawaited(c.discoverDrafts(more: true)),
+                  child: const Text('更多草稿'),
+                ),
+            ],
             if (c.pendingRequest != null) ...[
               const Divider(),
               TextButton(

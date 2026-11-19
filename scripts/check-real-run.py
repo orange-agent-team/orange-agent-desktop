@@ -99,9 +99,11 @@ def main():
         if not (args.memory or args.memory_write):
             (workspace / 'proof.txt').write_text(sentinel + '\n')
         nonce, instance = uuid.uuid4().hex + uuid.uuid4().hex, uuid.uuid4().hex
+        context_tokens = 8192 if args.qualification_7b else 4096
+        report['profile_context_tokens'] = context_tokens
         write(runtime / 'profile.json', {'protocol': 1, 'runtime_directory': str(runtime), 'socket_directory': str(ipc), 'executable': str(backend),
               'executable_sha256': build['executable_sha256'], 'model': str(installed), 'model_sha256': lock['model']['sha256'],
-              'model_bytes': lock['model']['bytes'], 'model_version': 'qwen-desktop-acceptance-v1', 'context_tokens': 4096,
+              'model_bytes': lock['model']['bytes'], 'model_version': 'qwen-desktop-acceptance-v1', 'context_tokens': context_tokens,
               'startup_timeout_seconds': 120, 'control_nonce': nonce, 'instance_id': instance})
         config = base / 'acceptance.json'
         write(config, {'private_root': str(private), 'service_root': str(runtime), 'workspace': str(workspace), 'sentinel': sentinel, 'memory': args.memory,'memory_write':args.memory_write})
@@ -139,6 +141,7 @@ def main():
                 report.update(json.loads(output))
                 report['phase'] = 'validated'
             except Exception as error:
+                report['phase'] = 'failed'
                 report['failure'] = str(error)[:2000]
                 database = private / 'host.sqlite'
                 if database.is_file():

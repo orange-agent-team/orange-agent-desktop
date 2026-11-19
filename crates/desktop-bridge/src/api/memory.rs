@@ -321,3 +321,62 @@ pub async fn run_memory_requirements(
     })
     .await
 }
+
+pub async fn pending_user_drafts(
+    handle: String,
+    scope_id: String,
+    after: Option<String>,
+    limit: u16,
+) -> Result<Vec<MemoryOutcome>, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        registry.pending_user_drafts(&handle, &scope_id, after.as_deref(), limit)
+    })
+    .await
+}
+pub async fn discard_user_draft(
+    handle: String,
+    scope_id: String,
+    draft_id: String,
+    digest: String,
+) -> Result<MemoryOutcome, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        registry.discard_user_draft(&handle, &scope_id, &draft_id, &digest)
+    })
+    .await
+}
+#[derive(Debug, Clone)]
+pub struct UncertainMemoryWrite {
+    pub operation_id: String,
+    pub outcome: MemoryOutcome,
+}
+pub async fn uncertain_task_writes(
+    handle: String,
+    run_id: String,
+    after: Option<String>,
+    limit: u16,
+) -> Result<Vec<UncertainMemoryWrite>, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        registry.uncertain_task_writes(&handle, &run_id, after.as_deref(), limit)
+    })
+    .await
+}
+pub async fn reconcile_task_write(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    digest: String,
+    applied: bool,
+    resume: bool,
+) -> Result<(), BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, rt| {
+        rt.block_on(registry.reconcile_task_write(
+            &handle,
+            &run_id,
+            &operation_id,
+            &digest,
+            applied,
+            resume,
+        ))
+    })
+    .await
+}
