@@ -786,3 +786,96 @@ impl HostRegistry {
         Ok(())
     }
 }
+
+fn removal_review(receipt: store::OwnerRemovalReview) -> api::RemovalReview {
+    let t = receipt.target;
+    api::RemovalReview {
+        target: api::RemovalTarget {
+            scope_id: t.scope_id,
+            scope_revision: t.scope_revision,
+            entry_id: t.entry_id,
+            entry_version: t.entry_version,
+        },
+        request_id: receipt.request_id,
+        expires_at: receipt.expires_at.to_string(),
+        digest: receipt.approval_digest,
+        applied: receipt.applied,
+    }
+}
+impl HostRegistry {
+    pub(crate) fn owner_inventory(
+        &mut self,
+        h: &str,
+        scope: &str,
+        revision: &str,
+        after: Option<&str>,
+        limit: u16,
+    ) -> Result<Vec<api::OwnerEntry>, BridgeError> {
+        self.current(h)?
+            .journal
+            .owner_memory_inventory(LOCAL_OWNER, scope, revision, after, limit)
+            .map(|rows| {
+                rows.into_iter()
+                    .map(|e| api::OwnerEntry {
+                        entry_id: e.entry_id,
+                        version: e.version,
+                        enabled: e.enabled,
+                    })
+                    .collect()
+            })
+            .map_err(memory_error)
+    }
+    pub(crate) fn prepare_removal(
+        &mut self,
+        h: &str,
+        key: &str,
+        target: api::RemovalTarget,
+    ) -> Result<api::RemovalReview, BridgeError> {
+        let t = store::OwnerRemovalTarget {
+            scope_id: target.scope_id,
+            scope_revision: target.scope_revision,
+            entry_id: target.entry_id,
+            entry_version: target.entry_version,
+        };
+        self.current(h)?
+            .journal
+            .prepare_owner_removal(LOCAL_OWNER, key, t)
+            .map(removal_review)
+            .map_err(memory_error)
+    }
+    pub(crate) fn inspect_removal(
+        &mut self,
+        h: &str,
+        scope: &str,
+        key: &str,
+    ) -> Result<Option<api::RemovalReview>, BridgeError> {
+        self.current(h)?
+            .journal
+            .inspect_owner_removal(LOCAL_OWNER, scope, key)
+            .map(|r| r.map(removal_review))
+            .map_err(memory_error)
+    }
+    pub(crate) async fn approve_removal(
+        &mut self,
+        h: &str,
+        scope: &str,
+        key: &str,
+        digest: &str,
+    ) -> Result<api::RemovalReview, BridgeError> {
+        let host = self.current(h)?;
+        let receipt = host
+            .journal
+            .approve_owner_removal(LOCAL_OWNER, scope, key, digest)
+            .await
+            .map_err(memory_error)?;
+        let revoked = host
+            .memories
+            .get(scope)
+            .filter(|s| s.grant.is_revoked())
+            .map(|s| s.token.clone());
+        if let Some(token) = revoked {
+            self.memory_suspend(h, scope, &token).await?;
+        }
+        Ok(removal_review(receipt))
+    }
+}

@@ -502,6 +502,62 @@ class _MemoryPanelState extends State<MemoryPanel> {
                 ),
               ],
             ],
+            if (scope != null &&
+                scope.canAdminister &&
+                c.commands is OwnerRemovalCommands)
+              ExpansionTile(
+                title: const Text('按标识清理记忆'),
+                children: [
+                  TextButton(
+                    onPressed: c.busy
+                        ? null
+                        : () => unawaited(c.discoverRemovable()),
+                    child: const Text('关闭正文访问并查看清理清单'),
+                  ),
+                  for (final row in c.removalEntries)
+                    ListTile(
+                      title: Text(row.entryId),
+                      subtitle: Text('版本 ${row.version}'),
+                      trailing: OutlinedButton(
+                        onPressed: c.busy
+                            ? null
+                            : () => unawaited(c.previewRemoval(row)),
+                        child: const Text('核对清理目标'),
+                      ),
+                    ),
+                  if (c.removalCursor != null)
+                    TextButton(
+                      onPressed: c.busy
+                          ? null
+                          : () => unawaited(c.discoverRemovable(more: true)),
+                      child: const Text('更多清理目标'),
+                    ),
+                  if (c.hasRemovalRequest)
+                    TextButton(
+                      onPressed: c.busy
+                          ? null
+                          : () => unawaited(c.inspectLastRemoval()),
+                      child: const Text('查询上次清理回执'),
+                    ),
+                  if (c.removalReview case final r?)
+                    ListTile(
+                      title: Text(
+                        '${r.target.scopeId} / ${r.target.entryId} · 版本 ${r.target.entryVersion}',
+                      ),
+                      subtitle: Text(
+                        r.applied
+                            ? '数据已删除。'
+                            : '确认后将删除条目，关闭此空间现有访问，并作废原修订的待确认草稿。',
+                      ),
+                      trailing: FilledButton(
+                        onPressed: c.busy
+                            ? null
+                            : () => unawaited(c.confirmRemoval()),
+                        child: Text(r.applied ? '确认访问已关闭' : '确认按标识删除'),
+                      ),
+                    ),
+                ],
+              ),
             if (scope != null && c.commands is MemoryDraftDirectory) ...[
               TextButton(
                 onPressed: c.busy ? null : () => unawaited(c.discoverDrafts()),

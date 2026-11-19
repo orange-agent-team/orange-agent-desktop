@@ -202,6 +202,27 @@ void main() {
           ),
           throwsA(isA<host.BridgeError>()),
         );
+        await tap(tester, find.text('停用空间'));
+        expect(controller.scope!.enabled, isFalse);
+        await tap(tester, find.text('按标识清理记忆'));
+        await tap(tester, find.text('关闭正文访问并查看清理清单'));
+        expect(controller.access, isNull);
+        expect(controller.removalEntries.single.entryId, id);
+        await tap(tester, find.text('核对清理目标'));
+        final exact = controller.removalReview!;
+        expect(exact.target.entryId, id);
+        expect(exact.applied, isFalse);
+        await tap(tester, find.text('确认按标识删除'));
+        final removed = await api.inspectRemoval(
+          handle: handle,
+          scope: 'native-memory',
+          requestId: exact.requestId,
+        );
+        expect(removed!.digest, exact.digest);
+        expect(removed.applied, isTrue);
+        expect(controller.scope!.enabled, isFalse);
+        await tap(tester, find.text('关闭正文访问并查看清理清单'));
+        expect(controller.removalEntries, isEmpty);
         debugPrint(
           jsonEncode({
             'nativeMemory': true,
@@ -213,6 +234,7 @@ void main() {
             'persistedAfterReopen': true,
             'draftDiscoveredAndDiscardedAfterReopen': true,
             'readonlyWriteRejected': true,
+            'removedFromDisabledScope': true,
             'modelInference': false,
             'screenshot': screenshot,
           }),

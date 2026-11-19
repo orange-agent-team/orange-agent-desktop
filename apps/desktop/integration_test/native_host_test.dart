@@ -185,14 +185,33 @@ void main() {
           await settle(tester, 'checkpoint-04');
           expect(find.text('native-fixture-v1'), findsOneWidget);
           await tester.ensureVisible(
-            find.byType(DropdownButtonFormField<String>),
+            find.descendant(
+              of: find.byType(AgentPanel),
+              matching: find.byType(DropdownButtonFormField<String>),
+            ),
           );
-          await tester.tap(find.byType(DropdownButtonFormField<String>));
+          await tester.tap(
+            find.descendant(
+              of: find.byType(AgentPanel),
+              matching: find.byType(DropdownButtonFormField<String>),
+            ),
+          );
           await settle(tester, 'checkpoint-05');
           await tester.tap(find.text(workspace.path).last);
           await settle(tester, 'checkpoint-06');
-          await tester.ensureVisible(find.byType(TextField));
-          await tester.enterText(find.byType(TextField), 'Read proof.txt');
+          await tester.ensureVisible(
+            find.descendant(
+              of: find.byType(AgentPanel),
+              matching: find.byType(TextField),
+            ),
+          );
+          await tester.enterText(
+            find.descendant(
+              of: find.byType(AgentPanel),
+              matching: find.byType(TextField),
+            ),
+            'Read proof.txt',
+          );
           await tester.pump();
           if (askFirst) {
             await tester.ensureVisible(find.text('允许任务询问补充信息'));
@@ -500,7 +519,7 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          '48a7aae275c2467ef865a9301135945a889d7f2d',
+          'fcc2300c89303ce908452941bd789a167bb542a5',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(

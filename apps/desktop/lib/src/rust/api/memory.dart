@@ -8,7 +8,7 @@ import 'host.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<MemoryScopePage> listScopes({
   required String handle,
@@ -272,6 +272,52 @@ Future<void> reconcileTaskWrite({
   digest: digest,
   applied: applied,
   resume: resume,
+);
+
+Future<List<OwnerEntry>> ownerInventory({
+  required String handle,
+  required String scope,
+  required String revision,
+  String? after,
+  required int limit,
+}) => RustLib.instance.api.crateApiMemoryOwnerInventory(
+  handle: handle,
+  scope: scope,
+  revision: revision,
+  after: after,
+  limit: limit,
+);
+
+Future<RemovalReview> prepareRemoval({
+  required String handle,
+  required String requestId,
+  required RemovalTarget target,
+}) => RustLib.instance.api.crateApiMemoryPrepareRemoval(
+  handle: handle,
+  requestId: requestId,
+  target: target,
+);
+
+Future<RemovalReview?> inspectRemoval({
+  required String handle,
+  required String scope,
+  required String requestId,
+}) => RustLib.instance.api.crateApiMemoryInspectRemoval(
+  handle: handle,
+  scope: scope,
+  requestId: requestId,
+);
+
+Future<RemovalReview> approveRemoval({
+  required String handle,
+  required String scope,
+  required String requestId,
+  required String digest,
+}) => RustLib.instance.api.crateApiMemoryApproveRemoval(
+  handle: handle,
+  scope: scope,
+  requestId: requestId,
+  digest: digest,
 );
 
 class MemoryAccessView {
@@ -746,6 +792,96 @@ class MemorySummary {
           enabled == other.enabled &&
           origin == other.origin &&
           contentBytes == other.contentBytes;
+}
+
+class OwnerEntry {
+  final String entryId;
+  final String version;
+  final bool enabled;
+
+  const OwnerEntry({
+    required this.entryId,
+    required this.version,
+    required this.enabled,
+  });
+
+  @override
+  int get hashCode => entryId.hashCode ^ version.hashCode ^ enabled.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OwnerEntry &&
+          runtimeType == other.runtimeType &&
+          entryId == other.entryId &&
+          version == other.version &&
+          enabled == other.enabled;
+}
+
+class RemovalReview {
+  final RemovalTarget target;
+  final String requestId;
+  final String expiresAt;
+  final String digest;
+  final bool applied;
+
+  const RemovalReview({
+    required this.target,
+    required this.requestId,
+    required this.expiresAt,
+    required this.digest,
+    required this.applied,
+  });
+
+  @override
+  int get hashCode =>
+      target.hashCode ^
+      requestId.hashCode ^
+      expiresAt.hashCode ^
+      digest.hashCode ^
+      applied.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RemovalReview &&
+          runtimeType == other.runtimeType &&
+          target == other.target &&
+          requestId == other.requestId &&
+          expiresAt == other.expiresAt &&
+          digest == other.digest &&
+          applied == other.applied;
+}
+
+class RemovalTarget {
+  final String scopeId;
+  final String scopeRevision;
+  final String entryId;
+  final String entryVersion;
+
+  const RemovalTarget({
+    required this.scopeId,
+    required this.scopeRevision,
+    required this.entryId,
+    required this.entryVersion,
+  });
+
+  @override
+  int get hashCode =>
+      scopeId.hashCode ^
+      scopeRevision.hashCode ^
+      entryId.hashCode ^
+      entryVersion.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RemovalTarget &&
+          runtimeType == other.runtimeType &&
+          scopeId == other.scopeId &&
+          scopeRevision == other.scopeRevision &&
+          entryId == other.entryId &&
+          entryVersion == other.entryVersion;
 }
 
 class TaskMemoryRequirement {

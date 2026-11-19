@@ -1,5 +1,7 @@
 # Orange Agent Desktop
 
+本地会话支持按任务选择记忆空间、逐次批准工具请求、重启后恢复记忆草稿，以及在正文无法读取时由所有者按标识清理条目。[记忆管理界面](docs/memory-manager-ui.md) · [任务授权与验证命令](docs/task-memory.md)
+
 日期：2026-11-08。当前仓库职责为E05 `orange-desktop-bridge`和E06 `orange_desktop`，共2个工程。E03 Agent Runtime源码按用户确认移入服务端仓库，桌面通过固定提交/不可变版本引用同一共享核心。
 
 Flutter负责会话、工具批准、成果、模型/Worker、钱包团队等交互；FRB桥接与Dart同包配对。桌面本地Run使用SQLite，云Web Agent由平台隔离工作区执行；两者的运行历史、凭证和文件不自动互相同步。

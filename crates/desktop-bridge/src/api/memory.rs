@@ -380,3 +380,69 @@ pub async fn reconcile_task_write(
     })
     .await
 }
+
+#[derive(Debug, Clone)]
+pub struct RemovalTarget {
+    pub scope_id: String,
+    pub scope_revision: String,
+    pub entry_id: String,
+    pub entry_version: String,
+}
+#[derive(Debug, Clone)]
+pub struct OwnerEntry {
+    pub entry_id: String,
+    pub version: String,
+    pub enabled: bool,
+}
+#[derive(Debug, Clone)]
+pub struct RemovalReview {
+    pub target: RemovalTarget,
+    pub request_id: String,
+    pub expires_at: String,
+    pub digest: String,
+    pub applied: bool,
+}
+
+pub async fn owner_inventory(
+    handle: String,
+    scope: String,
+    revision: String,
+    after: Option<String>,
+    limit: u16,
+) -> Result<Vec<OwnerEntry>, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        registry.owner_inventory(&handle, &scope, &revision, after.as_deref(), limit)
+    })
+    .await
+}
+pub async fn prepare_removal(
+    handle: String,
+    request_id: String,
+    target: RemovalTarget,
+) -> Result<RemovalReview, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        registry.prepare_removal(&handle, &request_id, target)
+    })
+    .await
+}
+pub async fn inspect_removal(
+    handle: String,
+    scope: String,
+    request_id: String,
+) -> Result<Option<RemovalReview>, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        registry.inspect_removal(&handle, &scope, &request_id)
+    })
+    .await
+}
+pub async fn approve_removal(
+    handle: String,
+    scope: String,
+    request_id: String,
+    digest: String,
+) -> Result<RemovalReview, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, rt| {
+        rt.block_on(registry.approve_removal(&handle, &scope, &request_id, &digest))
+    })
+    .await
+}

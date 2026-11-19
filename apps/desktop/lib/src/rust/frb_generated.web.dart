@@ -57,6 +57,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MemorySelection dco_decode_box_autoadd_memory_selection(dynamic raw);
 
   @protected
+  RemovalReview dco_decode_box_autoadd_removal_review(dynamic raw);
+
+  @protected
+  RemovalTarget dco_decode_box_autoadd_removal_target(dynamic raw);
+
+  @protected
   RunPermissionSelection dco_decode_box_autoadd_run_permission_selection(
     dynamic raw,
   );
@@ -186,6 +192,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<MemorySummary> dco_decode_list_memory_summary(dynamic raw);
 
   @protected
+  List<OwnerEntry> dco_decode_list_owner_entry(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
@@ -281,6 +290,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MemoryOutcome? dco_decode_opt_box_autoadd_memory_outcome(dynamic raw);
 
   @protected
+  RemovalReview? dco_decode_opt_box_autoadd_removal_review(dynamic raw);
+
+  @protected
   RunPermissionSelection? dco_decode_opt_box_autoadd_run_permission_selection(
     dynamic raw,
   );
@@ -292,6 +304,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String>? dco_decode_opt_list_String(dynamic raw);
+
+  @protected
+  OwnerEntry dco_decode_owner_entry(dynamic raw);
 
   @protected
   RecoveryDecisionView dco_decode_recovery_decision_view(dynamic raw);
@@ -312,6 +327,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RecoveryWriteAccessView dco_decode_recovery_write_access_view(dynamic raw);
+
+  @protected
+  RemovalReview dco_decode_removal_review(dynamic raw);
+
+  @protected
+  RemovalTarget dco_decode_removal_target(dynamic raw);
 
   @protected
   RetentionAccessView dco_decode_retention_access_view(dynamic raw);
@@ -405,6 +426,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MemorySelection sse_decode_box_autoadd_memory_selection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RemovalReview sse_decode_box_autoadd_removal_review(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RemovalTarget sse_decode_box_autoadd_removal_target(
     SseDeserializer deserializer,
   );
 
@@ -566,6 +597,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<OwnerEntry> sse_decode_list_owner_entry(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
@@ -675,6 +709,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RemovalReview? sse_decode_opt_box_autoadd_removal_review(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RunPermissionSelection? sse_decode_opt_box_autoadd_run_permission_selection(
     SseDeserializer deserializer,
   );
@@ -686,6 +725,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String>? sse_decode_opt_list_String(SseDeserializer deserializer);
+
+  @protected
+  OwnerEntry sse_decode_owner_entry(SseDeserializer deserializer);
 
   @protected
   RecoveryDecisionView sse_decode_recovery_decision_view(
@@ -716,6 +758,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RecoveryWriteAccessView sse_decode_recovery_write_access_view(
     SseDeserializer deserializer,
   );
+
+  @protected
+  RemovalReview sse_decode_removal_review(SseDeserializer deserializer);
+
+  @protected
+  RemovalTarget sse_decode_removal_target(SseDeserializer deserializer);
 
   @protected
   RetentionAccessView sse_decode_retention_access_view(
@@ -838,6 +886,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_memory_selection(
     MemorySelection self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_removal_review(
+    RemovalReview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_removal_target(
+    RemovalTarget self,
     SseSerializer serializer,
   );
 
@@ -1040,6 +1100,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_owner_entry(
+    List<OwnerEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -1187,6 +1253,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_removal_review(
+    RemovalReview? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_run_permission_selection(
     RunPermissionSelection? self,
     SseSerializer serializer,
@@ -1200,6 +1272,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_list_String(List<String>? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_owner_entry(OwnerEntry self, SseSerializer serializer);
 
   @protected
   void sse_encode_recovery_decision_view(
@@ -1236,6 +1311,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     RecoveryWriteAccessView self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_removal_review(RemovalReview self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_removal_target(RemovalTarget self, SseSerializer serializer);
 
   @protected
   void sse_encode_retention_access_view(

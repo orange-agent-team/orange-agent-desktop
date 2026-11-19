@@ -1,3 +1,5 @@
+import 'package:orange_desktop/agent_panel.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -169,18 +171,38 @@ Future<void> untilVisibleResult(
 Future<void> enterEditablePrompt(WidgetTester tester, String value) async {
   await until(
     tester,
-    () => !tester.widget<TextField>(find.byType(TextField)).readOnly,
+    () => !tester
+        .widget<TextField>(
+          find.descendant(
+            of: find.byType(AgentPanel),
+            matching: find.byType(TextField),
+          ),
+        )
+        .readOnly,
   );
-  await tester.ensureVisible(find.byType(TextField));
+  await tester.ensureVisible(
+    find.descendant(
+      of: find.byType(AgentPanel),
+      matching: find.byType(TextField),
+    ),
+  );
   // A readonly transition closes native text input while the test binding can
   // retain the same focusedEditable. Reopen through the real tap gesture.
-  await tester.tap(find.byType(TextField));
+  await tester.tap(
+    find.descendant(
+      of: find.byType(AgentPanel),
+      matching: find.byType(TextField),
+    ),
+  );
   await tester.pump();
   expect(
     tester
         .widget<EditableText>(
           find.descendant(
-            of: find.byType(TextField),
+            of: find.descendant(
+              of: find.byType(AgentPanel),
+              matching: find.byType(TextField),
+            ),
             matching: find.byType(EditableText),
           ),
         )
@@ -189,10 +211,24 @@ Future<void> enterEditablePrompt(WidgetTester tester, String value) async {
     isTrue,
     reason: 'typing requires focus on the actual editable field',
   );
-  await tester.enterText(find.byType(TextField), value);
+  await tester.enterText(
+    find.descendant(
+      of: find.byType(AgentPanel),
+      matching: find.byType(TextField),
+    ),
+    value,
+  );
   await tester.pump();
   expect(
-    tester.widget<TextField>(find.byType(TextField)).controller!.text,
+    tester
+        .widget<TextField>(
+          find.descendant(
+            of: find.byType(AgentPanel),
+            matching: find.byType(TextField),
+          ),
+        )
+        .controller!
+        .text,
     value,
     reason: 'the exact new prompt must be visible before starting a run',
   );
@@ -579,13 +615,26 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('orange-local-qwen-v1'), findsOneWidget);
         await tester.ensureVisible(
-          find.byType(DropdownButtonFormField<String>),
+          find.descendant(
+            of: find.byType(AgentPanel),
+            matching: find.byType(DropdownButtonFormField<String>),
+          ),
         );
-        await tester.tap(find.byType(DropdownButtonFormField<String>));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AgentPanel),
+            matching: find.byType(DropdownButtonFormField<String>),
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text(workspace.path).last);
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.byType(TextField));
+        await tester.ensureVisible(
+          find.descendant(
+            of: find.byType(AgentPanel),
+            matching: find.byType(TextField),
+          ),
+        );
         await enterEditablePrompt(
           tester,
           'Use read_file to read proof.txt with relative path proof.txt. After the tool result, answer with the exact file text.',
@@ -608,7 +657,12 @@ void main() {
             'ORANGE_EVIDENCE_${DateTime.now().microsecondsSinceEpoch}';
         await File('${workspace.path}/proof.txt')
             .writeAsString('$searchSentinel\n');
-        await tester.ensureVisible(find.byType(TextField));
+        await tester.ensureVisible(
+          find.descendant(
+            of: find.byType(AgentPanel),
+            matching: find.byType(TextField),
+          ),
+        );
         await enterEditablePrompt(
           tester,
           'Call search_text with exactly these arguments: {"path":".","query":"ORANGE_EVIDENCE_"}. Do not add optional fields. Do not call read_file. Wait for the search result. Then answer with the exact complete matching line text from its excerpt. Do not invent or shorten the content.',

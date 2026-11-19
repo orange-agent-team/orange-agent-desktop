@@ -54,9 +54,50 @@ abstract interface class MemoryDraftDirectory {
   Future<api.MemoryOutcome> discardDraft(api.MemoryOutcome receipt);
 }
 
-class NativeMemoryCommands implements MemoryCommands, MemoryDraftDirectory {
+abstract interface class OwnerRemovalCommands {
+  Future<List<api.OwnerEntry>> inventory(
+    api.MemoryScopeView scope,
+    String? after,
+  );
+  Future<api.RemovalReview> prepareRemoval(
+    api.RemovalTarget target,
+    String request,
+  );
+  Future<api.RemovalReview> approveRemoval(api.RemovalReview review);
+  Future<api.RemovalReview?> inspectRemoval(String scope, String request);
+}
+
+class NativeMemoryCommands
+    implements MemoryCommands, MemoryDraftDirectory, OwnerRemovalCommands {
   NativeMemoryCommands(this.handle);
   final String handle;
+  @override
+  Future<List<api.OwnerEntry>> inventory(
+    api.MemoryScopeView scope,
+    String? after,
+  ) => api.ownerInventory(
+    handle: handle,
+    scope: scope.scopeId,
+    revision: scope.revision,
+    after: after,
+    limit: 30,
+  );
+  @override
+  Future<api.RemovalReview> prepareRemoval(
+    api.RemovalTarget target,
+    String request,
+  ) => api.prepareRemoval(handle: handle, target: target, requestId: request);
+  @override
+  Future<api.RemovalReview> approveRemoval(api.RemovalReview review) =>
+      api.approveRemoval(
+        handle: handle,
+        scope: review.target.scopeId,
+        requestId: review.requestId,
+        digest: review.digest,
+      );
+  @override
+  Future<api.RemovalReview?> inspectRemoval(String scope, String request) =>
+      api.inspectRemoval(handle: handle, scope: scope, requestId: request);
   @override
   Future<List<api.MemoryOutcome>> pendingDrafts(String scope, String? after) =>
       api.pendingUserDrafts(
@@ -241,6 +282,9 @@ class MemoryController extends ChangeNotifier {
 
   void _hide() {
     visibilityEpoch++;
+    removalEntries = [];
+    removalCursor = null;
+    removalReview = null;
     drafts = [];
     draftAfter = null;
     entries = [];
@@ -770,6 +814,119 @@ class MemoryController extends ChangeNotifier {
     });
   }
 
+  List<api.OwnerEntry> removalEntries = [];
+  String? removalCursor, _lastRemovalRequest, _lastRemovalScope;
+  api.RemovalReview? removalReview;
+  bool get hasRemovalRequest =>
+      _lastRemovalRequest != null && _lastRemovalScope == selectedScope;
+  Future<void> discoverRemovable({bool more = false}) async {
+    final target = scope, directory = commands;
+    if (target == null ||
+        !target.canAdminister ||
+        busy ||
+        directory is! OwnerRemovalCommands) {
+      return;
+    }
+    if (!more) {
+      final closing = closeAccess();
+      final generation = _epoch;
+      await closing;
+      if (!_live(generation) || scope?.scopeId != target.scopeId) return;
+    }
+    await _run((n) async {
+      final rows = await (directory as OwnerRemovalCommands).inventory(
+        target,
+        more ? removalCursor : null,
+      );
+      if (!_live(n)) return;
+      removalEntries = more ? [...removalEntries, ...rows] : rows;
+      removalCursor = rows.length == 30 ? rows.last.entryId : null;
+      if (removalEntries.isEmpty) notice = '当前空间没有可清理的条目。';
+    });
+  }
+
+  Future<void> previewRemoval(api.OwnerEntry row) => _run((n) async {
+    final target = scope, directory = commands;
+    if (target == null ||
+        !target.canAdminister ||
+        directory is! OwnerRemovalCommands ||
+        !removalEntries.contains(row)) {
+      return;
+    }
+    final requested = api.RemovalTarget(
+      scopeId: target.scopeId,
+      scopeRevision: target.revision,
+      entryId: row.entryId,
+      entryVersion: row.version,
+    );
+    final key = _token();
+    _lastRemovalRequest = key;
+    _lastRemovalScope = target.scopeId;
+    removalReview = null;
+    final review = await (directory as OwnerRemovalCommands).prepareRemoval(
+      requested,
+      key,
+    );
+    if (!_live(n)) return;
+    if (review.target != requested ||
+        review.requestId != key ||
+        review.applied) {
+      throw const FormatException('Removal target changed');
+    }
+    removalReview = review;
+  });
+  Future<void> confirmRemoval() => _run((n) async {
+    final directory = commands, exact = removalReview;
+    if (directory is! OwnerRemovalCommands ||
+        exact == null ||
+        exact.target.scopeId != selectedScope) {
+      return;
+    }
+    removalReview = null;
+    final result = await (directory as OwnerRemovalCommands).approveRemoval(
+      exact,
+    );
+    if (!_live(n)) return;
+    if (result.digest != exact.digest ||
+        result.target != exact.target ||
+        !result.applied) {
+      throw const FormatException('Removal not confirmed');
+    }
+    _hide();
+    notice = '条目已删除，原空间访问已关闭。';
+    // Reload the changed scope revision without assuming it is on page one.
+    final original = selectedScope;
+    final page = await commands.scopes(null);
+    if (!_live(n)) return;
+    scopes = page.scopes;
+    scopeCursor = page.nextCursor;
+    selectedScope = scopes.any((s) => s.scopeId == original) ? original : null;
+  });
+  Future<void> inspectLastRemoval() => _run((n) async {
+    final key = _lastRemovalRequest,
+        id = _lastRemovalScope,
+        directory = commands;
+    if (key == null ||
+        id == null ||
+        id != selectedScope ||
+        directory is! OwnerRemovalCommands) {
+      return;
+    }
+    final result = await (directory as OwnerRemovalCommands).inspectRemoval(
+      id,
+      key,
+    );
+    if (!_live(n)) return;
+    if (result == null) {
+      notice = '尚未登记这次清理请求。';
+      return;
+    }
+    if (result.requestId != key || result.target.scopeId != id) {
+      throw const FormatException('Receipt mismatch');
+    }
+    removalReview = result;
+    notice = result.applied ? '删除已提交，可确认原访问已关闭。' : '清理请求仍待确认。';
+  });
   Future<void> setEnabled(bool enabled) async {
     final target = scope;
     if (target == null || !target.canAdminister) return;
