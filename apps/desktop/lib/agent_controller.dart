@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import 'src/rust/api/host.dart' as api;
+import 'src/rust/api/memory.dart' as mem;
 
 /// UI scheduling only. Authorization, approval, limits, effects and recovery
 /// remain in Rust. Implementations used by tests live only under test/.
@@ -51,9 +52,69 @@ abstract interface class EditingAgentCommands {
   );
 }
 
-class NativeAgentCommands implements AgentCommands, EditingAgentCommands {
+abstract interface class MemoryAgentCommands {
+  Future<List<mem.TaskMemoryRequirement>> requirements(String run);
+  Future<api.AgentRunView> restoreMemory(
+    String run,
+    mem.TaskMemorySelection selection,
+  );
+
+  Future<api.AgentRunView> startWithMemory(
+    String workspace,
+    String id,
+    String prompt,
+    mem.TaskMemorySelection selection,
+    bool questions,
+  );
+  Future<mem.TaskMemoryReview> previewMemory(String run, String operation);
+  Future<api.AgentRunView> approveMemory(
+    String run,
+    String operation,
+    String digest,
+  );
+}
+
+class NativeAgentCommands
+    implements AgentCommands, EditingAgentCommands, MemoryAgentCommands {
   NativeAgentCommands(this.handle);
   final String handle;
+  @override
+  Future<List<mem.TaskMemoryRequirement>> requirements(String run) =>
+      mem.runMemoryRequirements(handle: handle, runId: run);
+  @override
+  Future<api.AgentRunView> restoreMemory(
+    String run,
+    mem.TaskMemorySelection selection,
+  ) => mem.restoreRunMemory(handle: handle, runId: run, selection: selection);
+  @override
+  Future<api.AgentRunView> startWithMemory(
+    String workspace,
+    String id,
+    String prompt,
+    mem.TaskMemorySelection selection,
+    bool questions,
+  ) => mem.startMemoryRun(
+    handle: handle,
+    workspace: workspace,
+    requestId: id,
+    prompt: prompt,
+    selection: selection,
+    interactive: questions,
+  );
+  @override
+  Future<mem.TaskMemoryReview> previewMemory(String run, String operation) =>
+      mem.previewRunMemory(handle: handle, runId: run, operationId: operation);
+  @override
+  Future<api.AgentRunView> approveMemory(
+    String run,
+    String operation,
+    String digest,
+  ) => mem.approveRunMemory(
+    handle: handle,
+    runId: run,
+    operationId: operation,
+    digest: digest,
+  );
   @override
   Future<api.AgentRunView> startEditing(
     String workspace,
@@ -182,7 +243,11 @@ const supportedReadTools = <String, String>{
   'search_text': '搜索文本',
 };
 
-String toolDisplayName(String name) => name == 'apply_patch'
+String toolDisplayName(String name) => name == 'memory_read'
+    ? '读取记忆'
+    : name == 'memory_write'
+    ? '修改记忆'
+    : name == 'apply_patch'
     ? '修改现有文件'
     : name == 'write_file'
     ? '新建文件'
@@ -228,6 +293,7 @@ class AgentController extends ChangeNotifier {
     bool allowQuestions,
     api.CreationAccessView? creation,
     api.EditingAccessView? editing,
+    mem.TaskMemorySelection? memory,
   })?
   _submission;
   bool get startUnconfirmed => _submission != null;
@@ -246,10 +312,102 @@ class AgentController extends ChangeNotifier {
       view!.pending.isEmpty &&
       {'ready', 'tools_pending'}.contains(view!.phase);
   bool get matchingModel => view == null || view!.modelId == model?.modelId;
+  mem.TaskMemoryReview? memoryReview;
+  List<mem.TaskMemoryRequirement> memoryRequirements = [];
+  bool usesMemory = false;
+  Future<void> restoreMemory(mem.MemorySelection selected) async {
+    final id = runId, transport = commands;
+    if (id == null ||
+        busy ||
+        cancelling ||
+        transport is! MemoryAgentCommands ||
+        memoryRequirements.length != 1) {
+      return;
+    }
+    final required = memoryRequirements.single;
+    if (required.scopeId != selected.scopeId) return;
+    final epoch = ++_epoch;
+    busy = true;
+    view = null;
+    error = null;
+    _changed();
+    try {
+      final restored = await (transport as MemoryAgentCommands).restoreMemory(
+        id,
+        mem.TaskMemorySelection(
+          scopes: [
+            mem.TaskMemoryScope(
+              scopeId: required.scopeId,
+              write: required.write,
+              sessionToken: selected.sessionToken,
+            ),
+          ],
+          sources: selected.sources,
+        ),
+      );
+      if (!_current(epoch)) return;
+      view = restored;
+      workspaceId = restored.workspaceId;
+      notice = '已重新验证任务访问权限。';
+    } catch (e) {
+      if (_current(epoch)) _failed(e);
+    } finally {
+      if (_current(epoch)) {
+        busy = false;
+        _changed();
+      }
+    }
+  }
+
+  bool get memoryReviewMatches {
+    final op = view?.pending.firstOrNull;
+    return op?.toolName == 'memory_write' &&
+        op!.operationId == memoryReview?.operationId &&
+        op.argumentDigest == memoryReview?.argumentDigest;
+  }
+
+  Future<void> previewMemoryWrite() async {
+    final current = view, op = view?.pending.firstOrNull, transport = commands;
+    if (busy ||
+        cancelling ||
+        op?.toolName != 'memory_write' ||
+        current == null ||
+        transport is! MemoryAgentCommands) {
+      return;
+    }
+    final epoch = ++_epoch;
+    busy = true;
+    error = null;
+    memoryReview = null;
+    _changed();
+    try {
+      final review = await (transport as MemoryAgentCommands).previewMemory(
+        current.runId,
+        op!.operationId,
+      );
+      if (!_current(epoch)) return;
+      if (review.operationId != op.operationId ||
+          review.argumentDigest != op.argumentDigest) {
+        throw const FormatException('Memory preview changed');
+      }
+      memoryReview = review;
+    } catch (e) {
+      if (_current(epoch)) _failed(e);
+    } finally {
+      if (_current(epoch)) {
+        busy = false;
+        _changed();
+      }
+    }
+  }
+
   bool get supportedPreview =>
       view != null &&
       view!.pending.isNotEmpty &&
       (editPreviewMatches ||
+          memoryReviewMatches ||
+          (commands is MemoryAgentCommands &&
+              view!.pending.first.toolName == 'memory_read') ||
           supportedReadTools.containsKey(view!.pending.first.toolName) ||
           (view!.pending.first.toolName == 'write_file' &&
               view!.creationConsentId != null &&
@@ -262,8 +420,9 @@ class AgentController extends ChangeNotifier {
       editPreview!.runId == view!.runId &&
       editPreview!.operationId == view!.pending.first.operationId &&
       editPreview!.argumentDigest == view!.pending.first.argumentDigest;
-  String get approvalLabel =>
-      view?.pending.firstOrNull?.toolName == 'apply_patch'
+  String get approvalLabel => memoryReviewMatches
+      ? '确认这次记忆修改'
+      : view?.pending.firstOrNull?.toolName == 'apply_patch'
       ? '批准这次精确修改'
       : view?.pending.firstOrNull?.toolName == 'write_file'
       ? '批准新建这个文件'
@@ -331,6 +490,7 @@ class AgentController extends ChangeNotifier {
   bool _current(int epoch) => _alive && epoch == _epoch;
   void _changed() {
     if (!editPreviewMatches) editPreview = null;
+    if (!memoryReviewMatches) memoryReview = null;
     if (_alive) notifyListeners();
   }
 
@@ -366,6 +526,7 @@ class AgentController extends ChangeNotifier {
     bool allowQuestions = false,
     api.CreationAccessView? creation,
     api.EditingAccessView? editing,
+    mem.TaskMemorySelection? memory,
   }) async {
     if (busy ||
         cancelling ||
@@ -377,7 +538,10 @@ class AgentController extends ChangeNotifier {
     final random = Random.secure();
     final id =
         'run-${List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
+    memoryRequirements = [];
+    usesMemory = memory != null;
     _submission = (
+      memory: memory,
       workspace: workspace,
       id: id,
       prompt: prompt,
@@ -401,7 +565,19 @@ class AgentController extends ChangeNotifier {
     _changed();
     try {
       final api.AgentRunView created;
-      if (submission.editing != null) {
+      if (submission.memory != null) {
+        final transport = commands;
+        if (transport is! MemoryAgentCommands) {
+          throw UnsupportedError('Memory transport unavailable');
+        }
+        created = await (transport as MemoryAgentCommands).startWithMemory(
+          submission.workspace,
+          submission.id,
+          submission.prompt,
+          submission.memory!,
+          submission.allowQuestions,
+        );
+      } else if (submission.editing != null) {
         final editing = commands;
         if (editing is! EditingAgentCommands) {
           throw UnsupportedError('Editing transport unavailable');
@@ -533,7 +709,17 @@ class AgentController extends ChangeNotifier {
     _changed();
     try {
       final api.AgentRunView approved;
-      if (preview.toolName == 'apply_patch') {
+      if (preview.toolName == 'memory_read' ||
+          preview.toolName == 'memory_write') {
+        final transport = commands as MemoryAgentCommands;
+        approved = await transport.approveMemory(
+          current.runId,
+          preview.operationId,
+          preview.toolName == 'memory_write'
+              ? memoryReview!.approvalDigest
+              : preview.argumentDigest,
+        );
+      } else if (preview.toolName == 'apply_patch') {
         final editing = commands;
         final exact = editPreview;
         if (editing is! EditingAgentCommands || exact == null) {
@@ -585,6 +771,16 @@ class AgentController extends ChangeNotifier {
     notice = null;
     _changed();
     try {
+      final transport = commands;
+      memoryRequirements = [];
+      if (transport is MemoryAgentCommands) {
+        final required = await (transport as MemoryAgentCommands).requirements(
+          id,
+        );
+        if (!_current(epoch)) return;
+        memoryRequirements = required;
+        usesMemory = required.isNotEmpty;
+      }
       final result = await commands.inspect(id);
       if (!_current(epoch)) return;
       view = result;

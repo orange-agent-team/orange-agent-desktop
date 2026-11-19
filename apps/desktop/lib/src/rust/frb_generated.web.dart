@@ -62,6 +62,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  TaskMemorySelection dco_decode_box_autoadd_task_memory_selection(dynamic raw);
+
+  @protected
   UserQuestionGroupView dco_decode_box_autoadd_user_question_group_view(
     dynamic raw,
   );
@@ -184,6 +187,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<RunSummary> dco_decode_list_run_summary(dynamic raw);
+
+  @protected
+  List<TaskMemoryRequirement> dco_decode_list_task_memory_requirement(
+    dynamic raw,
+  );
+
+  @protected
+  List<TaskMemoryScope> dco_decode_list_task_memory_scope(dynamic raw);
 
   @protected
   List<ToolApprovalView> dco_decode_list_tool_approval_view(dynamic raw);
@@ -313,6 +324,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RunSummary dco_decode_run_summary(dynamic raw);
 
   @protected
+  TaskMemoryRequirement dco_decode_task_memory_requirement(dynamic raw);
+
+  @protected
+  TaskMemoryReview dco_decode_task_memory_review(dynamic raw);
+
+  @protected
+  TaskMemoryScope dco_decode_task_memory_scope(dynamic raw);
+
+  @protected
+  TaskMemorySelection dco_decode_task_memory_selection(dynamic raw);
+
+  @protected
   ToolApprovalView dco_decode_tool_approval_view(dynamic raw);
 
   @protected
@@ -376,6 +399,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RunPermissionSelection sse_decode_box_autoadd_run_permission_selection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TaskMemorySelection sse_decode_box_autoadd_task_memory_selection(
     SseDeserializer deserializer,
   );
 
@@ -526,6 +554,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<RunSummary> sse_decode_list_run_summary(SseDeserializer deserializer);
+
+  @protected
+  List<TaskMemoryRequirement> sse_decode_list_task_memory_requirement(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<TaskMemoryScope> sse_decode_list_task_memory_scope(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<ToolApprovalView> sse_decode_list_tool_approval_view(
@@ -685,6 +723,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RunSummary sse_decode_run_summary(SseDeserializer deserializer);
 
   @protected
+  TaskMemoryRequirement sse_decode_task_memory_requirement(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TaskMemoryReview sse_decode_task_memory_review(SseDeserializer deserializer);
+
+  @protected
+  TaskMemoryScope sse_decode_task_memory_scope(SseDeserializer deserializer);
+
+  @protected
+  TaskMemorySelection sse_decode_task_memory_selection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ToolApprovalView sse_decode_tool_approval_view(SseDeserializer deserializer);
 
   @protected
@@ -764,6 +818,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_run_permission_selection(
     RunPermissionSelection self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_task_memory_selection(
+    TaskMemorySelection self,
     SseSerializer serializer,
   );
 
@@ -956,6 +1016,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_run_summary(
     List<RunSummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_task_memory_requirement(
+    List<TaskMemoryRequirement> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_task_memory_scope(
+    List<TaskMemoryScope> self,
     SseSerializer serializer,
   );
 
@@ -1156,6 +1228,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_run_summary(RunSummary self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_task_memory_requirement(
+    TaskMemoryRequirement self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_task_memory_review(
+    TaskMemoryReview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_task_memory_scope(
+    TaskMemoryScope self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_task_memory_selection(
+    TaskMemorySelection self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_tool_approval_view(

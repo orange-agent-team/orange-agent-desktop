@@ -8,7 +8,7 @@ import 'host.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<MemoryScopePage> listScopes({
   required String handle,
@@ -164,6 +164,62 @@ Future<MemoryOutcome?> inspectEdit({
   handle: handle,
   scopeId: scopeId,
   requestId: requestId,
+);
+
+Future<AgentRunView> startMemoryRun({
+  required String handle,
+  required String workspace,
+  required String requestId,
+  required String prompt,
+  required TaskMemorySelection selection,
+  required bool interactive,
+}) => RustLib.instance.api.crateApiMemoryStartMemoryRun(
+  handle: handle,
+  workspace: workspace,
+  requestId: requestId,
+  prompt: prompt,
+  selection: selection,
+  interactive: interactive,
+);
+
+Future<AgentRunView> restoreRunMemory({
+  required String handle,
+  required String runId,
+  required TaskMemorySelection selection,
+}) => RustLib.instance.api.crateApiMemoryRestoreRunMemory(
+  handle: handle,
+  runId: runId,
+  selection: selection,
+);
+
+Future<TaskMemoryReview> previewRunMemory({
+  required String handle,
+  required String runId,
+  required String operationId,
+}) => RustLib.instance.api.crateApiMemoryPreviewRunMemory(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+);
+
+Future<AgentRunView> approveRunMemory({
+  required String handle,
+  required String runId,
+  required String operationId,
+  required String digest,
+}) => RustLib.instance.api.crateApiMemoryApproveRunMemory(
+  handle: handle,
+  runId: runId,
+  operationId: operationId,
+  digest: digest,
+);
+
+Future<List<TaskMemoryRequirement>> runMemoryRequirements({
+  required String handle,
+  required String runId,
+}) => RustLib.instance.api.crateApiMemoryRunMemoryRequirements(
+  handle: handle,
+  runId: runId,
 );
 
 class MemoryAccessView {
@@ -638,4 +694,116 @@ class MemorySummary {
           enabled == other.enabled &&
           origin == other.origin &&
           contentBytes == other.contentBytes;
+}
+
+class TaskMemoryRequirement {
+  final String scopeId;
+  final String revision;
+  final bool write;
+
+  const TaskMemoryRequirement({
+    required this.scopeId,
+    required this.revision,
+    required this.write,
+  });
+
+  @override
+  int get hashCode => scopeId.hashCode ^ revision.hashCode ^ write.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TaskMemoryRequirement &&
+          runtimeType == other.runtimeType &&
+          scopeId == other.scopeId &&
+          revision == other.revision &&
+          write == other.write;
+}
+
+class TaskMemoryReview {
+  final String operationId;
+  final String argumentDigest;
+  final String approvalDigest;
+  final String reviewJson;
+  final String sourcesJson;
+
+  const TaskMemoryReview({
+    required this.operationId,
+    required this.argumentDigest,
+    required this.approvalDigest,
+    required this.reviewJson,
+    required this.sourcesJson,
+  });
+
+  @override
+  int get hashCode =>
+      operationId.hashCode ^
+      argumentDigest.hashCode ^
+      approvalDigest.hashCode ^
+      reviewJson.hashCode ^
+      sourcesJson.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TaskMemoryReview &&
+          runtimeType == other.runtimeType &&
+          operationId == other.operationId &&
+          argumentDigest == other.argumentDigest &&
+          approvalDigest == other.approvalDigest &&
+          reviewJson == other.reviewJson &&
+          sourcesJson == other.sourcesJson;
+}
+
+/// An explicit task permission bounded by the current selection.
+class TaskMemoryScope {
+  final String scopeId;
+  final String sessionToken;
+  final bool write;
+
+  const TaskMemoryScope({
+    required this.scopeId,
+    required this.sessionToken,
+    required this.write,
+  });
+
+  @override
+  int get hashCode => scopeId.hashCode ^ sessionToken.hashCode ^ write.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TaskMemoryScope &&
+          runtimeType == other.runtimeType &&
+          scopeId == other.scopeId &&
+          sessionToken == other.sessionToken &&
+          write == other.write;
+}
+
+class TaskMemorySelection {
+  final RunPermissionSelection? creation;
+  final RunPermissionSelection? editing;
+  final List<TaskMemoryScope> scopes;
+  final MemorySources sources;
+
+  const TaskMemorySelection({
+    this.creation,
+    this.editing,
+    required this.scopes,
+    required this.sources,
+  });
+
+  @override
+  int get hashCode =>
+      creation.hashCode ^ editing.hashCode ^ scopes.hashCode ^ sources.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TaskMemorySelection &&
+          runtimeType == other.runtimeType &&
+          creation == other.creation &&
+          editing == other.editing &&
+          scopes == other.scopes &&
+          sources == other.sources;
 }

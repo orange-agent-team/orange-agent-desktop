@@ -64,6 +64,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
       NativeRetentionCommands(widget.host.handle),
     );
     memory = MemoryController(NativeMemoryCommands(widget.host.handle));
+    memory.addListener(memoryChanged);
     memory.refresh();
     models?.configure();
   }
@@ -74,8 +75,25 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
     controller.dispose();
     recovery.dispose();
     retention.dispose();
+    memory.removeListener(memoryChanged);
     memory.dispose();
     super.dispose();
+  }
+
+  String? memoryIdentity;
+  void memoryChanged() {
+    final selection = memory.selection;
+    final identity = selection == null
+        ? null
+        : [
+            selection.sessionToken,
+            ...selection.sources.memoryTokens,
+            ...selection.sources.workspaceIds,
+          ].join('|');
+    if (identity == memoryIdentity || !mounted) return;
+    memoryIdentity = identity;
+    if (controller.usesMemory) controller.hideContent();
+    setState(() {});
   }
 
   void changed(List<WorkspaceView> rows) {
@@ -164,6 +182,8 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
       MemoryPanel(controller: memory, workspaces: workspaces),
       const SizedBox(height: 16),
       AgentPanel(
+        memory: memory.selection,
+        memoryWrite: memory.canWrite,
         controller: controller,
         workspaces: workspaces,
         creations: creations,

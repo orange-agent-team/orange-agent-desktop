@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:orange_desktop/src/rust/api/memory.dart' as mem;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orange_desktop/agent_controller.dart';
@@ -310,7 +312,101 @@ class EditingFixtureCommands extends FixtureCommands
   }
 }
 
+class MemoryTaskFixture extends FixtureCommands implements MemoryAgentCommands {
+  mem.TaskMemorySelection? selected;
+  String? approvedDigest;
+  @override
+  Future<AgentRunView> startWithMemory(
+    String workspace,
+    String id,
+    String prompt,
+    mem.TaskMemorySelection selection,
+    bool questions,
+  ) {
+    selected = selection;
+    return start(workspace, id, prompt);
+  }
+
+  @override
+  Future<List<mem.TaskMemoryRequirement>> requirements(String run) async => [
+    const mem.TaskMemoryRequirement(
+      scopeId: 'personal',
+      revision: '1',
+      write: true,
+    ),
+  ];
+  @override
+  Future<AgentRunView> restoreMemory(
+    String run,
+    mem.TaskMemorySelection selection,
+  ) async {
+    selected = selection;
+    return state('completed', text: 'restored');
+  }
+
+  @override
+  Future<mem.TaskMemoryReview> previewMemory(
+    String run,
+    String operation,
+  ) async => const mem.TaskMemoryReview(
+    operationId: 'fixture-operation',
+    argumentDigest: 'fixture-digest',
+    approvalDigest: 'review-digest',
+    reviewJson: '{"scope_id":"personal","entry_id":"note","mutation":"put","payload":{"title":"Preference","content":"Jasmine tea","enabled":true}}',
+    sourcesJson: '[]',
+  );
+  @override
+  Future<AgentRunView> approveMemory(
+    String run,
+    String operation,
+    String digest,
+  ) async {
+    approvedDigest = digest;
+    approved = true;
+    return state('tools_pending', steps: 1);
+  }
+}
+
 void main() {
+  testWidgets(
+    'memory write requires a displayed composite preview and a separate confirmation',
+    (tester) async {
+      final commands = MemoryTaskFixture()..toolName = 'memory_write';
+      final controller = await show(tester, commands);
+      const selection = mem.TaskMemorySelection(
+        scopes: [
+          mem.TaskMemoryScope(
+            scopeId: 'personal',
+            sessionToken: 'owned',
+            write: true,
+          ),
+        ],
+        sources: mem.MemorySources(workspaceIds: [], memoryTokens: []),
+      );
+      await controller.start(
+        workspace.workspaceId,
+        'Remember',
+        memory: selection,
+      );
+      await tester.pumpAndSettle();
+      expect(commands.selected, selection);
+      expect(controller.supportedPreview, isFalse);
+      await controller.approveFirst();
+      expect(commands.approved, isFalse);
+      await tester.ensureVisible(find.text('核对记忆修改和来源'));
+      await tester.tap(find.text('核对记忆修改和来源'));
+      await tester.pumpAndSettle();
+      expect(find.text('Jasmine tea'), findsOneWidget);
+      expect(commands.approved, isFalse);
+      await tester.ensureVisible(find.text('确认这次记忆修改'));
+      await tester.tap(find.text('确认这次记忆修改'));
+      await tester.pumpAndSettle();
+      expect(commands.approvedDigest, 'review-digest');
+      expect(controller.view?.phase, 'completed');
+      expect(controller.memoryReview, isNull);
+    },
+  );
+
   testWidgets('replacing editing scope invalidates an in-flight preview', (
     tester,
   ) async {

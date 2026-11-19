@@ -394,6 +394,7 @@ pub(crate) async fn start_editing_run(
                 &prompt,
                 interactive,
                 runs::WriteSelection {
+                    memory: None,
                     creation: creation
                         .as_ref()
                         .map(|s| (s.consent_id.as_str(), s.permission_version.as_str())),
@@ -417,18 +418,14 @@ impl HostRegistry {
         let edit = run_editing(host, run, &signals)?
             .ok_or_else(|| failure("EDITING_SESSION_ACCESS_REQUIRED"))?;
         let create = super::creation::run_creation(host, run)?;
+        let memory = host.task_memory.get(run).cloned().unwrap_or_default();
+        let mut authority = memory.authority(&read).with_editing(&edit);
+        if let Some(create) = &create {
+            authority = authority.with_creation(create);
+        }
         let review = host
             .journal
-            .agent_patch_preview(
-                LOCAL_OWNER,
-                run,
-                operation,
-                orange_agent_runtime::engine::EditingAuthority {
-                    read: &read,
-                    create: create.as_ref(),
-                    edit: &edit,
-                },
-            )
+            .agent_patch_preview_authorized(LOCAL_OWNER, run, operation, authority)
             .await
             .map_err(runs::engine_error)?;
         let p = review.preview;
@@ -460,8 +457,13 @@ impl HostRegistry {
         let edit = run_editing(host, run, &signals)?
             .ok_or_else(|| failure("EDITING_SESSION_ACCESS_REQUIRED"))?;
         let create = super::creation::run_creation(host, run)?;
+        let memory = host.task_memory.get(run).cloned().unwrap_or_default();
+        let mut authority = memory.authority(&read).with_editing(&edit);
+        if let Some(create) = &create {
+            authority = authority.with_creation(create);
+        }
         host.journal
-            .approve_agent_editing(
+            .approve_agent_editing_authorized(
                 LOCAL_OWNER,
                 run,
                 orange_agent_runtime::engine::EditingApproval {
@@ -469,11 +471,7 @@ impl HostRegistry {
                     preview_digest: digest,
                     expires_at: (runs::now()? + 60).min(config.deadline_unix),
                 },
-                orange_agent_runtime::engine::EditingAuthority {
-                    read: &read,
-                    create: create.as_ref(),
-                    edit: &edit,
-                },
+                authority,
             )
             .await
             .map_err(runs::engine_error)?;

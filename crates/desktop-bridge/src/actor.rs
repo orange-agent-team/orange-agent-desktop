@@ -81,6 +81,7 @@ impl CreationSignal {
     }
 }
 pub(crate) struct RunSignal {
+    pub memories: Vec<orange_agent_runtime::memory::MemoryGrant>,
     pub creation_id: Option<String>,
     pub editing_id: Option<String>,
     #[cfg(target_vendor = "apple")]
@@ -462,6 +463,9 @@ pub(crate) fn signal_cancel(handle: &str, run: &str) -> Result<(), BridgeError> 
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
     if let Some(run) = signals.runs.get(run) {
+        for memory in &run.memories {
+            memory.request_revoke();
+        }
         #[cfg(target_vendor = "apple")]
         if let Some(edit) = &run.editing_grant {
             edit.request_revoke();

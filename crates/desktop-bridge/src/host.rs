@@ -65,6 +65,7 @@ pub(crate) use creation::{
     suspend_creation_selection,
 };
 mod runs;
+mod task_memory;
 pub(crate) use managed::{
     cancel_model_start, close_model_import, configure_model_service, current_model_connection,
     import_model, inspect_model_service, start_model_service, stop_model_service,
@@ -112,6 +113,7 @@ struct Host {
     >,
     model: Option<runs::ModelConnection>,
     service: Option<crate::service::Client>,
+    task_memory: std::collections::HashMap<String, task_memory::TaskMemory>,
     run_grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
 }
 #[derive(Default)]
@@ -209,6 +211,7 @@ impl HostRegistry {
             run_edit_grants: std::collections::HashMap::new(),
             model: None,
             service: None,
+            task_memory: Default::default(),
             run_grants: std::collections::HashMap::new(),
         });
         Ok(view)
@@ -684,7 +687,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "9c258204116bb93a8dd024cf6c29529c2bbdf0dd"
+            "1c0ce59f490bdffc81bbbfa9a481db99d19f1d59"
         );
         assert_eq!(
             registry

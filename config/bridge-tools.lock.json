@@ -139,10 +139,15 @@
         "MemoryScopeView",
         "MemorySelection",
         "MemorySources",
-        "MemorySummary"
+        "MemorySummary",
+        "TaskMemoryRequirement",
+        "TaskMemoryReview",
+        "TaskMemoryScope",
+        "TaskMemorySelection"
       ],
       "functions": [
         "approveEdit",
+        "approveRunMemory",
         "authorizeScope",
         "createScope",
         "inspectEdit",
@@ -150,10 +155,14 @@
         "listMembers",
         "listScopes",
         "prepareEdit",
+        "previewRunMemory",
         "readEntry",
+        "restoreRunMemory",
         "reviewEdit",
+        "runMemoryRequirements",
         "setMember",
         "setScopeEnabled",
+        "startMemoryRun",
         "suspendAccess"
       ]
     }

@@ -43,6 +43,10 @@ struct Config {
     service_root: String,
     workspace: String,
     sentinel: String,
+    #[serde(default)]
+    memory: bool,
+    #[serde(default)]
+    memory_write: bool,
 }
 async fn open(root: &str) -> Result<HostView, BridgeError> {
     for _ in 0..100 {
@@ -64,6 +68,12 @@ async fn accept(config: Config) -> Result<(), Box<dyn Error>> {
     .await?;
     let model = connect_local_model(handle.clone(), config.service_root.clone()).await?;
     assert_eq!(model.verification, "local-development-configuration");
+    if config.memory_write {
+        return accept_memory_write(&config, handle, &grant.workspace_id).await;
+    }
+    if config.memory {
+        return accept_memory(&config, handle, &grant.workspace_id).await;
+    }
     let run_id = format!("acceptance-{}", uuid::Uuid::new_v4());
     let mut view = start_run(handle.clone(),grant.workspace_id.clone(),run_id.clone(),
         "Use read_file to read the existing workspace file proof.txt with the relative path proof.txt. Do not guess its content. After the tool result is returned, answer with the exact file text.".into()).await?;
@@ -152,6 +162,256 @@ async fn accept(config: Config) -> Result<(), Box<dyn Error>> {
     println!(
         "{}",
         serde_json::json!({"passed":true,"model_invocations":view.invocations,"steps":view.steps,"approved_operations":approvals,"sentinel_matched":true,"preapproval_rejected":true,"reopen_no_replay":true,"deleted_source_denied":true,"scope":"real local CPU model and desktop Rust Host API; not Flutter model UI, App Sandbox model transport, cloud, billing or GPU certification"})
+    );
+    Ok(())
+}
+async fn accept_memory(
+    config: &Config,
+    handle: &str,
+    workspace: &str,
+) -> Result<(), Box<dyn Error>> {
+    use orange_desktop_bridge::api::memory::*;
+    let scope = create_scope(handle.into(), "personal".into(), false).await?;
+    let empty_sources = || MemorySources {
+        workspace_ids: vec![],
+        memory_tokens: vec![],
+    };
+    let parent = authorize_scope(
+        handle.into(),
+        scope.scope_id.clone(),
+        scope.revision.clone(),
+        "owned-session".into(),
+        true,
+    )
+    .await?;
+    let selection = MemorySelection {
+        scope_id: scope.scope_id.clone(),
+        session_token: parent.session_token.clone(),
+        sources: empty_sources(),
+    };
+    let draft = prepare_edit(
+        handle.into(),
+        selection.clone(),
+        MemoryEdit {
+            request_id: "seed".into(),
+            entry_id: "proof".into(),
+            expected_version: None,
+            delete: false,
+            title: Some("Verification code".into()),
+            content: Some(config.sentinel.clone()),
+            enabled: Some(true),
+        },
+    )
+    .await?;
+    approve_edit(
+        handle.into(),
+        selection,
+        draft.draft_id,
+        draft.approval_digest,
+    )
+    .await?;
+    let task = |token: String| TaskMemorySelection {
+        scopes: vec![TaskMemoryScope {
+            scope_id: "personal".into(),
+            session_token: token,
+            write: false,
+        }],
+        sources: empty_sources(),
+        creation: None,
+        editing: None,
+    };
+    let id = uuid::Uuid::new_v4().to_string();
+    let mut view=start_memory_run(handle.into(),workspace.into(),id.clone(),r#"Read my saved verification code. Call memory_read with exactly {"mode":"entry","scope_id":"personal","entry_id":"proof"}. The code is only in the entry body. Return the value of its content field verbatim."#.into(),task(parent.session_token),false).await?;
+    let mut approvals = 0;
+    let mut entry_requested = false;
+    for _ in 0..12 {
+        if view.phase == "completed" {
+            break;
+        }
+        assert!(
+            matches!(view.phase.as_str(), "ready" | "tools_pending"),
+            "phase {}",
+            view.phase
+        );
+        for op in view.pending.clone() {
+            assert_eq!(op.tool_name, "memory_read");
+            let args: serde_json::Value = serde_json::from_str(&op.arguments_json)?;
+            assert_eq!(args["scope_id"], "personal");
+            match args["mode"].as_str() {
+                Some("entry") => {
+                    assert_eq!(args["entry_id"], "proof");
+                    entry_requested = true;
+                }
+                Some("list") => {} // Only this owned test scope is visible.
+                _ => return Err("Unrecognized memory read mode".into()),
+            }
+            assert_eq!(
+                advance_run(handle.into(), id.clone(), view.revision.clone())
+                    .await
+                    .expect_err("approval required")
+                    .code,
+                "TOOL_APPROVAL_REQUIRED"
+            );
+            view = approve_run_memory(
+                handle.into(),
+                id.clone(),
+                op.operation_id,
+                op.argument_digest,
+            )
+            .await?;
+            approvals += 1;
+        }
+        view = advance_run(handle.into(), id.clone(), view.revision.clone()).await?;
+    }
+    assert_eq!(view.phase, "completed");
+    assert!(
+        approvals > 0 && entry_requested,
+        "The model must read the actual entry body"
+    );
+    assert!(
+        view.final_text
+            .as_deref()
+            .is_some_and(|text| text.contains(&config.sentinel))
+    );
+    close_host(handle.into())?;
+    let reopened = open(&config.private_root).await?;
+    restore_workspace_access(reopened.handle.clone(), workspace.into()).await?;
+    assert!(
+        inspect_run(reopened.handle.clone(), id.clone())
+            .await
+            .is_err()
+    );
+    let grant = authorize_scope(
+        reopened.handle.clone(),
+        scope.scope_id,
+        scope.revision,
+        "restored-read".into(),
+        false,
+    )
+    .await?;
+    let restored = restore_run_memory(
+        reopened.handle.clone(),
+        id.clone(),
+        task(grant.session_token.clone()),
+    )
+    .await?;
+    assert_eq!(restored.final_text, view.final_text);
+    assert_eq!(restored.invocations, view.invocations);
+    suspend_access(reopened.handle.clone(), grant.session_token).await?;
+    assert!(inspect_run(reopened.handle.clone(), id).await.is_err());
+    close_host(reopened.handle)?;
+    println!(
+        "{}",
+        serde_json::json!({"passed":true,"scope":"Desktop Rust Host, real local CPU inference and explicitly approved memory_read","approved_operations":approvals,"model_invocations":view.invocations,"sentinel_matched":true,"reopen_requires_selection":true,"revocation_denied":true})
+    );
+    Ok(())
+}
+async fn accept_memory_write(
+    config: &Config,
+    h: &str,
+    workspace: &str,
+) -> Result<(), Box<dyn Error>> {
+    use orange_desktop_bridge::api::memory::*;
+    let scope = create_scope(h.into(), "personal".into(), false).await?;
+    let parent = authorize_scope(
+        h.into(),
+        scope.scope_id.clone(),
+        scope.revision,
+        "write-selection".into(),
+        true,
+    )
+    .await?;
+    let empty = || MemorySources {
+        workspace_ids: vec![],
+        memory_tokens: vec![],
+    };
+    let selection = MemorySelection {
+        scope_id: scope.scope_id.clone(),
+        session_token: parent.session_token.clone(),
+        sources: empty(),
+    };
+    let task = TaskMemorySelection {
+        scopes: vec![TaskMemoryScope {
+            scope_id: scope.scope_id,
+            session_token: parent.session_token,
+            write: true,
+        }],
+        sources: empty(),
+        creation: None,
+        editing: None,
+    };
+    let id = uuid::Uuid::new_v4().to_string();
+    let args = serde_json::json!({"scope_id":"personal","mutation":"put","payload":{"title":"Verification code","content":config.sentinel,"enabled":true}});
+    let prompt = format!(
+        "Remember my verification code. Call memory_write with exactly these arguments: {args}. After the tool result, confirm the save."
+    );
+    let mut view =
+        start_memory_run(h.into(), workspace.into(), id.clone(), prompt, task, false).await?;
+    let mut entry = None;
+    for _ in 0..8 {
+        if view.phase == "completed" {
+            break;
+        }
+        assert!(matches!(view.phase.as_str(), "tools_pending" | "ready"));
+        for op in view.pending.clone() {
+            assert_eq!(op.tool_name, "memory_write");
+            assert!(entry.is_none(), "duplicate effect rejected");
+            let preview = preview_run_memory(h.into(), id.clone(), op.operation_id.clone()).await?;
+            let review: serde_json::Value = serde_json::from_str(&preview.review_json)?;
+            assert_eq!(review["payload"], args["payload"]);
+            assert_eq!(review["scope_id"], "personal");
+            assert_eq!(review["mutation"], "put");
+            assert!(review["expected_version"].is_null());
+            assert_eq!(
+                advance_run(h.into(), id.clone(), view.revision.clone())
+                    .await
+                    .expect_err("preapproval")
+                    .code,
+                "TOOL_APPROVAL_REQUIRED"
+            );
+            assert!(
+                approve_run_memory(
+                    h.into(),
+                    id.clone(),
+                    op.operation_id.clone(),
+                    op.argument_digest
+                )
+                .await
+                .is_err()
+            );
+            entry = Some(
+                review["entry_id"]
+                    .as_str()
+                    .ok_or("missing entry")?
+                    .to_owned(),
+            );
+            view = approve_run_memory(
+                h.into(),
+                id.clone(),
+                op.operation_id,
+                preview.approval_digest,
+            )
+            .await?;
+        }
+        view = advance_run(h.into(), id.clone(), view.revision.clone()).await?;
+    }
+    assert_eq!(view.phase, "completed");
+    let value = read_entry(
+        h.into(),
+        selection,
+        entry.ok_or("model never proposed a write")?,
+        Some("1".into()),
+        0,
+        4096,
+        false,
+    )
+    .await?;
+    assert_eq!(value.content, config.sentinel);
+    assert_eq!(value.origin, "model_inference");
+    close_host(h.into())?;
+    println!(
+        "{}",
+        serde_json::json!({"passed":true,"scope":"real CPU model proposed and completed explicitly approved task memory write","approved_operations":1,"model_invocations":view.invocations,"actual_memory_version":value.version,"origin":value.origin,"sentinel_matched":true})
     );
     Ok(())
 }

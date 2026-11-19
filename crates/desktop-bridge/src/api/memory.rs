@@ -224,3 +224,100 @@ pub async fn inspect_edit(
 ) -> Result<Option<MemoryOutcome>, BridgeError> {
     crate::host::memory::inspect_edit(handle, scope_id, request_id).await
 }
+
+/// An explicit task permission bounded by the current selection.
+#[derive(Debug, Clone)]
+pub struct TaskMemoryScope {
+    pub scope_id: String,
+    pub session_token: String,
+    pub write: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskMemorySelection {
+    pub creation: Option<super::host::RunPermissionSelection>,
+    pub editing: Option<super::host::RunPermissionSelection>,
+    pub scopes: Vec<TaskMemoryScope>,
+    pub sources: MemorySources,
+}
+
+pub async fn start_memory_run(
+    handle: String,
+    workspace: String,
+    request_id: String,
+    prompt: String,
+    selection: TaskMemorySelection,
+    interactive: bool,
+) -> Result<super::host::AgentRunView, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, rt| {
+        rt.block_on(registry.start_memory_run(
+            &handle,
+            &workspace,
+            &request_id,
+            &prompt,
+            &selection,
+            interactive,
+        ))
+    })
+    .await
+}
+
+pub async fn restore_run_memory(
+    handle: String,
+    run_id: String,
+    selection: TaskMemorySelection,
+) -> Result<super::host::AgentRunView, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, rt| {
+        rt.block_on(registry.restore_run_memory(&handle, &run_id, &selection))
+    })
+    .await
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskMemoryReview {
+    pub operation_id: String,
+    pub argument_digest: String,
+    pub approval_digest: String,
+    pub review_json: String,
+    pub sources_json: String,
+}
+
+pub async fn preview_run_memory(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+) -> Result<TaskMemoryReview, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, rt| {
+        rt.block_on(registry.preview_run_memory(&handle, &run_id, &operation_id))
+    })
+    .await
+}
+
+pub async fn approve_run_memory(
+    handle: String,
+    run_id: String,
+    operation_id: String,
+    digest: String,
+) -> Result<super::host::AgentRunView, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, rt| {
+        rt.block_on(registry.approve_run_memory(&handle, &run_id, &operation_id, &digest))
+    })
+    .await
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskMemoryRequirement {
+    pub scope_id: String,
+    pub revision: String,
+    pub write: bool,
+}
+
+pub async fn run_memory_requirements(
+    handle: String,
+    run_id: String,
+) -> Result<Vec<TaskMemoryRequirement>, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        registry.run_memory_requirements(&handle, &run_id)
+    })
+    .await
+}

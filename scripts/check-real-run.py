@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+import sqlite3
 from environment import ROOT, tool_environment
 
 
@@ -35,15 +36,26 @@ def main():
     parser = argparse.ArgumentParser()
     for option in ['model-lock', 'build-manifest', 'model', 'backend', 'model-host']:
         parser.add_argument('--' + option, type=Path, required=True)
+    parser.add_argument('--memory', action='store_true', help='Exercise a task-scoped approved memory read')
+    parser.add_argument('--memory-write', action='store_true', help='Exercise a model-proposed write with exact test-owner approval')
+    parser.add_argument('--qualification-7b', action='store_true', help='Use the existing hash-pinned merged Qwen2.5-7B fixture for a separate CPU qualification')
     args = parser.parse_args()
+    if args.memory and args.memory_write:parser.error('Select one memory scenario')
     os.umask(0o077)
-    report_dir = ROOT / '.local/real-run'
+    report_dir = ROOT / ('.local/real-memory-write' if args.memory_write else '.local/real-memory-run' if args.memory else '.local/real-run')
+    if args.qualification_7b:
+        if not (args.memory or args.memory_write):
+            parser.error('7B qualification is available for the memory scenarios')
+        report_dir = report_dir.with_name(report_dir.name + '-7b')
     report_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     report = {'passed': False, 'phase': 'preparing', 'test_run_id': uuid.uuid4().hex}
     write(report_dir / 'last-report.json', report)
     lock = json.loads(args.model_lock.read_text())
     build = json.loads(args.build_manifest.read_text())
     model, backend, executable = [p.resolve(strict=True) for p in [args.model, args.backend, args.model_host]]
+    if args.qualification_7b:
+        lock['model'] = {'sha256': '1875fb29e8c91c86615c00e92d8b4114e56bc24359adb5a8db8b36452fae4a49', 'bytes': 4683073536}
+        report['model_profile'] = 'Qwen2.5-7B-Instruct-Q4_K_M, local merged qualification artifact'
     if model.stat().st_size != lock['model']['bytes'] or digest(model) != lock['model']['sha256']:
         raise RuntimeError('Pinned real model size/digest differs')
     if build['backend_commit'] != lock['backend']['commit'] or build['gpu_enabled'] or digest(backend) != build['executable_sha256']:
@@ -63,31 +75,36 @@ def main():
         ipc.mkdir(mode=0o700)
         import_config=base/'import.json'
         descriptor=lock['model']
-        write(import_config,{'source':str(model),'cache':str(private/'models'),'url':'https://huggingface.co/'+descriptor['repository']+'/resolve/'+descriptor['revision']+'/'+descriptor['file'],'sha256':descriptor['sha256'],'bytes':descriptor['bytes']})
-        import_command=[str(ROOT/'target/debug/examples/run-acceptance'),'--import',str(import_config)]
-        imported=json.loads(subprocess.check_output(import_command,env=environment,text=True,timeout=180))
-        reused=json.loads(subprocess.check_output(import_command,env=environment,text=True,timeout=180))
-        if imported!={'imported':True,'cached':False,'sha256':descriptor['sha256'],'bytes':str(descriptor['bytes'])} or reused!={**imported,'cached':True}:
-            raise RuntimeError('Actual private model import/cache reuse failed')
-        installed=private/'models'/(descriptor['sha256']+'.gguf')
-        if digest(installed)!=descriptor['sha256'] or installed.stat().st_nlink!=1 or (installed.stat().st_dev,installed.stat().st_ino)==(model.stat().st_dev,model.stat().st_ino):
-            raise RuntimeError('Installed artifact is not an independently verified copy')
-        report['actual_private_model_import']=True
-        report['verified_cache_reuse']=True
+        if args.qualification_7b:
+            installed = model
+            report['model_source'] = 'existing verified qualification file'
+        else:
+            write(import_config,{'source':str(model),'cache':str(private/'models'),'url':'https://huggingface.co/'+descriptor['repository']+'/resolve/'+descriptor['revision']+'/'+descriptor['file'],'sha256':descriptor['sha256'],'bytes':descriptor['bytes']})
+            import_command=[str(ROOT/'target/debug/examples/run-acceptance'),'--import',str(import_config)]
+            imported=json.loads(subprocess.check_output(import_command,env=environment,text=True,timeout=180))
+            reused=json.loads(subprocess.check_output(import_command,env=environment,text=True,timeout=180))
+            if imported!={'imported':True,'cached':False,'sha256':descriptor['sha256'],'bytes':str(descriptor['bytes'])} or reused!={**imported,'cached':True}:
+                raise RuntimeError('Actual private model import/cache reuse failed')
+            installed=private/'models'/(descriptor['sha256']+'.gguf')
+            if digest(installed)!=descriptor['sha256'] or installed.stat().st_nlink!=1 or (installed.stat().st_dev,installed.stat().st_ino)==(model.stat().st_dev,model.stat().st_ino):
+                raise RuntimeError('Installed artifact is not an independently verified copy')
+            report['actual_private_model_import']=True
+            report['verified_cache_reuse']=True
         report['separate_private_ipc'] = True
         report['durable_socket_path_bytes'] = len(os.fsencode(runtime / 'engine.sock'))
         report['actual_socket_path_bytes'] = len(os.fsencode(ipc / 'engine.sock'))
         if report['durable_socket_path_bytes'] <= 100 or report['actual_socket_path_bytes'] > 100:
             raise RuntimeError('Long-state/short-IPC regression not exercised')
         sentinel = 'ORANGE_DESKTOP_' + uuid.uuid4().hex
-        (workspace / 'proof.txt').write_text(sentinel + '\n')
+        if not (args.memory or args.memory_write):
+            (workspace / 'proof.txt').write_text(sentinel + '\n')
         nonce, instance = uuid.uuid4().hex + uuid.uuid4().hex, uuid.uuid4().hex
         write(runtime / 'profile.json', {'protocol': 1, 'runtime_directory': str(runtime), 'socket_directory': str(ipc), 'executable': str(backend),
               'executable_sha256': build['executable_sha256'], 'model': str(installed), 'model_sha256': lock['model']['sha256'],
               'model_bytes': lock['model']['bytes'], 'model_version': 'qwen-desktop-acceptance-v1', 'context_tokens': 4096,
               'startup_timeout_seconds': 120, 'control_nonce': nonce, 'instance_id': instance})
         config = base / 'acceptance.json'
-        write(config, {'private_root': str(private), 'service_root': str(runtime), 'workspace': str(workspace), 'sentinel': sentinel})
+        write(config, {'private_root': str(private), 'service_root': str(runtime), 'workspace': str(workspace), 'sentinel': sentinel, 'memory': args.memory,'memory_write':args.memory_write})
         with (runtime / 'host.log').open('w') as log:
             host = subprocess.Popen([str(executable), str(runtime / 'profile.json')], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, env={'PATH': '/usr/bin:/bin'})
             child = None
@@ -123,6 +140,11 @@ def main():
                 report['phase'] = 'validated'
             except Exception as error:
                 report['failure'] = str(error)[:2000]
+                database = private / 'host.sqlite'
+                if database.is_file():
+                    with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as db:
+                        report['events'] = [row[0] for row in db.execute('SELECT kind FROM events ORDER BY rowid DESC LIMIT 20')]
+                        report['tool_states'] = db.execute('SELECT tool_version,state FROM operations LIMIT 20').fetchall()
                 raise
             finally:
                 if child is not None and child.poll() is None:

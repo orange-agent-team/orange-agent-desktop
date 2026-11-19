@@ -8,6 +8,7 @@ mod export_retirement;
 mod memory_management;
 #[cfg(target_vendor = "apple")]
 mod recovery_inspection;
+mod task_memory;
 use crate::api::host as api;
 use orange_protocol::model::{ResponseCandidate, ToolCall};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -661,6 +662,7 @@ async fn actor_approval_cancellation_revocation_close_and_recovery() {
             .all(|g| !g.session_access)
     );
     memory_management::exercise(&reopened.handle).await;
+    task_memory::exercise(&reopened.handle, temporary.path()).await;
     exercise_creation_actor(&reopened.handle, temporary.path()).await;
     #[cfg(target_vendor = "apple")]
     exercise_editing_actor(&reopened.handle, temporary.path()).await;

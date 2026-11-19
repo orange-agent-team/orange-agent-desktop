@@ -18,6 +18,7 @@ use tokio::sync::watch;
 
 #[derive(Default)]
 pub(super) struct WriteSelection<'a> {
+    pub memory: Option<&'a crate::api::memory::TaskMemorySelection>,
     pub creation: Option<(&'a str, &'a str)>,
     pub editing: Option<(&'a str, &'a str)>,
 }
@@ -80,7 +81,10 @@ impl ModelGateway for LocalGateway {
             self.client
                 .generate(&request, cancel)
                 .await
-                .map_err(|_| GatewayFailure)
+                .map_err(|kind| {
+                    eprintln!("Local model request failed ({kind:?})");
+                    GatewayFailure
+                })
         })
     }
 }
@@ -271,6 +275,7 @@ impl HostRegistry {
             .runs
             .entry(run.into())
             .or_insert_with(|| crate::actor::RunSignal {
+                memories: Vec::new(),
                 workspace: workspace.clone(),
                 creation_id,
                 editing_id,
@@ -279,6 +284,11 @@ impl HostRegistry {
                 cancel: watch::channel(false).0,
                 grant: grant.clone(),
             });
+        control.memories = host
+            .task_memory
+            .get(run)
+            .map(|task| task.grants())
+            .unwrap_or_default();
         Ok((workspace, config, grant, control.cancel.subscribe()))
     }
     pub(super) async fn connect_model(
@@ -500,7 +510,11 @@ impl HostRegistry {
             },
             Err(error) => return Err(engine_error(error)),
         };
-        let messages = vec![Message::plain(Role::User, prompt.into())];
+        let mut messages = Vec::new();
+        if selection.memory.is_some() {
+            messages.push(Message::plain(Role::System, task_memory::TOOL_GUIDE.into()));
+        }
+        messages.push(Message::plain(Role::User, prompt.into()));
         let create = if let Some((id, version)) = selection.creation {
             let current = host
                 .creations
@@ -538,21 +552,48 @@ impl HostRegistry {
         if selection.editing.is_some() {
             return Err(failure("EDITING_UNAVAILABLE_ON_TARGET"));
         }
-        #[cfg(target_vendor = "apple")]
-        if let Some(edit) = &editing {
+        if let Some(selection) = selection.memory {
+            let task = task_memory::TaskMemory::derive(host, selection)?;
+            let mut authority = task.authority(&grant);
+            if let Some(create) = &create {
+                authority = authority.with_creation(create);
+            }
+            #[cfg(target_vendor = "apple")]
+            if let Some(edit) = &editing {
+                authority = authority.with_editing(edit);
+            }
             host.journal
-                .start_agent_editing(
+                .start_agent_discovering(&config, messages, authority, interactive)
+                .map_err(engine_error)?;
+            if let Some(old) = host.task_memory.insert(id.into(), task) {
+                old.revoke();
+            }
+        } else {
+            #[cfg(target_vendor = "apple")]
+            if let Some(edit) = &editing {
+                host.journal
+                    .start_agent_editing(
+                        &config,
+                        messages,
+                        orange_agent_runtime::engine::EditingAuthority {
+                            read: &grant,
+                            create: create.as_ref(),
+                            edit,
+                        },
+                        interactive,
+                    )
+                    .map_err(engine_error)?;
+            } else {
+                start_base(
+                    &mut host.journal,
                     &config,
                     messages,
-                    orange_agent_runtime::engine::EditingAuthority {
-                        read: &grant,
-                        create: create.as_ref(),
-                        edit,
-                    },
+                    &grant,
+                    create.as_ref(),
                     interactive,
-                )
-                .map_err(engine_error)?;
-        } else {
+                )?;
+            }
+            #[cfg(not(target_vendor = "apple"))]
             start_base(
                 &mut host.journal,
                 &config,
@@ -562,15 +603,6 @@ impl HostRegistry {
                 interactive,
             )?;
         }
-        #[cfg(not(target_vendor = "apple"))]
-        start_base(
-            &mut host.journal,
-            &config,
-            messages,
-            &grant,
-            create.as_ref(),
-            interactive,
-        )?;
         if host
             .service
             .as_ref()
@@ -592,7 +624,15 @@ impl HostRegistry {
         let host = self.current(handle)?;
         let view = host
             .journal
-            .agent_view_authorized(LOCAL_OWNER, run, &grant)
+            .agent_view_authorized_scopes(
+                LOCAL_OWNER,
+                run,
+                host.task_memory
+                    .get(run)
+                    .cloned()
+                    .unwrap_or_default()
+                    .authority(&grant),
+            )
             .await
             .map_err(engine_error)?;
         project(
@@ -620,7 +660,15 @@ impl HostRegistry {
         let host = self.current(handle)?;
         let view = host
             .journal
-            .agent_view_authorized(LOCAL_OWNER, run, &grant)
+            .agent_view_authorized_scopes(
+                LOCAL_OWNER,
+                run,
+                host.task_memory
+                    .get(run)
+                    .cloned()
+                    .unwrap_or_default()
+                    .authority(&grant),
+            )
             .await
             .map_err(engine_error)?;
         if !view
@@ -653,7 +701,7 @@ impl HostRegistry {
         let create = super::creation::run_creation(host, run)?
             .ok_or_else(|| failure("CREATION_SESSION_ACCESS_REQUIRED"))?;
         host.journal
-            .approve_agent_creation(
+            .approve_agent_creation_authorized(
                 LOCAL_OWNER,
                 run,
                 orange_agent_runtime::engine::CreationApproval {
@@ -661,8 +709,12 @@ impl HostRegistry {
                     argument_digest: digest,
                     expires_at: (now()? + 60).min(config.deadline_unix),
                 },
-                &grant,
-                &create,
+                host.task_memory
+                    .get(run)
+                    .cloned()
+                    .unwrap_or_default()
+                    .authority(&grant)
+                    .with_creation(&create),
             )
             .await
             .map_err(engine_error)?;
@@ -687,7 +739,17 @@ impl HostRegistry {
         // exact replay, cancellation and limits. No model or approval is invoked.
         let view = host
             .journal
-            .answer_agent_question(LOCAL_OWNER, run, &answer, &grant, cancel)
+            .answer_agent_question_authorized(
+                LOCAL_OWNER,
+                run,
+                &answer,
+                host.task_memory
+                    .get(run)
+                    .cloned()
+                    .unwrap_or_default()
+                    .authority(&grant),
+                cancel,
+            )
             .await
             .map_err(engine_error)?;
         project(
@@ -721,10 +783,14 @@ impl HostRegistry {
         {
             return Err(failure("MODEL_SERVICE_UNAVAILABLE"));
         }
-        let view = host
-            .journal
-            .agent_view(LOCAL_OWNER, run)
-            .map_err(engine_error)?;
+        let view = if let Some(task) = host.task_memory.get(run) {
+            host.journal
+                .agent_view_authorized_scopes(LOCAL_OWNER, run, task.authority(&grant))
+                .await
+        } else {
+            host.journal.agent_view(LOCAL_OWNER, run)
+        }
+        .map_err(engine_error)?;
         if revision(&view) != expected {
             return Err(failure("RUN_VERSION_CHANGED"));
         }
@@ -739,6 +805,21 @@ impl HostRegistry {
             return Err(failure("MODEL_CONTEXT_CHANGED"));
         }
         let gateway = GatewayRef(model.gateway.as_ref());
+        if let Some(task) = host.task_memory.get(run) {
+            let mut authority = task.authority(&grant);
+            if let Some(create) = &create {
+                authority = authority.with_creation(create);
+            }
+            #[cfg(target_vendor = "apple")]
+            if let Some(edit) = &editing {
+                authority = authority.with_editing(edit);
+            }
+            host.journal
+                .advance_agent_authorized(LOCAL_OWNER, run, authority, &gateway, cancel)
+                .await
+                .map_err(engine_error)?;
+            return self.inspect_run(handle, run).await;
+        }
         #[cfg(target_vendor = "apple")]
         if let Some(edit) = &editing {
             host.journal
@@ -785,7 +866,15 @@ impl HostRegistry {
             || view.user_question.is_some()
         {
             host.journal
-                .agent_view_authorized(LOCAL_OWNER, run, &grant)
+                .agent_view_authorized_scopes(
+                    LOCAL_OWNER,
+                    run,
+                    host.task_memory
+                        .get(run)
+                        .cloned()
+                        .unwrap_or_default()
+                        .authority(&grant),
+                )
                 .await
                 .map_err(engine_error)?
         } else {
@@ -816,6 +905,9 @@ impl HostRegistry {
             .agent_workspace_id(LOCAL_OWNER, run)
             .map_err(engine_error)?
             .ok_or_else(|| failure("RUN_WORKSPACE_REQUIRED"))?;
+        if let Some(task) = host.task_memory.remove(run) {
+            task.revoke();
+        }
         if let Some(grant) = host.run_grants.remove(run) {
             grant.request_revoke();
         }
@@ -950,6 +1042,7 @@ pub(crate) async fn start_creation_run(
             &prompt,
             interactive,
             WriteSelection {
+                memory: None,
                 creation: Some((&consent, &version)),
                 editing: None,
             },

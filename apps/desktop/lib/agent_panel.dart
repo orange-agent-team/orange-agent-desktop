@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import 'agent_controller.dart';
+import 'src/rust/api/memory.dart' as mem;
 import 'question_panel.dart';
 import 'src/rust/api/host.dart';
 
@@ -9,9 +12,13 @@ class AgentPanel extends StatefulWidget {
     super.key,
     required this.controller,
     required this.workspaces,
+    this.memory,
+    this.memoryWrite = false,
     this.creations = const [],
     this.editings = const [],
   });
+  final mem.MemorySelection? memory;
+  final bool memoryWrite;
   final AgentController controller;
   final List<WorkspaceView> workspaces;
   final List<CreationAccessView> creations;
@@ -23,6 +30,7 @@ class AgentPanel extends StatefulWidget {
 class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
   final prompt = TextEditingController();
   String? selected;
+  bool allowMemory = false, writeMemory = false;
   bool allowQuestions = false, allowCreation = false, allowEditing = false;
   AgentController get controller => widget.controller;
   @override
@@ -34,6 +42,10 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(covariant AgentPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.memory?.sessionToken != widget.memory?.sessionToken) {
+      allowMemory = false;
+      writeMemory = false;
+    }
     String editingKey(List<EditingAccessView> rows) => rows
         .map((e) => '${e.consentId}:${e.permissionVersion}:${e.sessionToken}')
         .join('|');
@@ -232,6 +244,26 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                     ? null
                     : (value) => setState(() => allowEditing = value ?? false),
               ),
+              if (widget.memory != null) ...[
+                CheckboxListTile(
+                  value: allowMemory,
+                  title: Text('允许本次任务读取记忆空间 ${widget.memory!.scopeId}'),
+                  onChanged: busy || controller.active
+                      ? null
+                      : (v) => setState(() {
+                          allowMemory = v ?? false;
+                          writeMemory = false;
+                        }),
+                ),
+                if (allowMemory && widget.memoryWrite)
+                  CheckboxListTile(
+                    value: writeMemory,
+                    title: const Text('允许提出记忆修改，逐次确认'),
+                    onChanged: busy || controller.active
+                        ? null
+                        : (v) => setState(() => writeMemory = v ?? false),
+                  ),
+              ],
               const SizedBox(height: 12),
               Wrap(
                 spacing: 10,
@@ -250,6 +282,34 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                             selectedId,
                             prompt.text,
                             allowQuestions: allowQuestions,
+                            memory: allowMemory && widget.memory != null
+                                ? mem.TaskMemorySelection(
+                                    scopes: [
+                                      mem.TaskMemoryScope(
+                                        scopeId: widget.memory!.scopeId,
+                                        sessionToken:
+                                            widget.memory!.sessionToken,
+                                        write:
+                                            writeMemory && widget.memoryWrite,
+                                      ),
+                                    ],
+                                    sources: widget.memory!.sources,
+                                    creation: allowCreation && creation != null
+                                        ? RunPermissionSelection(
+                                            consentId: creation.consentId,
+                                            permissionVersion:
+                                                creation.permissionVersion,
+                                          )
+                                        : null,
+                                    editing: allowEditing && editing != null
+                                        ? RunPermissionSelection(
+                                            consentId: editing.consentId,
+                                            permissionVersion:
+                                                editing.permissionVersion,
+                                          )
+                                        : null,
+                                  )
+                                : null,
                             creation: allowCreation ? creation : null,
                             editing: allowEditing ? editing : null,
                           ),
@@ -291,6 +351,25 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                   padding: EdgeInsets.only(top: 12),
                   child: LinearProgressIndicator(),
                 ),
+              if (controller.view == null &&
+                  controller.memoryRequirements.isNotEmpty) ...[
+                Text(
+                  '恢复任务所需的记忆空间：${controller.memoryRequirements.map((r) => "${r.scopeId}（${r.write ? '读写' : '只读'}，版本 ${r.revision}）").join('、')}',
+                ),
+                OutlinedButton(
+                  onPressed:
+                      busy ||
+                          widget.memory == null ||
+                          controller.memoryRequirements.length != 1 ||
+                          controller.memoryRequirements.single.scopeId !=
+                              widget.memory!.scopeId ||
+                          (controller.memoryRequirements.single.write &&
+                              !widget.memoryWrite)
+                      ? null
+                      : () => controller.restoreMemory(widget.memory!),
+                  child: const Text('使用已选空间恢复任务访问'),
+                ),
+              ],
               if (controller.error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
@@ -336,7 +415,17 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                           Text(toolDisplayName(pending[i].toolName)),
                           if (pending[i].toolName == 'write_file')
                             const Text('将创建下面的新文件。内容来自模型，请完整核对；现有文件不会被替换。'),
-                          if (pending[i].toolName == 'apply_patch') ...[
+                          if (pending[i].toolName == 'memory_write') ...[
+                            OutlinedButton(
+                              onPressed: busy || i != 0
+                                  ? null
+                                  : controller.previewMemoryWrite,
+                              child: const Text('核对记忆修改和来源'),
+                            ),
+                            if (i == 0 && controller.memoryReviewMatches) ...[
+                              _MemoryChange(review: controller.memoryReview!),
+                            ],
+                          ] else if (pending[i].toolName == 'apply_patch') ...[
                             const Text('修改现有文件。先获取并核对实际差异；批准只适用于这一次内容和版本。'),
                             OutlinedButton(
                               onPressed: busy || i != 0
@@ -439,6 +528,51 @@ class CreationPreview extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _MemoryChange extends StatelessWidget {
+  const _MemoryChange({required this.review});
+  final mem.TaskMemoryReview review;
+  @override
+  Widget build(BuildContext context) {
+    final draft = jsonDecode(review.reviewJson) as Map<String, dynamic>;
+    final sources = jsonDecode(review.sourcesJson) as List<dynamic>;
+    final payload = draft['payload'] as Map<String, dynamic>?;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${draft["scope_id"]} · ${draft["entry_id"]}'),
+        Text(
+          draft['expected_version'] == null
+              ? '新增记忆'
+              : '基于版本 ${draft["expected_version"]}',
+        ),
+        if (draft['mutation'] == 'delete') const Text('确认后删除这条记忆。'),
+        if (payload != null) ...[
+          SelectableText(payload['title'] as String),
+          SelectableText(payload['content'] as String),
+          Text(payload['enabled'] == true ? '保存后启用' : '保存后禁用'),
+        ],
+        if (sources.isNotEmpty)
+          ExpansionTile(
+            title: Text('查看 ${sources.length} 个来源'),
+            children: [
+              for (final source in sources)
+                ListTile(
+                  title: SelectableText(
+                    source['kind'] == 'memory'
+                        ? '${source["scope"]} · ${source["entry"]} · 版本 ${source["version"]}'
+                        : '工作区操作 ${source["operation"]}',
+                  ),
+                  subtitle: source['kind'] == 'workspace'
+                      ? SelectableText(source['result_digest'] as String)
+                      : null,
+                ),
+            ],
+          ),
       ],
     );
   }

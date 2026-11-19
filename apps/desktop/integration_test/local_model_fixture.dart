@@ -13,6 +13,7 @@ class LocalModelFixture {
     this.readPath,
     this.createAfterRead,
     this.editAfterRead,
+    this.taskMemory,
   );
   final Directory root, ipc;
   final HttpServer server;
@@ -21,6 +22,7 @@ class LocalModelFixture {
   final String readPath;
   final bool createAfterRead;
   final bool editAfterRead;
+  final bool taskMemory;
   int calls = 0;
   final failures = <String>[];
   static const key = 'fixtureonly0123456789fixtureonly0123456789';
@@ -31,6 +33,7 @@ class LocalModelFixture {
     String readPath = 'proof.txt',
     bool createAfterRead = false,
     bool editAfterRead = false,
+    bool taskMemory = false,
   }) async {
     final root = await Directory('${hostRoot.path}/m').create();
     final ipc = await Directory.systemTemp.createTemp('oi');
@@ -89,6 +92,7 @@ class LocalModelFixture {
       readPath,
       createAfterRead,
       editAfterRead,
+      taskMemory,
     );
     server.listen(
       fixture._handle,
@@ -121,7 +125,62 @@ class LocalModelFixture {
         calls++;
         final Map<String, dynamic> delta;
         String finish;
-        if (askFirst && calls == 1) {
+        if (taskMemory) {
+          final history = (input['messages'] as List)
+              .where((m) => m['role'] == 'tool')
+              .toList();
+          if (calls == 1 || calls == 2) {
+            final name = calls == 1 ? 'memory_write' : 'memory_read';
+            if (!(input['tools'] as List).any(
+              (tool) => tool['function']['name'] == name,
+            )) {
+              throw StateError('Missing selected memory tool');
+            }
+            final args = <String, dynamic>{'scope_id': 'personal'};
+            if (calls == 1) {
+              args.addAll({
+                'mutation': 'put',
+                'payload': {
+                  'title': 'Preference',
+                  'content': expected,
+                  'enabled': true,
+                },
+              });
+            } else {
+              final receipt = jsonDecode(history.single['content'] as String);
+              if (receipt['kind'] != 'memory_write' ||
+                  receipt['data']['state'] != 'approved') {
+                throw StateError('Missing approved write receipt');
+              }
+              args.addAll({
+                'mode': 'entry',
+                'entry_id': receipt['data']['entry_id'],
+                'expected_version': '1',
+              });
+            }
+            delta = {
+              'tool_calls': [
+                {
+                  'index': 0,
+                  'id': 'memory-call-$calls',
+                  'type': 'function',
+                  'function': {'name': name, 'arguments': jsonEncode(args)},
+                },
+              ],
+            };
+            finish = 'tool_calls';
+          } else if (calls == 3 &&
+              history.length == 2 &&
+              jsonDecode(
+                    history.last['content'] as String,
+                  )['data']['value']['content'] ==
+                  expected) {
+            delta = {'content': expected};
+            finish = 'stop';
+          } else {
+            throw StateError('Missing actual memory output');
+          }
+        } else if (askFirst && calls == 1) {
           delta = {
             'tool_calls': [
               {
