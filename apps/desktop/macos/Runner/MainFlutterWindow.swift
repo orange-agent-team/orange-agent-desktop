@@ -1,4 +1,5 @@
 import Cocoa
+import Darwin
 import FlutterMacOS
 import UniformTypeIdentifiers
 
@@ -6,7 +7,28 @@ class MainFlutterWindow: NSWindow {
   private var platformChannel: FlutterMethodChannel?
   private var selections: [String: (URL, Bool, String)] = [:]
   private var pickerActive = false
+  // The installation probe loads only the signed bridge from this app.
+  // It runs before the Flutter engine, workspace store and user preferences.
+  private func verifyInstallation() -> Never {
+    guard let directory = Bundle.main.privateFrameworksURL,
+          let identifier = Bundle.main.bundleIdentifier else { exit(2) }
+    let bridge = directory.appendingPathComponent("orange_desktop_bridge.framework/Versions/A/orange_desktop_bridge")
+    guard let library = dlopen(bridge.path, RTLD_NOW | RTLD_LOCAL),
+          let symbol = dlsym(library, "frb_get_rust_content_hash") else { exit(3) }
+    typealias ContentHash = @convention(c) () -> Int32
+    let contentHash = unsafeBitCast(symbol, to: ContentHash.self)()
+    let receipt: [String: Any] = ["bundle_id": identifier, "bridge_content_hash": Int(contentHash)]
+    guard var data = try? JSONSerialization.data(withJSONObject: receipt) else { exit(4) }
+    data.append(10)
+    FileHandle.standardOutput.write(data)
+    dlclose(library)
+    exit(0)
+  }
+
   override func awakeFromNib() {
+    if Array(CommandLine.arguments.dropFirst()) == ["--verify-installation"] {
+      verifyInstallation()
+    }
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
     self.contentViewController = flutterViewController
