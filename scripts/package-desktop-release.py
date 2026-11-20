@@ -105,6 +105,17 @@ def package():
         if hashes[0]!=hashes[1]:
             differences=[{"member":n,"first":seen[0].get(n),"second":seen[1].get(n)}
                          for n in sorted(set(seen[0])|set(seen[1])) if seen[0].get(n)!=seen[1].get(n)]
+            # Retain only differing native executables for diagnosing the signed inputs.
+            # The original app artifacts, user data and signing state are never modified.
+            diagnostics=distribution/"diagnostics"/commit
+            for difference in differences:
+                member=difference["member"]
+                if member.endswith(("/orange_desktop_bridge","/MacOS/orange_desktop")):
+                    for i in range(2):
+                        app_root=scratch/str(i)/"apps/desktop/build/macos/Build/Products/Release"
+                        dest=diagnostics/str(i)/Path(member).name
+                        dest.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+                        shutil.copy2(app_root/member,dest)
             failure={"source":commit,"archive_digests":hashes,"changed_members":differences,"inspections":probes}
             (distribution/(commit+"-differences.json")).write_text(json.dumps(failure,indent=2)+"\n")
             raise ValueError("Independent builds differ; inspect the per-member diagnostics")
