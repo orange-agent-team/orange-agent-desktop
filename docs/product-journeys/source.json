@@ -1,0 +1,19 @@
+{
+  "requirement": "PRD-002",
+  "producer": "orange-agent-server",
+  "source_commit": "9d340e88688f59d979d1198a1430f50dbcdddfa5",
+  "files": {
+    "README.md": {
+      "source": "docs/product-journeys/README.md",
+      "sha256": "ff8373ebd4f7cb437452e60ae431310927fd9412ba8b13f247352cf4d5a90c05"
+    },
+    "surfaces.md": {
+      "source": "docs/product-journeys/surfaces.md",
+      "sha256": "fe934805e0f916ced49926d69e52367889c4db10618d15e29d7f7031abc08014"
+    },
+    "flows.json": {
+      "source": "docs/product-journeys/flows.json",
+      "sha256": "415c0d2e9511b3f83f68e9b3ce3c890bfad764b9caa1cfe4ed65334f4c4a4218"
+    }
+  }
+}
