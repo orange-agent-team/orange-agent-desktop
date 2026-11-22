@@ -73,6 +73,7 @@ void main() {
         await until(tester, () => agent.observedFailure != null);
         final observation = agent.observedFailure!;
         expect(observation.reason, 'gateway_failed');
+        expect(observation.adapterCode, 'unavailable');
         expect(observation.waitLimitMs, '120000');
         expect(int.parse(observation.elapsedMs!), greaterThanOrEqualTo(0));
         expect(find.text('调用编号 ${observation.invocationId}'), findsOneWidget);
@@ -93,6 +94,7 @@ void main() {
         debugPrint(
           jsonEncode({
             'nativeObservation': 'gateway_failed',
+            'adapterCode': observation.adapterCode,
             'reopenKeptInvocation': true,
             'endpointCalls': server.calls,
           }),

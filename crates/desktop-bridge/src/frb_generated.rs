@@ -5995,12 +5995,14 @@ impl SseDecode for Vec<crate::api::host::WorkspaceView> {
 impl SseDecode for crate::api::host::LocalModelObservation {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_adapterCode = <Option<String>>::sse_decode(deserializer);
         let mut var_invocationId = <String>::sse_decode(deserializer);
         let mut var_reason = <String>::sse_decode(deserializer);
         let mut var_observedAtUnix = <String>::sse_decode(deserializer);
         let mut var_waitLimitMs = <Option<String>>::sse_decode(deserializer);
         let mut var_elapsedMs = <Option<String>>::sse_decode(deserializer);
         return crate::api::host::LocalModelObservation {
+            adapter_code: var_adapterCode,
             invocation_id: var_invocationId,
             reason: var_reason,
             observed_at_unix: var_observedAtUnix,
@@ -7922,6 +7924,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::host::HostView> for crate::ap
 impl flutter_rust_bridge::IntoDart for crate::api::host::LocalModelObservation {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
+            self.adapter_code.into_into_dart().into_dart(),
             self.invocation_id.into_into_dart().into_dart(),
             self.reason.into_into_dart().into_dart(),
             self.observed_at_unix.into_into_dart().into_dart(),
@@ -9518,6 +9521,7 @@ impl SseEncode for Vec<crate::api::host::WorkspaceView> {
 impl SseEncode for crate::api::host::LocalModelObservation {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<String>>::sse_encode(self.adapter_code, serializer);
         <String>::sse_encode(self.invocation_id, serializer);
         <String>::sse_encode(self.reason, serializer);
         <String>::sse_encode(self.observed_at_unix, serializer);

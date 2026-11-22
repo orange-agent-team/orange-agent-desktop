@@ -6212,14 +6212,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   LocalModelObservation dco_decode_local_model_observation(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return LocalModelObservation(
-      invocationId: dco_decode_String(arr[0]),
-      reason: dco_decode_String(arr[1]),
-      observedAtUnix: dco_decode_String(arr[2]),
-      waitLimitMs: dco_decode_opt_String(arr[3]),
-      elapsedMs: dco_decode_opt_String(arr[4]),
+      adapterCode: dco_decode_opt_String(arr[0]),
+      invocationId: dco_decode_String(arr[1]),
+      reason: dco_decode_String(arr[2]),
+      observedAtUnix: dco_decode_String(arr[3]),
+      waitLimitMs: dco_decode_opt_String(arr[4]),
+      elapsedMs: dco_decode_opt_String(arr[5]),
     );
   }
 
@@ -7921,12 +7922,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_adapterCode = sse_decode_opt_String(deserializer);
     var var_invocationId = sse_decode_String(deserializer);
     var var_reason = sse_decode_String(deserializer);
     var var_observedAtUnix = sse_decode_String(deserializer);
     var var_waitLimitMs = sse_decode_opt_String(deserializer);
     var var_elapsedMs = sse_decode_opt_String(deserializer);
     return LocalModelObservation(
+      adapterCode: var_adapterCode,
       invocationId: var_invocationId,
       reason: var_reason,
       observedAtUnix: var_observedAtUnix,
@@ -9661,6 +9664,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.adapterCode, serializer);
     sse_encode_String(self.invocationId, serializer);
     sse_encode_String(self.reason, serializer);
     sse_encode_String(self.observedAtUnix, serializer);

@@ -220,9 +220,28 @@ void main() {
                   agent.observationMessage != null,
             );
             final obs = agent.observedFailure;
+            final service = await host.inspectModelService(handle: h);
+            final diagnostic = File('${data.path}/m7/failure.json');
+            final supervisor = await diagnostic.exists()
+                ? jsonDecode(await diagnostic.readAsString())
+                      as Map<String, dynamic>
+                : <String, dynamic>{};
+            final actual = await file.readAsString();
             debugPrint(
               jsonEncode({
                 'nativeDispatchObservation': obs?.reason,
+                'adapterCode': obs?.adapterCode,
+                'managedProcessPhase': service.phase,
+                'managedFailure': service.failure,
+                'helperExitCode': supervisor['helper_exit_code'],
+                'helperExitSignal': supervisor['helper_exit_signal'],
+                'lastPingAgeMs': supervisor['last_ping_age_ms'],
+                'maxPingGapMs': supervisor['max_ping_gap_ms'],
+                'fixtureFile': actual == original
+                    ? 'original'
+                    : actual == wanted
+                    ? 'approved-result'
+                    : 'unexpected',
                 'waitLimitMs': obs?.waitLimitMs,
                 'elapsedMs': obs?.elapsedMs,
               }),

@@ -354,6 +354,7 @@ pub async fn answer_user_question(
 }
 #[derive(Debug, Clone)]
 pub struct LocalModelObservation {
+    pub adapter_code: Option<String>,
     pub invocation_id: String,
     pub reason: String,
     pub observed_at_unix: String,

@@ -1899,6 +1899,7 @@ class HostView {
 }
 
 class LocalModelObservation {
+  final String? adapterCode;
   final String invocationId;
   final String reason;
   final String observedAtUnix;
@@ -1906,6 +1907,7 @@ class LocalModelObservation {
   final String? elapsedMs;
 
   const LocalModelObservation({
+    this.adapterCode,
     required this.invocationId,
     required this.reason,
     required this.observedAtUnix,
@@ -1915,6 +1917,7 @@ class LocalModelObservation {
 
   @override
   int get hashCode =>
+      adapterCode.hashCode ^
       invocationId.hashCode ^
       reason.hashCode ^
       observedAtUnix.hashCode ^
@@ -1926,6 +1929,7 @@ class LocalModelObservation {
       identical(this, other) ||
       other is LocalModelObservation &&
           runtimeType == other.runtimeType &&
+          adapterCode == other.adapterCode &&
           invocationId == other.invocationId &&
           reason == other.reason &&
           observedAtUnix == other.observedAtUnix &&

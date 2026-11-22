@@ -74,14 +74,23 @@ impl ModelGateway for LocalGateway {
         request: &'a GenerateRequest,
         cancel: watch::Receiver<bool>,
     ) -> ModelFuture<'a> {
+        let pending = self.generate_observed(request, cancel);
+        Box::pin(async move { pending.await.map_err(|_| GatewayFailure) })
+    }
+    fn generate_observed<'a>(
+        &'a self,
+        request: &'a GenerateRequest,
+        cancel: watch::Receiver<bool>,
+    ) -> orange_agent_runtime::engine::ObservedModelFuture<'a> {
+        use orange_protocol::model::GatewayIssue;
         Box::pin(async move {
             if request.model_version != self.id {
-                return Err(GatewayFailure);
+                return Err(GatewayIssue::IdentityChanged);
             }
             let mut request = request.clone();
             request.model_version = self.alias.clone();
             let projection =
-                llama_memory::Projection::for_request(&request).map_err(|_| GatewayFailure)?;
+                llama_memory::Projection::for_request(&request).map_err(GatewayIssue::from)?;
             let wire = projection.as_ref().map_or(&request, |p| &p.request);
             let result =
                 self.client
@@ -93,7 +102,7 @@ impl ModelGateway for LocalGateway {
                     });
             result.map_err(|kind| {
                 eprintln!("Local model request failed ({kind:?})");
-                GatewayFailure
+                GatewayIssue::from(kind)
             })
         })
     }
@@ -1024,6 +1033,13 @@ impl ModelGateway for GatewayRef<'_> {
     fn generate<'a>(&'a self, r: &'a GenerateRequest, c: watch::Receiver<bool>) -> ModelFuture<'a> {
         self.0.generate(r, c)
     }
+    fn generate_observed<'a>(
+        &'a self,
+        r: &'a GenerateRequest,
+        c: watch::Receiver<bool>,
+    ) -> orange_agent_runtime::engine::ObservedModelFuture<'a> {
+        self.0.generate_observed(r, c)
+    }
 }
 pub(crate) async fn connect_local_model(
     handle: String,
@@ -1183,6 +1199,7 @@ pub(crate) async fn inspect_model_observation(
             observation.map(|o| crate::api::host::LocalModelObservation {
                 invocation_id: o.invocation,
                 reason: o.kind,
+                adapter_code: o.adapter_code,
                 observed_at_unix: o.observed_at_unix,
                 wait_limit_ms: o.wait_limit_ms,
                 elapsed_ms: o.elapsed_ms,

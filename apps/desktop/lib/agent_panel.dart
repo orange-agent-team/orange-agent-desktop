@@ -481,6 +481,17 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                       'host_reopened' => '宿主重启时发现一条尚未确认的模型派发。',
                       _ => '正在核对模型派发。',
                     }),
+                    if (obs.adapterCode case final code?)
+                      Text(switch (code) {
+                        'unavailable' => '本地模型接口未能提供可用响应。',
+                        'incomplete' => '模型回复在完成前结束。',
+                        'limit' => '模型适配器检测到超限。',
+                        'protocol' => '模型回复未通过协议检查。',
+                        'identity_changed' => '模型连接与原调用身份不符。',
+                        'invalid' => '本地模型拒绝该请求配置。',
+                        'cancelled' => '模型适配器观察到取消。',
+                        _ => '模型适配器未提供进一步分类。',
+                      }),
                     SelectableText('调用编号 ${obs.invocationId}'),
                     if (obs.elapsedMs != null && obs.waitLimitMs != null)
                       Text(
