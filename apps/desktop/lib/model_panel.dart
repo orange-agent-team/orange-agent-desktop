@@ -57,6 +57,44 @@ class ModelPanel extends StatelessWidget {
                           : null,
                       child: Text(controller.importing ? '正在导入…' : '导入模型文件'),
                     ),
+                  if (view != null && !view.installed)
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.download),
+                      label: Text(controller.downloading ? '正在下载…' : '下载审核模型'),
+                      onPressed: controller.canInstall
+                          ? () async {
+                              final approved = await showDialog<bool>(
+                                context: context,
+                                builder: (dialog) => AlertDialog(
+                                  title: const Text('下载本地模型'),
+                                  content: Text(
+                                    '从 Hugging Face 的固定模型版本下载 ${view.modelName}（${view.modelBytes} 字节）。下载完成后会核对文件摘要。工作区文件和会话文本保留在本机。',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(dialog, false),
+                                      child: const Text('返回'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.pop(dialog, true),
+                                      child: const Text('确认下载'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (approved == true && context.mounted) {
+                                await controller.download();
+                              }
+                            }
+                          : null,
+                    ),
+                  if (controller.downloading)
+                    TextButton(
+                      onPressed: controller.cancelDownload,
+                      child: const Text('取消下载'),
+                    ),
                   if (controller.importing)
                     TextButton(
                       onPressed: controller.cancelImport,

@@ -30,6 +30,13 @@ for package in metadata['packages']:
         if Path(package['manifest_path']).resolve()!=wanted:raise SystemExit('Shared core escaped fixed local artifact')
         seen.add(package['name'])
 if not set(expected)<=seen:raise SystemExit('Required shared Runtime dependencies missing')
+packages={p["id"]:p["name"] for p in metadata["packages"]}
+nodes={n["id"]:n for n in metadata["resolve"]["nodes"]}
+runtime_node=next(n for n in nodes.values() if packages[n["id"]]=="orange-model-runtime")
+http_id=next(dep["pkg"] for dep in runtime_node["deps"] if dep["name"]=="reqwest")
+if "system-proxy" not in nodes[http_id]["features"]:
+    raise SystemExit("The pinned desktop model transport is missing OS proxy discovery")
+
 for arguments in [ ['fmt','-p','orange-desktop-bridge','--check'],['test','-p','orange-desktop-bridge','--locked','--offline'],['clippy','-p','orange-desktop-bridge','--all-targets','--locked','--offline','--','-D','warnings'] ]:
     subprocess.run([str(tools['cargo']),*arguments],cwd=ROOT,env=environment,check=True)
 subprocess.run([str(tools['flutter']),'--suppress-analytics','pub','get','--offline','--enforce-lockfile'],cwd=APP,env=environment,check=True)

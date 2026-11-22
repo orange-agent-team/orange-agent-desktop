@@ -83,6 +83,17 @@ pub async fn cancel_model_start(
 ) -> Result<ModelServiceView, BridgeError> {
     crate::host::cancel_model_start(handle, request_id).await
 }
+/// Downloads the fixed model from its reviewed catalog. Callers cannot supply a URI, file name or digest.
+pub async fn download_model(
+    handle: String,
+    operation_id: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::download_model(handle, operation_id).await
+}
+/// Fences a pending download for this host. Verified cache content is retained.
+pub async fn close_model_download(handle: String, operation_id: String) -> Result<(), BridgeError> {
+    crate::host::close_model_download(handle, operation_id).await
+}
 /// Operation ID is known before file selection is released, including lost replies.
 pub async fn import_model(
     handle: String,

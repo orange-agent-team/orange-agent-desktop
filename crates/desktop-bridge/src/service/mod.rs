@@ -58,6 +58,14 @@ pub(crate) fn cache_error(
     use orange_model_runtime::cache::CacheError;
     crate::host::failure(match error {
         CacheError::Cancelled => "MODEL_IMPORT_CANCELLED",
+        CacheError::Redirect => "MODEL_DOWNLOAD_SOURCE_DENIED",
+        CacheError::Connection => "MODEL_DOWNLOAD_CONNECTION",
+        CacheError::Timeout => "MODEL_DOWNLOAD_TIMEOUT",
+        CacheError::Transport => "MODEL_DOWNLOAD_INTERRUPTED",
+        CacheError::Http(401 | 403) => "MODEL_DOWNLOAD_ACCESS_DENIED",
+        CacheError::Http(429) => "MODEL_DOWNLOAD_RATE_LIMIT",
+        CacheError::Http(_) => "MODEL_DOWNLOAD_HTTP_FAILURE",
+        CacheError::Protocol => "MODEL_DOWNLOAD_RANGE_INVALID",
         CacheError::Quota => "MODEL_CACHE_QUOTA",
         CacheError::LockUnavailable => "MODEL_CACHE_BUSY",
         CacheError::Integrity | CacheError::TooLarge | CacheError::Incomplete => "MODEL_INTEGRITY",

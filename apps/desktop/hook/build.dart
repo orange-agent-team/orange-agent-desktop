@@ -8,7 +8,10 @@ void main(List<String> args) async {
       '../../scripts/import-runtime.py',
     );
     final lock = input.packageRoot.resolve('../../config/runtime.lock.json');
-    output.dependencies.addAll([verifier, lock]);
+    final linkerConfig = input.packageRoot.resolve(
+      '../../crates/desktop-bridge/build.rs',
+    );
+    output.dependencies.addAll([verifier, lock, linkerConfig]);
     final result = await Process.run('python3', [
       File.fromUri(verifier).path,
       '--verify',

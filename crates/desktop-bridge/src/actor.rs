@@ -96,6 +96,12 @@ pub(crate) struct WorkspaceSignal {
     pub revoker: WorkspaceRevoker,
     pub grant: WorkspaceGrant,
 }
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) enum ModelTransferSource {
+    SelectedFile(String),
+    PinnedDownload,
+}
+
 #[derive(Default)]
 pub(crate) struct Signals {
     pub workspaces: HashMap<String, WorkspaceSignal>,
@@ -128,7 +134,7 @@ pub(crate) struct Signals {
     #[cfg(target_vendor = "apple")]
     pub recovery_epochs: HashMap<String, u64>,
     pub service: Option<crate::service::Client>,
-    pub imports: HashMap<String, (String, watch::Sender<bool>)>,
+    pub imports: HashMap<String, (ModelTransferSource, watch::Sender<bool>)>,
     pub closed_imports: HashSet<String>,
 }
 impl Signals {
@@ -194,6 +200,23 @@ pub(crate) fn import_signal(
     id: &str,
     path: &str,
 ) -> Result<watch::Receiver<bool>, BridgeError> {
+    transfer_signal(
+        handle,
+        id,
+        ModelTransferSource::SelectedFile(path.to_owned()),
+    )
+}
+pub(crate) fn download_signal(
+    handle: &str,
+    id: &str,
+) -> Result<watch::Receiver<bool>, BridgeError> {
+    transfer_signal(handle, id, ModelTransferSource::PinnedDownload)
+}
+fn transfer_signal(
+    handle: &str,
+    id: &str,
+    source: ModelTransferSource,
+) -> Result<watch::Receiver<bool>, BridgeError> {
     if !orange_protocol::valid_id(id) {
         return Err(failure("INVALID_MODEL_REQUEST"));
     }
@@ -207,7 +230,13 @@ pub(crate) fn import_signal(
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
     if controls.closed_imports.contains(id) {
-        return Err(failure("MODEL_IMPORT_CLOSED"));
+        return Err(failure(
+            if matches!(source, ModelTransferSource::PinnedDownload) {
+                "MODEL_DOWNLOAD_CANCELLED"
+            } else {
+                "MODEL_IMPORT_CLOSED"
+            },
+        ));
     }
     if controls.imports.len() >= 256 && !controls.imports.contains_key(id) {
         return Err(failure("MODEL_COMMAND_LIMIT"));
@@ -215,13 +244,17 @@ pub(crate) fn import_signal(
     let entry = controls
         .imports
         .entry(id.into())
-        .or_insert_with(|| (path.into(), watch::channel(false).0));
-    if entry.0 != path {
+        .or_insert_with(|| (source.clone(), watch::channel(false).0));
+    if entry.0 != source {
         return Err(failure("MODEL_IMPORT_CONFLICT"));
     }
     Ok(entry.1.subscribe())
 }
-pub(crate) fn close_import_signal(handle: &str, id: &str) -> Result<(), BridgeError> {
+pub(crate) fn close_import_signal(
+    handle: &str,
+    id: &str,
+    download: bool,
+) -> Result<(), BridgeError> {
     if !orange_protocol::valid_id(id) {
         return Err(failure("INVALID_MODEL_REQUEST"));
     }
@@ -234,6 +267,11 @@ pub(crate) fn close_import_signal(handle: &str, id: &str) -> Result<(), BridgeEr
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
+    if controls.imports.get(id).is_some_and(|(source, _)| {
+        matches!(source, ModelTransferSource::PinnedDownload) != download
+    }) {
+        return Err(failure("MODEL_IMPORT_CONFLICT"));
+    }
     if controls.closed_imports.len() >= 8192 && !controls.closed_imports.contains(id) {
         return Err(failure("MODEL_COMMAND_LIMIT"));
     }

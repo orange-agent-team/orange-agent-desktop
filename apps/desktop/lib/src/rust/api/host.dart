@@ -36,6 +36,24 @@ Future<ModelServiceView> cancelModelStart({
   requestId: requestId,
 );
 
+/// Downloads the fixed model from its reviewed catalog. Callers cannot supply a URI, file name or digest.
+Future<ModelServiceView> downloadModel({
+  required String handle,
+  required String operationId,
+}) => RustLib.instance.api.crateApiHostDownloadModel(
+  handle: handle,
+  operationId: operationId,
+);
+
+/// Fences a pending download for this host. Verified cache content is retained.
+Future<void> closeModelDownload({
+  required String handle,
+  required String operationId,
+}) => RustLib.instance.api.crateApiHostCloseModelDownload(
+  handle: handle,
+  operationId: operationId,
+);
+
 /// Operation ID is known before file selection is released, including lost replies.
 Future<ModelServiceView> importModel({
   required String handle,

@@ -68,8 +68,9 @@ mod llama_memory;
 mod runs;
 mod task_memory;
 pub(crate) use managed::{
-    cancel_model_start, close_model_import, configure_model_service, current_model_connection,
-    import_model, inspect_model_service, start_model_service, stop_model_service,
+    cancel_model_start, close_model_download, close_model_import, configure_model_service,
+    current_model_connection, download_model, import_model, inspect_model_service,
+    start_model_service, stop_model_service,
 };
 pub(crate) use runs::{
     advance_run, answer_user_question, approve_creation_tool, approve_tool, cancel_run,

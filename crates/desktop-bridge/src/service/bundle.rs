@@ -19,12 +19,36 @@ pub(crate) struct Bundle {
     pub model_name: String,
     pub model_url: String,
 }
+fn catalog_model_url(repo: &str, revision: &str, file: &str) -> Result<String, BridgeError> {
+    let (publisher, repository) = repo
+        .split_once('/')
+        .ok_or_else(|| failure("MODEL_CATALOG_INVALID"))?;
+    if [publisher, repository, revision, file]
+        .iter()
+        .any(|segment| {
+            segment.is_empty()
+                || *segment == "."
+                || *segment == ".."
+                || segment.contains('/')
+                || segment.contains('\\')
+        })
+    {
+        return Err(failure("MODEL_CATALOG_INVALID"));
+    }
+    if revision.len() != 40 || !revision.bytes().all(|c| c.is_ascii_hexdigit()) {
+        return Err(failure("MODEL_CATALOG_INVALID"));
+    }
+    let mut url = reqwest::Url::parse("https://huggingface.co/")
+        .map_err(|_| failure("MODEL_CATALOG_INVALID"))?;
+    url.path_segments_mut()
+        .map_err(|_| failure("MODEL_CATALOG_INVALID"))?
+        .extend([publisher, repository, "resolve", revision, file]);
+    Ok(url.into())
+}
+
 pub(super) fn catalog() -> Result<Value, BridgeError> {
-    serde_json::from_str(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../vendor/runtime-97fdddb/config/local-model.lock.json"
-    )))
-    .map_err(|_| failure("MODEL_CATALOG_INVALID"))
+    serde_json::from_str(include_str!(env!("ORANGE_DESKTOP_MODEL_CATALOG")))
+        .map_err(|_| failure("MODEL_CATALOG_INVALID"))
 }
 fn version(value: &str) -> Result<[u32; 3], BridgeError> {
     let parts = value.split('.').collect::<Vec<_>>();
@@ -146,12 +170,7 @@ impl Bundle {
                 .as_u64()
                 .ok_or_else(|| failure("MODEL_CATALOG_INVALID"))?,
             model_name: text("file")?,
-            model_url: format!(
-                "https://huggingface.co/{}/resolve/{}/{}",
-                text("repository")?,
-                text("revision")?,
-                text("file")?
-            ),
+            model_url: catalog_model_url(&text("repository")?, &text("revision")?, &text("file")?)?,
         };
         result.verify_programs()?;
         Ok(result)
@@ -165,7 +184,7 @@ impl Bundle {
             &self.model_url,
             &self.model_sha,
             self.model_bytes,
-            &["huggingface.co"],
+            &["huggingface.co", "us.aws.cdn.hf.co"],
             b"GGUF",
         )
         .map_err(|_| failure("MODEL_CATALOG_INVALID"))

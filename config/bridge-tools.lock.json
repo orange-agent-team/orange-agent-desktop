@@ -122,7 +122,9 @@
     "approveExportRestoration",
     "listExportRestorations",
     "inspectExportRestoration",
-    "suspendExportRestoration"
+    "suspendExportRestoration",
+    "downloadModel",
+    "closeModelDownload"
   ],
   "additional_public_modules": {
     "memory": {

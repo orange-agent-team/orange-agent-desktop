@@ -197,11 +197,59 @@ pub(crate) async fn import_model(
     })
     .await
 }
+pub(crate) async fn download_model(
+    handle: String,
+    operation: String,
+) -> Result<ModelServiceView, BridgeError> {
+    let mut cancelled = crate::actor::download_signal(&handle, &operation)?;
+    let checked = handle.clone();
+    let client = crate::actor::call(handle.clone(), move |host, _| host.service(&checked)).await?;
+    if !matches!(client.view()?.phase.as_str(), "idle" | "stopped") {
+        return Err(failure("MODEL_SERVICE_BUSY"));
+    }
+    let settings = client.settings();
+    let cache = ModelCache::new(&settings.cache, 2 * 1024 * 1024 * 1024).map_err(cache_error)?;
+    let spec = settings.bundle.spec()?;
+    if *cancelled.borrow() {
+        return Err(failure("MODEL_DOWNLOAD_CANCELLED"));
+    }
+    // No database actor or UI queue is held during transport. The cache independently
+    // owns the digest lock, resumable partial and verified atomic publication.
+    // ModelCache itself owns bounded retries, range validation and digest verification.
+    let verified = tokio::select! {
+        biased;
+        _=cancelled.changed()=>false,
+        result=cache.ensure(&spec)=>{result.map_err(cache_error)?;true}
+    };
+    if !verified && !settings.check_installed().await? {
+        return Err(failure("MODEL_DOWNLOAD_CANCELLED"));
+    }
+    let checked = handle.clone();
+    crate::actor::call(handle, move |host, _| {
+        let current = host.service(&checked)?;
+        current.installed(true)?;
+        current.view()
+    })
+    .await
+}
 pub(crate) async fn close_model_import(
     handle: String,
     operation: String,
 ) -> Result<(), BridgeError> {
-    crate::actor::close_import_signal(&handle, &operation)?;
+    close_model_transfer(handle, operation, false).await
+}
+pub(crate) async fn close_model_download(
+    handle: String,
+    operation: String,
+) -> Result<(), BridgeError> {
+    close_model_transfer(handle, operation, true).await
+}
+async fn close_model_transfer(
+    handle: String,
+    operation: String,
+    download: bool,
+) -> Result<(), BridgeError> {
+    crate::actor::close_import_signal(&handle, &operation, download)?;
     crate::actor::call(handle, move |host, _| {
         host.signals
             .lock()

@@ -16,16 +16,18 @@ class ModelController extends ChangeNotifier {
   String? error, notice;
   bool configuring = false,
       importing = false,
+      downloading = false,
       starting = false,
       stopping = false;
-  String? _importId, _startId;
+  String? _importId, _downloadId, _startId;
   String? _lastInstance;
   bool _alive = true;
   int _epoch = 0;
   int _reads = 0;
   bool startUnconfirmed = false;
   Completer<void>? _configuration;
-  bool get busy => configuring || importing || starting || stopping;
+  bool get busy =>
+      configuring || importing || downloading || starting || stopping;
   bool get canStop =>
       starting ||
       startUnconfirmed ||
@@ -177,6 +179,58 @@ class ModelController extends ChangeNotifier {
     }
   }
 
+  Future<void> download() async {
+    if (!canInstall) return;
+    final operation = id();
+    final epoch = ++_epoch;
+    _downloadId = operation;
+    downloading = true;
+    error = null;
+    notice = null;
+    changed();
+    try {
+      final result = await api.downloadModel(
+        handle: handle,
+        operationId: operation,
+      );
+      if (current(epoch)) {
+        publish(result);
+        notice = '已校验模型文件，可以启动本地推理。';
+      }
+    } catch (failure) {
+      if (current(epoch)) error = describeModelError(failure);
+    } finally {
+      try {
+        await api.closeModelDownload(handle: handle, operationId: operation);
+      } on api.BridgeError catch (failure) {
+        if (current(epoch) && failure.code != 'STALE_HOST_HANDLE') {
+          error = describeModelError(failure);
+        }
+      } finally {
+        if (_downloadId == operation) _downloadId = null;
+        downloading = false;
+        changed();
+      }
+    }
+  }
+
+  Future<void> cancelDownload() async {
+    final operation = _downloadId;
+    if (operation == null) return;
+    try {
+      await api.closeModelDownload(handle: handle, operationId: operation);
+      if (_alive) {
+        notice = '正在停止下载。';
+        changed();
+      }
+    } catch (failure) {
+      if (_alive) {
+        error = describeModelError(failure);
+        changed();
+      }
+    }
+  }
+
   Future<void> cancelImport() async {
     final operation = _importId;
     if (operation == null) return;
@@ -286,6 +340,12 @@ class ModelController extends ChangeNotifier {
     _epoch++;
     Future<void> finish() async {
       try {
+        if (_downloadId != null) {
+          await api.closeModelDownload(
+            handle: handle,
+            operationId: _downloadId!,
+          );
+        }
         if (_importId != null) {
           await api.closeModelImport(handle: handle, operationId: _importId!);
         }
@@ -362,6 +422,15 @@ String describeModelFailureCode(String code) {
     'MODEL_PLATFORM_UNAVAILABLE' => '本机系统版本或架构不满足模型组件要求。',
     'MODEL_NOT_INSTALLED' => '请先导入清单中指定的模型文件。',
     'MODEL_INTEGRITY' => '文件或模型组件未通过完整性校验。',
+    'MODEL_DOWNLOAD_CANCELLED' => '模型下载已停止，可重新选择下载以继续。自己的工作区仍在本机。',
+    'MODEL_DOWNLOAD_SOURCE_DENIED' => '模型下载地址不在当前目录允许的来源中。可导入已取得的同版本文件。',
+    'MODEL_DOWNLOAD_CONNECTION' => '未能建立与模型来源的连接。',
+    'MODEL_DOWNLOAD_TIMEOUT' => '模型传输超时。可重试以继续下载。',
+    'MODEL_DOWNLOAD_INTERRUPTED' => '模型传输中断。可重试以继续下载。',
+    'MODEL_DOWNLOAD_ACCESS_DENIED' => '模型来源拒绝了读取请求。',
+    'MODEL_DOWNLOAD_RATE_LIMIT' => '模型来源暂时限制请求，请稍后重试。',
+    'MODEL_DOWNLOAD_HTTP_FAILURE' => '模型来源返回了失败状态。',
+    'MODEL_DOWNLOAD_RANGE_INVALID' => '模型来源返回的下载范围与原文件不符。',
     'MODEL_CACHE_QUOTA' => '模型缓存空间限额不足。',
     'MODEL_CACHE_BUSY' || 'MODEL_SERVICE_BUSY' => '本地模型正忙，请核对状态后重试。',
     'MODEL_IMPORT_CANCELLED' || 'MODEL_IMPORT_CLOSED' => '导入已停止；已经完成校验的缓存仍会保留。',
