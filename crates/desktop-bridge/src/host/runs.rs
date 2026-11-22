@@ -1169,6 +1169,28 @@ pub(crate) async fn answer_user_question(
     })
     .await
 }
+pub(crate) async fn inspect_model_observation(
+    handle: String,
+    run: String,
+) -> Result<Option<crate::api::host::LocalModelObservation>, BridgeError> {
+    crate::actor::call(handle.clone(), move |registry, _| {
+        let observation = registry
+            .current(&handle)?
+            .journal
+            .latest_model_observation(LOCAL_OWNER, &run)
+            .map_err(engine_error)?;
+        Ok(
+            observation.map(|o| crate::api::host::LocalModelObservation {
+                invocation_id: o.invocation,
+                reason: o.kind,
+                observed_at_unix: o.observed_at_unix,
+                wait_limit_ms: o.wait_limit_ms,
+                elapsed_ms: o.elapsed_ms,
+            }),
+        )
+    })
+    .await
+}
 pub(crate) async fn inspect_run(
     handle: String,
     run_id: String,

@@ -43,6 +43,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ExportOutcomeView dco_decode_box_autoadd_export_outcome_view(dynamic raw);
 
   @protected
+  LocalModelObservation dco_decode_box_autoadd_local_model_observation(
+    dynamic raw,
+  );
+
+  @protected
   LocalSkillSelection dco_decode_box_autoadd_local_skill_selection(dynamic raw);
 
   @protected
@@ -235,6 +240,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<WorkspaceView> dco_decode_list_workspace_view(dynamic raw);
 
   @protected
+  LocalModelObservation dco_decode_local_model_observation(dynamic raw);
+
+  @protected
   LocalPackageReview dco_decode_local_package_review(dynamic raw);
 
   @protected
@@ -304,6 +312,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportOutcomeView? dco_decode_opt_box_autoadd_export_outcome_view(
+    dynamic raw,
+  );
+
+  @protected
+  LocalModelObservation? dco_decode_opt_box_autoadd_local_model_observation(
     dynamic raw,
   );
 
@@ -442,6 +455,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportOutcomeView sse_decode_box_autoadd_export_outcome_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  LocalModelObservation sse_decode_box_autoadd_local_model_observation(
     SseDeserializer deserializer,
   );
 
@@ -686,6 +704,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  LocalModelObservation sse_decode_local_model_observation(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   LocalPackageReview sse_decode_local_package_review(
     SseDeserializer deserializer,
   );
@@ -763,6 +786,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportOutcomeView? sse_decode_opt_box_autoadd_export_outcome_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  LocalModelObservation? sse_decode_opt_box_autoadd_local_model_observation(
     SseDeserializer deserializer,
   );
 
@@ -938,6 +966,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_export_outcome_view(
     ExportOutcomeView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_local_model_observation(
+    LocalModelObservation self,
     SseSerializer serializer,
   );
 
@@ -1251,6 +1285,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_local_model_observation(
+    LocalModelObservation self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_local_package_review(
     LocalPackageReview self,
     SseSerializer serializer,
@@ -1358,6 +1398,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_export_outcome_view(
     ExportOutcomeView? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_local_model_observation(
+    LocalModelObservation? self,
     SseSerializer serializer,
   );
 

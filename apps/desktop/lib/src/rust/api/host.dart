@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -274,6 +274,14 @@ Future<AgentRunView> answerUserQuestion({
   questionId: questionId,
   expectedDigest: expectedDigest,
   answers: answers,
+);
+
+Future<LocalModelObservation?> inspectModelObservation({
+  required String handle,
+  required String runId,
+}) => RustLib.instance.api.crateApiHostInspectModelObservation(
+  handle: handle,
+  runId: runId,
 );
 
 Future<AgentRunView> inspectRun({
@@ -1888,6 +1896,41 @@ class HostView {
           runtimeSourceCommit == other.runtimeSourceCommit &&
           availableReadTools == other.availableReadTools &&
           availableEditTools == other.availableEditTools;
+}
+
+class LocalModelObservation {
+  final String invocationId;
+  final String reason;
+  final String observedAtUnix;
+  final String? waitLimitMs;
+  final String? elapsedMs;
+
+  const LocalModelObservation({
+    required this.invocationId,
+    required this.reason,
+    required this.observedAtUnix,
+    this.waitLimitMs,
+    this.elapsedMs,
+  });
+
+  @override
+  int get hashCode =>
+      invocationId.hashCode ^
+      reason.hashCode ^
+      observedAtUnix.hashCode ^
+      waitLimitMs.hashCode ^
+      elapsedMs.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LocalModelObservation &&
+          runtimeType == other.runtimeType &&
+          invocationId == other.invocationId &&
+          reason == other.reason &&
+          observedAtUnix == other.observedAtUnix &&
+          waitLimitMs == other.waitLimitMs &&
+          elapsedMs == other.elapsedMs;
 }
 
 class LocalPackageReview {

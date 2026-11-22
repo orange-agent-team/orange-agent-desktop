@@ -467,6 +467,29 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                 Text('${phaseLabel(run.phase)} · ${run.steps} 步'),
                 if (!controller.matchingModel)
                   const Text('继续执行需要连接此会话使用的原模型版本。'),
+                if (run.phase == 'recovery_required' &&
+                    controller.supportsModelObservation) ...[
+                  TextButton(
+                    onPressed: controller.inspectModelFailure,
+                    child: const Text('核对模型派发记录'),
+                  ),
+                  if (controller.observedFailure case final obs?) ...[
+                    Text(switch (obs.reason) {
+                      'call_time_limit' => '模型调用达到运行时的单次等待上限。',
+                      'gateway_failed' => '模型适配器报告失败，派发结果仍需核对。',
+                      'run_deadline' => '整个会话的截止时间已到。',
+                      'host_reopened' => '宿主重启时发现一条尚未确认的模型派发。',
+                      _ => '正在核对模型派发。',
+                    }),
+                    SelectableText('调用编号 ${obs.invocationId}'),
+                    if (obs.elapsedMs != null && obs.waitLimitMs != null)
+                      Text(
+                        '实际等待 ${obs.elapsedMs} 毫秒 · 当时上限 ${obs.waitLimitMs} 毫秒',
+                      ),
+                  ],
+                  if (controller.observationMessage != null)
+                    Text(controller.observationMessage!),
+                ],
                 if (run.failure != null) const Text('本次执行已停止；请核对状态后处理恢复记录。'),
                 if (run.phase == 'awaiting_user' && run.userQuestion != null)
                   QuestionPanel(

@@ -211,6 +211,23 @@ void main() {
               'invocations': agent.view?.invocations,
             }),
           );
+          if (agent.view?.phase == 'recovery_required') {
+            await click(find.text('核对模型派发记录'));
+            await until(
+              tester,
+              () =>
+                  agent.observedFailure != null ||
+                  agent.observationMessage != null,
+            );
+            final obs = agent.observedFailure;
+            debugPrint(
+              jsonEncode({
+                'nativeDispatchObservation': obs?.reason,
+                'waitLimitMs': obs?.waitLimitMs,
+                'elapsedMs': obs?.elapsedMs,
+              }),
+            );
+          }
           expect(agent.error, isNull);
           expect(
             agent.view?.phase,

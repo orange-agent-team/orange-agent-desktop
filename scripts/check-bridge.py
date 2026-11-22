@@ -8,7 +8,10 @@ import subprocess
 import sys
 from environment import ROOT,APP,tool_environment
 from bridge_surface import verify_surface
-parser=argparse.ArgumentParser();parser.add_argument('--native',action='store_true');args=parser.parse_args()
+parser=argparse.ArgumentParser()
+parser.add_argument('--native',action='store_true')
+parser.add_argument('--model-observation',action='store_true',help='Read the original unknown dispatch through the actual app after a local IPC failure')
+args=parser.parse_args()
 subprocess.run([sys.executable,str(ROOT/'scripts/import-runtime.py'),'--verify'],check=True)
 manifest=json.loads((ROOT/'config/generated-bridge.lock.json').read_text())
 verify_surface(ROOT,APP,json.loads((ROOT/'config/bridge-tools.lock.json').read_text()))
@@ -43,8 +46,15 @@ subprocess.run([str(tools['flutter']),'--suppress-analytics','pub','get','--offl
 subprocess.run([str(tools['dart']),'--suppress-analytics','format','--output=none','--set-exit-if-changed','lib','test','integration_test','hook'],cwd=APP,env=environment,check=True)
 subprocess.run([str(tools['flutter']),'--suppress-analytics','analyze','--no-pub'],cwd=APP,env=environment,check=True)
 subprocess.run([str(tools['flutter']),'--suppress-analytics','test','--no-pub','test'],cwd=APP,env=environment,check=True,timeout=300)
+if args.model_observation:
+    result=subprocess.run([tools['flutter'],'--suppress-analytics','test','integration_test/model_observation_test.dart','-d','macos','--no-pub'],
+                          cwd=APP,env=environment,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=900)
+    print(result.stdout,end='',flush=True);result.check_returncode()
+    if '"nativeObservation":"gateway_failed"' not in result.stdout or '"endpointCalls":1' not in result.stdout or 'All tests passed!' not in result.stdout:
+        raise RuntimeError('Native dispatch observation proof missing')
+    print('PASS actual Flutter/FRB/SQLite model observation and original invocation recovery against a controlled HTTP fault')
 if args.native:
     subprocess.run([str(tools['flutter']),'--suppress-analytics','test','integration_test/native_host_test.dart','-d','macos','--no-pub'],cwd=APP,env=environment,check=True,timeout=900)
     print('PASS actual macOS Flutter/FRB/private Unix IPC/SQLite/file-tool approval UI and scoped access cleanup; exact integer strings and stale handles. Model protocol and OS selection callbacks are explicit fixtures. Real API inference is check-real-run.py; actual managed model lifecycle/UI is check-managed-model.py. No cloud, GPU or persistent OS-bookmark certificate')
-else:
+elif not args.model_observation:
     print('PASS Rust host and Dart static checks; native FFI application not exercised without --native')

@@ -352,6 +352,20 @@ pub async fn answer_user_question(
 ) -> Result<AgentRunView, BridgeError> {
     crate::host::answer_user_question(handle, run_id, question_id, expected_digest, answers).await
 }
+#[derive(Debug, Clone)]
+pub struct LocalModelObservation {
+    pub invocation_id: String,
+    pub reason: String,
+    pub observed_at_unix: String,
+    pub wait_limit_ms: Option<String>,
+    pub elapsed_ms: Option<String>,
+}
+pub async fn inspect_model_observation(
+    handle: String,
+    run_id: String,
+) -> Result<Option<LocalModelObservation>, BridgeError> {
+    crate::host::inspect_model_observation(handle, run_id).await
+}
 pub async fn inspect_run(handle: String, run_id: String) -> Result<AgentRunView, BridgeError> {
     crate::host::inspect_run(handle, run_id).await
 }

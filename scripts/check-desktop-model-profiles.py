@@ -7,9 +7,49 @@ import os
 from pathlib import Path
 import platform
 import subprocess
+import selectors
+import signal
+import sys
+import time
 import tempfile
 from environment import APP,ROOT,tool_environment
 from model_bundle import verify_bundle,STAGED
+
+def run_native(command, env):
+    # Stream the real test output to the caller so interruption preserves the observed phases.
+    with subprocess.Popen(command,cwd=APP,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                          start_new_session=True) as child, selectors.DefaultSelector() as ready:
+        ready.register(child.stdout,selectors.EVENT_READ)
+        deadline=time.monotonic()+1500
+        observed=set()
+        line=b""
+        def inspect(data):
+            for marker in (b'"approved7bDesktopPatch":true',b'"persistedSelection":true',b'All tests passed!'):
+                if marker in data:observed.add(marker)
+        try:
+            while ready.get_map():
+                remaining=deadline-time.monotonic()
+                if remaining<=0:raise TimeoutError('Desktop model verification exceeded its deadline')
+                for key,_ in ready.select(min(5,remaining)):
+                    chunk=os.read(key.fd,65536)
+                    if not chunk:
+                        ready.unregister(key.fileobj)
+                        break
+                    sys.stdout.buffer.write(chunk);sys.stdout.buffer.flush()
+                    data=line+chunk
+                    inspect(data)
+                    line=data[-64:]
+            code=child.wait(timeout=max(0.1,deadline-time.monotonic()))
+            if code:raise RuntimeError(f'Actual desktop qualification exited with status {code}')
+            if len(observed)!=3:raise RuntimeError('Native selection and editing proof missing')
+        finally:
+            if child.poll() is None:
+                os.killpg(child.pid,signal.SIGTERM)
+                try:child.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    os.killpg(child.pid,signal.SIGKILL)
+                    child.wait(timeout=10)
+
 
 def main():
     cl=argparse.ArgumentParser();cl.add_argument('--model',type=Path,required=True);args=cl.parse_args()
@@ -29,12 +69,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='orange-selected-weight-',dir=container) as tmp:
         file=Path(tmp)/'selected.gguf'
         subprocess.run(['/bin/cp','-c',args.model.resolve(),file],check=True)
-        result=subprocess.run([tools['flutter'],'--suppress-analytics','test','integration_test/model_profiles_test.dart',
-                            '-d','macos','--no-pub','--dart-define=ORANGE_SELECTED_7B='+str(file)],
-                           cwd=APP,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=1500)
-        print(result.stdout,end='',flush=True);result.check_returncode()
-        if '"approved7bDesktopPatch":true' not in result.stdout or '"persistedSelection":true' not in result.stdout or 'All tests passed!' not in result.stdout:
-            raise RuntimeError('Native selection and editing proof missing')
+        run_native([tools['flutter'],'--suppress-analytics','test','integration_test/model_profiles_test.dart',
+                    '-d','macos','--no-pub','--dart-define=ORANGE_SELECTED_7B='+str(file)],env)
     print('PASS sandboxed macOS alternate model, stale selection denial and approved real 7B edit',flush=True)
 
 if __name__=='__main__':main()

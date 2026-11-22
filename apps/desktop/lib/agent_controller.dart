@@ -51,6 +51,10 @@ abstract interface class PatchSkillCommands {
   );
 }
 
+abstract interface class ModelObservationCommands {
+  Future<api.LocalModelObservation?> inspectModelObservation(String run);
+}
+
 abstract interface class LocalSkillCommands {
   Future<List<api.LocalSkillChoice>> listSkills();
   Future<String> setSkillEnabled(api.LocalSkillChoice choice, bool enabled);
@@ -114,6 +118,7 @@ class NativeAgentCommands
     implements
         AgentCommands,
         LocalSkillCommands,
+        ModelObservationCommands,
         PatchSkillCommands,
         LocalPackageCommands,
         EditingAgentCommands,
@@ -121,6 +126,10 @@ class NativeAgentCommands
         MemoryRecoveryCommands {
   NativeAgentCommands(this.handle);
   final String handle;
+  @override
+  Future<api.LocalModelObservation?> inspectModelObservation(String run) =>
+      api.inspectModelObservation(handle: handle, runId: run);
+
   @override
   Future<api.LocalPackageReview> reviewPackage(String manifest) =>
       api.reviewLocalPackage(handle: handle, manifest: manifest);
@@ -419,6 +428,46 @@ String toolDisplayName(String name) => name == 'memory_read'
 class AgentController extends ChangeNotifier {
   AgentController(this.commands, {required this.serviceDirectory});
   final AgentCommands commands;
+  String? _observedRun;
+  int? _observationEpoch;
+  api.LocalModelObservation? _observation;
+  String? _observationMessage;
+  bool get supportsModelObservation => commands is ModelObservationCommands;
+  api.LocalModelObservation? get observedFailure =>
+      _observedRun == runId && _observationEpoch == _epoch
+      ? _observation
+      : null;
+  String? get observationMessage =>
+      _observedRun == runId && _observationEpoch == _epoch
+      ? _observationMessage
+      : null;
+  Future<void> inspectModelFailure() async {
+    final id = runId;
+    if (!_alive ||
+        id == null ||
+        view?.phase != 'recovery_required' ||
+        !supportsModelObservation) {
+      return;
+    }
+    final epoch = _epoch;
+    _observedRun = id;
+    _observationEpoch = epoch;
+    _observation = null;
+    _observationMessage = null;
+    _changed();
+    try {
+      final result = await (commands as ModelObservationCommands)
+          .inspectModelObservation(id);
+      if (!_alive || epoch != _epoch || runId != id) return;
+      _observation = result;
+      if (result == null) _observationMessage = '此会话没有保存模型派发的具体观测。';
+    } catch (_) {
+      if (!_alive || epoch != _epoch || runId != id) return;
+      _observationMessage = '当前无法读取这次派发的诊断记录。';
+    }
+    _changed();
+  }
+
   List<api.LocalSkillChoice> skills = [];
   bool skillBusy = false;
   String? skillError;

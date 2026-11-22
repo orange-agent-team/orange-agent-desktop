@@ -1,0 +1,22 @@
+[
+  {
+    "id": "orange.text-summary",
+    "version": "1.0.0",
+    "digest": "07b7ba82c35734e598956c4b41f3e72621c7196b8dc7892fbbf91988771117a8"
+  },
+  {
+    "id": "orange.source-question",
+    "version": "1.0.0",
+    "digest": "d74d8fa954ecddffbae1d3b59e702ee4383dd260db4c4e7ae94cee054d748346"
+  },
+  {
+    "id": "orange.code-review",
+    "version": "1.0.0",
+    "digest": "ccbd9103ded15d80c2160ce59b2dfa16a36274e1fa1814212390ebd86d19ff53"
+  },
+  {
+    "id": "orange.reviewed-patch",
+    "version": "1.0.0",
+    "digest": "2f303cc6494cff26bfd23c001fc3f42682fcb5dcdabcfa3e0081cdee304760e9"
+  }
+]

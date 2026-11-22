@@ -14,6 +14,7 @@ class LocalModelFixture {
     this.createAfterRead,
     this.editAfterRead,
     this.taskMemory,
+    this.rejectGeneration,
   );
   final Directory root, ipc;
   final HttpServer server;
@@ -23,6 +24,7 @@ class LocalModelFixture {
   final bool createAfterRead;
   final bool editAfterRead;
   final bool taskMemory;
+  final bool rejectGeneration;
   int calls = 0;
   final failures = <String>[];
   static const key = 'fixtureonly0123456789fixtureonly0123456789';
@@ -34,6 +36,7 @@ class LocalModelFixture {
     bool createAfterRead = false,
     bool editAfterRead = false,
     bool taskMemory = false,
+    bool rejectGeneration = false,
   }) async {
     final root = await Directory('${hostRoot.path}/m').create();
     final ipc = await Directory.systemTemp.createTemp('oi');
@@ -93,6 +96,7 @@ class LocalModelFixture {
       createAfterRead,
       editAfterRead,
       taskMemory,
+      rejectGeneration,
     );
     server.listen(
       fixture._handle,
@@ -123,6 +127,11 @@ class LocalModelFixture {
           throw StateError('model alias mismatch');
         }
         calls++;
+        if (rejectGeneration) {
+          request.response.statusCode = 503;
+          await request.response.close();
+          return;
+        }
         final Map<String, dynamic> delta;
         String finish;
         if (taskMemory) {

@@ -46,7 +46,8 @@
     "LocalSkillChoice",
     "LocalSourceReference",
     "LocalSkillSelection",
-    "LocalPackageReview"
+    "LocalPackageReview",
+    "LocalModelObservation"
   ],
   "public_functions": [
     "advanceRun",
@@ -140,7 +141,8 @@
     "cancelModelStartForProfile",
     "importModelForProfile",
     "downloadModelForProfile",
-    "startLocalPatchSkillRun"
+    "startLocalPatchSkillRun",
+    "inspectModelObservation"
   ],
   "additional_public_modules": {
     "memory": {
