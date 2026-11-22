@@ -91,8 +91,13 @@ class LocalSkillPicker extends StatelessWidget {
             child: const Text('重读模板目录'),
           ),
         if (selected != null) ...[
+          if (selected.requiredModelProfile != null &&
+              controller.model?.qualifiedSkills != true)
+            const Text('此模板需要启动已校验的本地 7B 模型。'),
           Text(
-            selected.tools.isEmpty
+            selected.skillId == 'orange.reviewed-patch'
+                ? '可读取已有文件并提出补丁。每次模型回复上限为 512 token，每次写入须核对差异并批准。'
+                : selected.tools.isEmpty
                 ? '此模板仅使用任务文本。'
                 : '可申请的只读工具：${selected.tools.join('、')}。读取仍需工作区授权。',
           ),

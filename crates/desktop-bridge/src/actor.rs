@@ -199,23 +199,27 @@ pub(crate) fn import_signal(
     handle: &str,
     id: &str,
     path: &str,
+    revision: Option<&str>,
 ) -> Result<watch::Receiver<bool>, BridgeError> {
     transfer_signal(
         handle,
         id,
         ModelTransferSource::SelectedFile(path.to_owned()),
+        revision,
     )
 }
 pub(crate) fn download_signal(
     handle: &str,
     id: &str,
+    revision: Option<&str>,
 ) -> Result<watch::Receiver<bool>, BridgeError> {
-    transfer_signal(handle, id, ModelTransferSource::PinnedDownload)
+    transfer_signal(handle, id, ModelTransferSource::PinnedDownload, revision)
 }
 fn transfer_signal(
     handle: &str,
     id: &str,
     source: ModelTransferSource,
+    revision: Option<&str>,
 ) -> Result<watch::Receiver<bool>, BridgeError> {
     if !orange_protocol::valid_id(id) {
         return Err(failure("INVALID_MODEL_REQUEST"));
@@ -229,6 +233,18 @@ fn transfer_signal(
         .signals
         .lock()
         .map_err(|_| failure("HOST_INTERNAL"))?;
+    let selection = controls
+        .service
+        .as_ref()
+        .ok_or_else(|| failure("MODEL_SERVICE_NOT_CONFIGURED"))?
+        .settings()
+        .selection;
+    selection.require(revision)?;
+    if matches!(source, ModelTransferSource::PinnedDownload)
+        && selection.profile == crate::service::Profile::SevenB
+    {
+        return Err(failure("MODEL_PROFILE_IMPORT_ONLY"));
+    }
     if controls.closed_imports.contains(id) {
         return Err(failure(
             if matches!(source, ModelTransferSource::PinnedDownload) {

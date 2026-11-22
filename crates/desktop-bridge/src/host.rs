@@ -74,7 +74,7 @@ mod task_memory;
 pub(crate) use managed::{
     cancel_model_start, close_model_download, close_model_import, configure_model_service,
     current_model_connection, download_model, import_model, inspect_model_service,
-    start_model_service, stop_model_service,
+    select_model_profile, start_model_service, stop_model_service,
 };
 pub(crate) use runs::{
     advance_run, answer_user_question, approve_creation_tool, approve_tool, cancel_run,
@@ -694,7 +694,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "938bc63654127951ae52810ba91f44af4eafecf2"
+            "7876359b73b86c54292e6231da32179556994299"
         );
         assert_eq!(
             registry

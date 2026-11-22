@@ -47,6 +47,7 @@ pub struct RunPage {
 }
 #[derive(Debug, Clone)]
 pub struct ModelConnectionView {
+    pub qualified_skills: Option<bool>,
     pub model_id: String,
     pub display_name: String,
     pub context_tokens: u32,
@@ -54,6 +55,10 @@ pub struct ModelConnectionView {
 }
 #[derive(Debug, Clone)]
 pub struct ModelServiceView {
+    pub inference_threads: Option<u16>,
+    pub profile_id: Option<String>,
+    pub selection_revision: Option<String>,
+    pub model_sha256: Option<String>,
     pub phase: String,
     pub model_name: String,
     pub model_bytes: String,
@@ -71,6 +76,13 @@ pub async fn configure_model_service(
     crate::host::configure_model_service(handle, contents_directory, ipc_directory, os_version)
         .await
 }
+pub async fn select_model_profile(
+    handle: String,
+    profile_id: String,
+    expected_revision: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::select_model_profile(handle, profile_id, expected_revision).await
+}
 pub async fn inspect_model_service(handle: String) -> Result<ModelServiceView, BridgeError> {
     crate::host::inspect_model_service(handle).await
 }
@@ -81,14 +93,28 @@ pub async fn cancel_model_start(
     handle: String,
     request_id: String,
 ) -> Result<ModelServiceView, BridgeError> {
-    crate::host::cancel_model_start(handle, request_id).await
+    crate::host::cancel_model_start(handle, request_id, None).await
+}
+pub async fn cancel_model_start_for_profile(
+    handle: String,
+    request_id: String,
+    selection_revision: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::cancel_model_start(handle, request_id, Some(selection_revision)).await
 }
 /// Downloads the fixed model from its reviewed catalog. Callers cannot supply a URI, file name or digest.
 pub async fn download_model(
     handle: String,
     operation_id: String,
 ) -> Result<ModelServiceView, BridgeError> {
-    crate::host::download_model(handle, operation_id).await
+    crate::host::download_model(handle, operation_id, None).await
+}
+pub async fn download_model_for_profile(
+    handle: String,
+    operation_id: String,
+    selection_revision: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::download_model(handle, operation_id, Some(selection_revision)).await
 }
 /// Fences a pending download for this host. Verified cache content is retained.
 pub async fn close_model_download(handle: String, operation_id: String) -> Result<(), BridgeError> {
@@ -100,7 +126,21 @@ pub async fn import_model(
     operation_id: String,
     selected_file: String,
 ) -> Result<ModelServiceView, BridgeError> {
-    crate::host::import_model(handle, operation_id, selected_file).await
+    crate::host::import_model(handle, operation_id, selected_file, None).await
+}
+pub async fn import_model_for_profile(
+    handle: String,
+    operation_id: String,
+    selected_file: String,
+    selection_revision: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::import_model(
+        handle,
+        operation_id,
+        selected_file,
+        Some(selection_revision),
+    )
+    .await
 }
 /// Stops further file reads and drains the owned import before native scope release.
 pub async fn close_model_import(handle: String, operation_id: String) -> Result<(), BridgeError> {
@@ -110,7 +150,14 @@ pub async fn start_model_service(
     handle: String,
     request_id: String,
 ) -> Result<ModelServiceView, BridgeError> {
-    crate::host::start_model_service(handle, request_id).await
+    crate::host::start_model_service(handle, request_id, None).await
+}
+pub async fn start_model_service_for_profile(
+    handle: String,
+    request_id: String,
+    selection_revision: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::host::start_model_service(handle, request_id, Some(selection_revision)).await
 }
 pub async fn stop_model_service(
     handle: String,
@@ -176,6 +223,7 @@ pub struct LocalSourceReference {
 }
 #[derive(Debug, Clone)]
 pub struct LocalSkillChoice {
+    pub required_model_profile: Option<String>,
     pub skill_id: String,
     pub version: String,
     pub digest: String,
@@ -248,6 +296,25 @@ pub struct LocalSkillSelection {
     pub digest: String,
     pub activation_revision: String,
 }
+pub async fn start_local_patch_skill_run(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    prompt: String,
+    selection: LocalSkillSelection,
+    editing_consent_id: String,
+    editing_version: String,
+) -> Result<AgentRunView, BridgeError> {
+    crate::host::start_local_skill_run(
+        handle,
+        workspace_id,
+        request_id,
+        prompt,
+        selection,
+        Some((editing_consent_id, editing_version)),
+    )
+    .await
+}
 pub async fn start_local_skill_run(
     handle: String,
     workspace_id: String,
@@ -255,7 +322,8 @@ pub async fn start_local_skill_run(
     prompt: String,
     selection: LocalSkillSelection,
 ) -> Result<AgentRunView, BridgeError> {
-    crate::host::start_local_skill_run(handle, workspace_id, request_id, prompt, selection).await
+    crate::host::start_local_skill_run(handle, workspace_id, request_id, prompt, selection, None)
+        .await
 }
 pub async fn start_run(
     handle: String,

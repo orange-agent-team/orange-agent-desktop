@@ -72,6 +72,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TaskMemorySelection dco_decode_box_autoadd_task_memory_selection(dynamic raw);
 
   @protected
+  int dco_decode_box_autoadd_u_16(dynamic raw);
+
+  @protected
   UserQuestionGroupView dco_decode_box_autoadd_user_question_group_view(
     dynamic raw,
   );
@@ -319,6 +322,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int? dco_decode_opt_box_autoadd_u_16(dynamic raw);
+
+  @protected
   UserQuestionGroupView? dco_decode_opt_box_autoadd_user_question_group_view(
     dynamic raw,
   );
@@ -479,6 +485,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TaskMemorySelection sse_decode_box_autoadd_task_memory_selection(
     SseDeserializer deserializer,
   );
+
+  @protected
+  int sse_decode_box_autoadd_u_16(SseDeserializer deserializer);
 
   @protected
   UserQuestionGroupView sse_decode_box_autoadd_user_question_group_view(
@@ -778,6 +787,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer);
+
+  @protected
   UserQuestionGroupView? sse_decode_opt_box_autoadd_user_question_group_view(
     SseDeserializer deserializer,
   );
@@ -982,6 +994,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     TaskMemorySelection self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_user_question_group_view(
@@ -1369,6 +1384,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     RunPermissionSelection? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_user_question_group_view(

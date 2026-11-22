@@ -134,7 +134,13 @@
     "startLocalSkillRun",
     "reviewLocalPackage",
     "installLocalPackage",
-    "uninstallLocalPackage"
+    "uninstallLocalPackage",
+    "selectModelProfile",
+    "startModelServiceForProfile",
+    "cancelModelStartForProfile",
+    "importModelForProfile",
+    "downloadModelForProfile",
+    "startLocalPatchSkillRun"
   ],
   "additional_public_modules": {
     "memory": {

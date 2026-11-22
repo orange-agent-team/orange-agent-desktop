@@ -21,10 +21,12 @@ use tokio::{
 
 mod diagnostics;
 
+#[cfg(test)]
 const ALIAS: &str = "orange-local-qwen-v1";
 #[derive(Clone)]
 pub(crate) struct Settings {
     pub bundle: Bundle,
+    pub selection: super::Selection,
     pub root: PathBuf,
     pub ipc: PathBuf,
     pub cache: PathBuf,
@@ -101,6 +103,10 @@ struct Record {
 #[serde(deny_unknown_fields)]
 struct Frame {
     protocol: u32,
+    #[serde(default)]
+    inference_threads: Option<u16>,
+    #[serde(default)]
+    execution_profile_digest: Option<String>,
     record: Record,
 }
 
@@ -128,6 +134,10 @@ fn snapshot(settings: &Settings, state: &Shared) -> ModelServiceView {
         },
         model_name: settings.bundle.model_name.clone(),
         model_bytes: settings.bundle.model_bytes.to_string(),
+        profile_id: Some(settings.selection.profile.id().into()),
+        selection_revision: Some(settings.selection.revision.to_string()),
+        model_sha256: Some(settings.bundle.model_sha.clone()),
+        inference_threads: Some(settings.selection.threads()),
         installed: state.installed,
         instance_id: state.history.entries.last().map(|e| e.instance.clone()),
         failure: state.failure.clone(),
@@ -480,7 +490,7 @@ async fn stop_owned_with_cause(
                     && r.cpu_only
                     && r.model_sha256 == settings.bundle.model_sha
                     && r.executable_sha256 == settings.bundle.backend_sha
-                    && r.model_version == ALIAS
+                    && r.model_version == settings.selection.alias()
             })
         });
     if stopped {
@@ -569,7 +579,7 @@ async fn start_owned(
     io::write_json(
         &settings.root.join("profile.json"),
         &serde_json::json!({"protocol":1,"runtime_directory":settings.root,"socket_directory":settings.ipc,"executable":settings.bundle.backend,"executable_sha256":settings.bundle.backend_sha,
-        "model":settings.cache.join(format!("{}.gguf",settings.bundle.model_sha)),"model_sha256":settings.bundle.model_sha,"model_bytes":settings.bundle.model_bytes,"model_version":ALIAS,"context_tokens":4096,"startup_timeout_seconds":settings.startup_seconds,"control_nonce":nonce,"instance_id":instance}),
+        "model":settings.cache.join(format!("{}.gguf",settings.bundle.model_sha)),"model_sha256":settings.bundle.model_sha,"model_bytes":settings.bundle.model_bytes,"model_version":settings.selection.alias(),"context_tokens":if settings.selection.profile==super::Profile::SevenB {8192}else{4096},"inference_threads":if settings.selection.profile==super::Profile::SevenB {Some(settings.selection.threads())}else{None},"startup_timeout_seconds":settings.startup_seconds,"control_nonce":nonce,"instance_id":instance}),
     )?;
     if *cancel.borrow() || *closing.borrow() {
         change(
@@ -651,7 +661,11 @@ async fn start_owned(
                 && value.record.instance_id == instance
                 && value.record.model_sha256 == settings.bundle.model_sha
                 && value.record.executable_sha256 == settings.bundle.backend_sha
-                && value.record.model_version == ALIAS
+                && value.record.model_version == settings.selection.alias()
+                && settings.confirms_execution(
+                    value.inference_threads,
+                    value.execution_profile_digest.as_deref(),
+                )
                 && value.record.cpu_only =>
         {
             change(settings, state, index, "ready", None)
@@ -750,6 +764,7 @@ mod tests {
             let temp = tempfile::tempdir().expect("owned fixture");
             let root = io::directory(&temp.path().join("private")).expect("private");
             let settings = Settings {
+                selection: Default::default(),
                 bundle: Bundle {
                     contents: root.clone(),
                     helper: root.join("unused"),
@@ -761,7 +776,7 @@ mod tests {
                     model_sha: "0".repeat(64),
                     model_bytes: 4,
                     model_name: "fixture".into(),
-                    model_url: "https://example.invalid".into(),
+                    model_url: Some("https://example.invalid".into()),
                 },
                 root: root.clone(),
                 ipc: root.clone(),
@@ -882,9 +897,10 @@ mod tests {
             model_sha: "0".repeat(64),
             model_bytes: 4,
             model_name: "admission-fixture".into(),
-            model_url: "https://huggingface.co/fixture".into(),
+            model_url: Some("https://huggingface.co/fixture".into()),
         };
         let settings = Settings {
+            selection: Default::default(),
             bundle,
             root: root.clone(),
             ipc: root.clone(),

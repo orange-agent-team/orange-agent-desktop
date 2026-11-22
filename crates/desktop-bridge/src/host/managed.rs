@@ -17,7 +17,7 @@ impl HostRegistry {
         let host = self.current(handle)?;
         if let Some(client) = &host.service {
             if contents.canonicalize().ok().as_ref() != Some(&client.settings().bundle.contents)
-                || ipc.canonicalize().ok().as_ref() != Some(&client.settings().ipc)
+                || ipc.canonicalize().ok().as_deref() != Some(client.settings().base_ipc())
             {
                 return Err(failure("MODEL_SERVICE_CONTEXT_CHANGED"));
             }
@@ -43,6 +43,51 @@ impl HostRegistry {
         host.service = Some(client);
         Ok(view)
     }
+    async fn select_profile(
+        &mut self,
+        handle: &str,
+        id: &str,
+        expected: &str,
+    ) -> Result<ModelServiceView, BridgeError> {
+        let signals = self.signals.clone();
+        let host = self.current(handle)?;
+        let old = host
+            .service
+            .clone()
+            .ok_or_else(|| failure("MODEL_SERVICE_NOT_CONFIGURED"))?;
+        let previous = old.settings();
+        let next = previous.selection.next(id, expected)?;
+        if next == previous.selection {
+            return old.view();
+        }
+        if host.model.is_some() || !matches!(old.view()?.phase.as_str(), "idle" | "stopped") {
+            return Err(failure("MODEL_SERVICE_BUSY"));
+        }
+        let settings = Settings::for_selection(
+            &host.root,
+            previous.bundle.clone(),
+            previous.base_ipc(),
+            next,
+        )?;
+        host.journal
+            .reserve_private_directory(&settings.ipc)
+            .map_err(workspace_error)?;
+        let installed = settings.check_installed().await?;
+        let mut live = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
+        if !live.imports.is_empty() {
+            return Err(failure("MODEL_SERVICE_BUSY"));
+        }
+        let new = Client::new(settings, installed)?;
+        let view = new.view()?;
+        if let Err(error) = next.save(&host.root) {
+            new.close();
+            return Err(error);
+        }
+        old.close();
+        host.service = Some(new.clone());
+        live.service = Some(new);
+        Ok(view)
+    }
     fn service(&mut self, handle: &str) -> Result<Client, BridgeError> {
         self.current(handle)?
             .service
@@ -53,15 +98,17 @@ impl HostRegistry {
         &mut self,
         handle: &str,
         path: &Path,
+        revision: Option<&str>,
         cancel: tokio::sync::watch::Receiver<bool>,
     ) -> Result<ModelServiceView, BridgeError> {
         let service = self.service(handle)?;
+        service.settings().selection.require(revision)?;
         if !matches!(service.view()?.phase.as_str(), "idle" | "stopped") {
             return Err(failure("MODEL_SERVICE_BUSY"));
         }
         let settings = service.settings();
-        let cache =
-            ModelCache::new(&settings.cache, 2 * 1024 * 1024 * 1024).map_err(cache_error)?;
+        let cache = ModelCache::new(&settings.cache, settings.selection.profile.quota())
+            .map_err(cache_error)?;
         cache
             .import_file_with_cancel(&settings.bundle.spec()?, path, cancel)
             .await
@@ -73,8 +120,10 @@ impl HostRegistry {
         &mut self,
         handle: &str,
         request: &str,
+        revision: Option<&str>,
     ) -> Result<ModelServiceView, BridgeError> {
         let service = self.service(handle)?;
+        service.settings().selection.require(revision)?;
         let installed = match service.settings().check_installed().await {
             Ok(value) => value,
             Err(error) => {
@@ -153,6 +202,16 @@ pub(crate) async fn configure_model_service(
     })
     .await
 }
+pub(crate) async fn select_model_profile(
+    handle: String,
+    id: String,
+    expected: String,
+) -> Result<ModelServiceView, BridgeError> {
+    crate::actor::call(handle.clone(), move |host, rt| {
+        rt.block_on(host.select_profile(&handle, &id, &expected))
+    })
+    .await
+}
 pub(crate) async fn inspect_model_service(handle: String) -> Result<ModelServiceView, BridgeError> {
     crate::actor::model_service(&handle)?.view()
 }
@@ -178,8 +237,10 @@ pub(crate) async fn current_model_connection(
 pub(crate) async fn cancel_model_start(
     handle: String,
     request: String,
+    revision: Option<String>,
 ) -> Result<ModelServiceView, BridgeError> {
     let client = crate::actor::model_service(&handle)?;
+    client.settings().selection.require(revision.as_deref())?;
     if let Some(instance) = client.cancel_request(&request)? {
         stop_model_service(handle, instance).await
     } else {
@@ -190,25 +251,37 @@ pub(crate) async fn import_model(
     handle: String,
     operation: String,
     path: String,
+    revision: Option<String>,
 ) -> Result<ModelServiceView, BridgeError> {
-    let cancel = crate::actor::import_signal(&handle, &operation, &path)?;
+    let cancel = crate::actor::import_signal(&handle, &operation, &path, revision.as_deref())?;
     crate::actor::call(handle.clone(), move |host, rt| {
-        rt.block_on(host.import_selected_model(&handle, Path::new(&path), cancel))
+        rt.block_on(host.import_selected_model(
+            &handle,
+            Path::new(&path),
+            revision.as_deref(),
+            cancel,
+        ))
     })
     .await
 }
 pub(crate) async fn download_model(
     handle: String,
     operation: String,
+    revision: Option<String>,
 ) -> Result<ModelServiceView, BridgeError> {
-    let mut cancelled = crate::actor::download_signal(&handle, &operation)?;
+    let mut cancelled = crate::actor::download_signal(&handle, &operation, revision.as_deref())?;
     let checked = handle.clone();
     let client = crate::actor::call(handle.clone(), move |host, _| host.service(&checked)).await?;
+    client.settings().selection.require(revision.as_deref())?;
+    if client.settings().selection.profile == crate::service::Profile::SevenB {
+        return Err(failure("MODEL_PROFILE_IMPORT_ONLY"));
+    }
     if !matches!(client.view()?.phase.as_str(), "idle" | "stopped") {
         return Err(failure("MODEL_SERVICE_BUSY"));
     }
     let settings = client.settings();
-    let cache = ModelCache::new(&settings.cache, 2 * 1024 * 1024 * 1024).map_err(cache_error)?;
+    let cache = ModelCache::new(&settings.cache, settings.selection.profile.quota())
+        .map_err(cache_error)?;
     let spec = settings.bundle.spec()?;
     if *cancelled.borrow() {
         return Err(failure("MODEL_DOWNLOAD_CANCELLED"));
@@ -227,6 +300,9 @@ pub(crate) async fn download_model(
     let checked = handle.clone();
     crate::actor::call(handle, move |host, _| {
         let current = host.service(&checked)?;
+        if current.settings().selection != client.settings().selection {
+            return Err(failure("MODEL_SELECTION_CHANGED"));
+        }
         current.installed(true)?;
         current.view()
     })
@@ -263,9 +339,10 @@ async fn close_model_transfer(
 pub(crate) async fn start_model_service(
     handle: String,
     request: String,
+    revision: Option<String>,
 ) -> Result<ModelServiceView, BridgeError> {
     crate::actor::call(handle.clone(), move |host, rt| {
-        rt.block_on(host.start_service(&handle, &request))
+        rt.block_on(host.start_service(&handle, &request, revision.as_deref()))
     })
     .await
 }

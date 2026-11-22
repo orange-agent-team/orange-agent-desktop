@@ -132,6 +132,7 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
           .where((v) => v.digest == selectedSkillDigest)
           .firstOrNull;
       final templateSelected = selectedSkillDigest != null;
+      final patchSelected = chosenSkill?.skillId == 'orange.reviewed-patch';
       final pending = run?.pending ?? const <ToolApprovalView>[];
       return Card(
         child: Padding(
@@ -218,8 +219,10 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                   selectedDigest: selectedSkillDigest,
                   locked:
                       busy || controller.active || controller.startUnconfirmed,
-                  onChanged: (digest) =>
-                      setState(() => selectedSkillDigest = digest),
+                  onChanged: (digest) => setState(() {
+                    selectedSkillDigest = digest;
+                    allowEditing = false;
+                  }),
                 ),
               if (!templateSelected) ...[
                 CheckboxListTile(
@@ -252,6 +255,8 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                       : (value) =>
                             setState(() => allowCreation = value ?? false),
                 ),
+              ],
+              if (!templateSelected || patchSelected)
                 CheckboxListTile(
                   title: const Text('允许提出修改现有文件请求'),
                   subtitle: Text(
@@ -271,26 +276,25 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                       : (value) =>
                             setState(() => allowEditing = value ?? false),
                 ),
-                if (widget.memory != null) ...[
+              if (!templateSelected && widget.memory != null) ...[
+                CheckboxListTile(
+                  value: allowMemory,
+                  title: Text('允许本次任务读取记忆空间 ${widget.memory!.scopeId}'),
+                  onChanged: busy || controller.active
+                      ? null
+                      : (v) => setState(() {
+                          allowMemory = v ?? false;
+                          writeMemory = false;
+                        }),
+                ),
+                if (allowMemory && widget.memoryWrite)
                   CheckboxListTile(
-                    value: allowMemory,
-                    title: Text('允许本次任务读取记忆空间 ${widget.memory!.scopeId}'),
+                    value: writeMemory,
+                    title: const Text('允许提出记忆修改，逐次确认'),
                     onChanged: busy || controller.active
                         ? null
-                        : (v) => setState(() {
-                            allowMemory = v ?? false;
-                            writeMemory = false;
-                          }),
+                        : (v) => setState(() => writeMemory = v ?? false),
                   ),
-                  if (allowMemory && widget.memoryWrite)
-                    CheckboxListTile(
-                      value: writeMemory,
-                      title: const Text('允许提出记忆修改，逐次确认'),
-                      onChanged: busy || controller.active
-                          ? null
-                          : (v) => setState(() => writeMemory = v ?? false),
-                    ),
-                ],
               ],
               const SizedBox(height: 12),
               Wrap(
@@ -304,7 +308,13 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                             controller.startUnconfirmed ||
                             (templateSelected &&
                                 (controller.skillBusy ||
-                                    chosenSkill?.enabled != true)) ||
+                                    chosenSkill?.enabled != true ||
+                                    (chosenSkill?.requiredModelProfile !=
+                                            null &&
+                                        controller.model?.qualifiedSkills !=
+                                            true) ||
+                                    (patchSelected &&
+                                        (!allowEditing || editing == null)))) ||
                             controller.model == null ||
                             selectedId == null ||
                             prompt.text.trim().isEmpty

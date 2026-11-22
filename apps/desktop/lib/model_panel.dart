@@ -19,7 +19,34 @@ class ModelPanel extends StatelessWidget {
               Text('本地模型', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 12),
               if (view != null) ...[
+                if (view.profileId != null)
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('model-profile-${view.selectionRevision}'),
+                    initialValue: view.profileId,
+                    decoration: const InputDecoration(labelText: '本地模型配置'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'local-small',
+                        child: Text('Qwen2.5 0.5B'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'local-7b',
+                        child: Text('Qwen2.5 7B · 审阅与补丁'),
+                      ),
+                    ],
+                    onChanged: controller.canSelectProfile
+                        ? (id) {
+                            if (id != null) controller.selectProfile(id);
+                          }
+                        : null,
+                  ),
                 Text(view.modelName),
+                if (view.inferenceThreads != null)
+                  Text('本地推理使用 ${view.inferenceThreads} 个 CPU 线程'),
+                if (view.profileId == 'local-7b') ...[
+                  const Text('选择合并后的 Q4_K_M GGUF 文件。导入前可以用下方摘要核对本地文件。'),
+                  SelectableText('SHA-256  ${view.modelSha256}'),
+                ],
                 Text(
                   '所需文件：${view.modelBytes} 字节 · ${view.installed ? '文件已校验' : '尚未导入'}',
                 ),
@@ -57,7 +84,9 @@ class ModelPanel extends StatelessWidget {
                           : null,
                       child: Text(controller.importing ? '正在导入…' : '导入模型文件'),
                     ),
-                  if (view != null && !view.installed)
+                  if (view != null &&
+                      !view.installed &&
+                      view.profileId != 'local-7b')
                     OutlinedButton.icon(
                       icon: const Icon(Icons.download),
                       label: Text(controller.downloading ? '正在下载…' : '下载审核模型'),

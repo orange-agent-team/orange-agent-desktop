@@ -19,7 +19,7 @@ class ModelController extends ChangeNotifier {
       downloading = false,
       starting = false,
       stopping = false;
-  String? _importId, _downloadId, _startId;
+  String? _importId, _downloadId, _startId, _startRevision;
   String? _lastInstance;
   bool _alive = true;
   int _epoch = 0;
@@ -126,9 +126,59 @@ class ModelController extends ChangeNotifier {
     }
   }
 
+  bool get canSelectProfile =>
+      _alive &&
+      !busy &&
+      !startUnconfirmed &&
+      view != null &&
+      {'idle', 'stopped'}.contains(view!.phase);
+  Future<void> selectProfile(String id) async {
+    final currentView = view;
+    if (!canSelectProfile ||
+        currentView?.selectionRevision == null ||
+        currentView?.profileId == id) {
+      return;
+    }
+    final epoch = ++_epoch;
+    configuring = true;
+    error = null;
+    notice = null;
+    changed();
+    try {
+      final selected = await api.selectModelProfile(
+        handle: handle,
+        profileId: id,
+        expectedRevision: currentView!.selectionRevision!,
+      );
+      if (current(epoch)) {
+        _lastInstance = null;
+        publish(selected);
+      }
+    } catch (failure) {
+      if (current(epoch)) {
+        error = describeModelError(failure);
+      }
+    } finally {
+      configuring = false;
+      changed();
+    }
+  }
+
+  Future<api.ModelServiceView> cancelStart(String request) {
+    final revision = _startRevision;
+    return revision == null || revision == '0'
+        ? api.cancelModelStart(handle: handle, requestId: request)
+        : api.cancelModelStartForProfile(
+            handle: handle,
+            requestId: request,
+            selectionRevision: revision,
+          );
+  }
+
   Future<void> importFile() async {
     if (!canInstall) return;
     final epoch = ++_epoch;
+    final revision = view?.selectionRevision;
     importing = true;
     error = null;
     notice = null;
@@ -145,11 +195,18 @@ class ModelController extends ChangeNotifier {
       selection = chosen['selectionId'] as String;
       _importId = selection;
       if (!current(epoch)) return;
-      final result = await api.importModel(
-        handle: handle,
-        operationId: selection,
-        selectedFile: chosen['path'] as String,
-      );
+      final result = revision == null || revision == '0'
+          ? await api.importModel(
+              handle: handle,
+              operationId: selection,
+              selectedFile: chosen['path'] as String,
+            )
+          : await api.importModelForProfile(
+              handle: handle,
+              operationId: selection,
+              selectedFile: chosen['path'] as String,
+              selectionRevision: revision,
+            );
       if (current(epoch)) {
         publish(result);
         notice = '模型文件已校验并保存到本机。';
@@ -189,10 +246,14 @@ class ModelController extends ChangeNotifier {
     notice = null;
     changed();
     try {
-      final result = await api.downloadModel(
-        handle: handle,
-        operationId: operation,
-      );
+      final revision = view?.selectionRevision;
+      final result = revision == null || revision == '0'
+          ? await api.downloadModel(handle: handle, operationId: operation)
+          : await api.downloadModelForProfile(
+              handle: handle,
+              operationId: operation,
+              selectionRevision: revision,
+            );
       if (current(epoch)) {
         publish(result);
         notice = '已校验模型文件，可以启动本地推理。';
@@ -263,13 +324,18 @@ class ModelController extends ChangeNotifier {
     error = null;
     notice = '正在校验并启动本地模型…';
     _startId = id();
+    _startRevision = view?.selectionRevision;
     startUnconfirmed = true;
     changed();
     try {
-      final result = await api.startModelService(
-        handle: handle,
-        requestId: _startId!,
-      );
+      final revision = _startRevision;
+      final result = revision == null || revision == '0'
+          ? await api.startModelService(handle: handle, requestId: _startId!)
+          : await api.startModelServiceForProfile(
+              handle: handle,
+              requestId: _startId!,
+              selectionRevision: revision,
+            );
       if (current(epoch)) {
         publish(result);
         notice = result.phase == 'ready' ? '本地模型已就绪。' : null;
@@ -311,7 +377,7 @@ class ModelController extends ChangeNotifier {
     changed();
     try {
       final result = request != null
-          ? await api.cancelModelStart(handle: handle, requestId: request)
+          ? await cancelStart(request)
           : await api.stopModelService(handle: handle, instanceId: instance!);
       if (current(epoch)) {
         publish(result);
@@ -350,7 +416,7 @@ class ModelController extends ChangeNotifier {
           await api.closeModelImport(handle: handle, operationId: _importId!);
         }
         if ((starting || startUnconfirmed) && _startId != null) {
-          await api.cancelModelStart(handle: handle, requestId: _startId!);
+          await cancelStart(_startId!);
         } else if (_lastInstance != null &&
             (view == null || !{'idle', 'stopped'}.contains(view!.phase))) {
           await api.stopModelService(
@@ -422,6 +488,8 @@ String describeModelFailureCode(String code) {
     'MODEL_PLATFORM_UNAVAILABLE' => '本机系统版本或架构不满足模型组件要求。',
     'MODEL_NOT_INSTALLED' => '请先导入清单中指定的模型文件。',
     'MODEL_INTEGRITY' => '文件或模型组件未通过完整性校验。',
+    'MODEL_SELECTION_CHANGED' => '模型选择已变化，请核对当前配置后再操作。',
+    'MODEL_PROFILE_IMPORT_ONLY' => '该 7B 模型需要从本地导入已合并的 GGUF 文件。',
     'MODEL_DOWNLOAD_CANCELLED' => '模型下载已停止，可重新选择下载以继续。自己的工作区仍在本机。',
     'MODEL_DOWNLOAD_SOURCE_DENIED' => '模型下载地址不在当前目录允许的来源中。可导入已取得的同版本文件。',
     'MODEL_DOWNLOAD_CONNECTION' => '未能建立与模型来源的连接。',

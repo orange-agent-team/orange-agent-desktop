@@ -17,7 +17,7 @@ pub(crate) struct Bundle {
     pub model_sha: String,
     pub model_bytes: u64,
     pub model_name: String,
-    pub model_url: String,
+    pub model_url: Option<String>,
 }
 fn catalog_model_url(repo: &str, revision: &str, file: &str) -> Result<String, BridgeError> {
     let (publisher, repository) = repo
@@ -170,7 +170,11 @@ impl Bundle {
                 .as_u64()
                 .ok_or_else(|| failure("MODEL_CATALOG_INVALID"))?,
             model_name: text("file")?,
-            model_url: catalog_model_url(&text("repository")?, &text("revision")?, &text("file")?)?,
+            model_url: Some(catalog_model_url(
+                &text("repository")?,
+                &text("revision")?,
+                &text("file")?,
+            )?),
         };
         result.verify_programs()?;
         Ok(result)
@@ -179,9 +183,44 @@ impl Bundle {
         io::hash_file(&self.helper, &self.helper_sha, self.helper_bytes)?;
         io::hash_file(&self.backend, &self.backend_sha, self.backend_bytes)
     }
+    pub(super) fn select_profile(&mut self, profile: super::Profile) -> Result<(), BridgeError> {
+        match profile {
+            super::Profile::Small => {
+                let catalog = catalog()?;
+                let m = &catalog["model"];
+                let field = |k: &str| {
+                    m[k].as_str()
+                        .ok_or_else(|| failure("MODEL_CATALOG_INVALID"))
+                };
+                self.model_sha = field("sha256")?.into();
+                self.model_bytes = m["bytes"]
+                    .as_u64()
+                    .ok_or_else(|| failure("MODEL_CATALOG_INVALID"))?;
+                self.model_name = field("file")?.into();
+                self.model_url = Some(catalog_model_url(
+                    field("repository")?,
+                    field("revision")?,
+                    field("file")?,
+                )?);
+            }
+            super::Profile::SevenB => {
+                let pin = orange_protocol::local_model::local_7b_pin()
+                    .map_err(|_| failure("MODEL_CATALOG_INVALID"))?;
+                self.model_sha = pin.sha256;
+                self.model_bytes = pin.bytes;
+                self.model_name = "Qwen2.5-7B-Instruct Q4_K_M".into();
+                self.model_url = None;
+            }
+        }
+        Ok(())
+    }
     pub fn spec(&self) -> Result<ArtifactSpec, BridgeError> {
+        let Some(url) = &self.model_url else {
+            return ArtifactSpec::local_only(&self.model_sha, self.model_bytes, b"GGUF")
+                .map_err(|_| failure("MODEL_CATALOG_INVALID"));
+        };
         ArtifactSpec::new(
-            &self.model_url,
+            url,
             &self.model_sha,
             self.model_bytes,
             &["huggingface.co", "us.aws.cdn.hf.co"],

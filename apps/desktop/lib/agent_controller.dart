@@ -41,6 +41,16 @@ abstract interface class LocalPackageCommands {
   Future<void> uninstallPackage(api.LocalPackageReview review);
 }
 
+abstract interface class PatchSkillCommands {
+  Future<api.AgentRunView> startPatchSkill(
+    String workspace,
+    String id,
+    String prompt,
+    api.LocalSkillChoice skill,
+    api.EditingAccessView permission,
+  );
+}
+
 abstract interface class LocalSkillCommands {
   Future<List<api.LocalSkillChoice>> listSkills();
   Future<String> setSkillEnabled(api.LocalSkillChoice choice, bool enabled);
@@ -104,6 +114,7 @@ class NativeAgentCommands
     implements
         AgentCommands,
         LocalSkillCommands,
+        PatchSkillCommands,
         LocalPackageCommands,
         EditingAgentCommands,
         MemoryAgentCommands,
@@ -153,6 +164,27 @@ class NativeAgentCommands
         expectedRevision: choice.revision,
         enabled: enabled,
       );
+  @override
+  Future<api.AgentRunView> startPatchSkill(
+    String workspace,
+    String id,
+    String prompt,
+    api.LocalSkillChoice skill,
+    api.EditingAccessView permission,
+  ) => api.startLocalPatchSkillRun(
+    handle: handle,
+    workspaceId: workspace,
+    requestId: id,
+    prompt: prompt,
+    editingConsentId: permission.consentId,
+    editingVersion: permission.permissionVersion,
+    selection: api.LocalSkillSelection(
+      skillId: skill.skillId,
+      version: skill.version,
+      digest: skill.digest,
+      activationRevision: skill.revision,
+    ),
+  );
   @override
   Future<api.AgentRunView> startSkill(
     String workspace,
@@ -773,7 +805,15 @@ class AgentController extends ChangeNotifier {
       }
       allowQuestions = false;
       creation = null;
-      editing = null;
+      if (skill.requiredModelProfile != null &&
+          model?.qualifiedSkills != true) {
+        return;
+      }
+      if (skill.skillId == 'orange.reviewed-patch') {
+        if (editing == null || commands is! PatchSkillCommands) return;
+      } else {
+        editing = null;
+      }
       memory = null;
     }
     memoryRequirements = [];
@@ -810,12 +850,26 @@ class AgentController extends ChangeNotifier {
         if (transport is! LocalSkillCommands) {
           throw UnsupportedError('Local skill transport unavailable');
         }
-        created = await (transport as LocalSkillCommands).startSkill(
-          submission.workspace,
-          submission.id,
-          submission.prompt,
-          submission.skill!,
-        );
+        if (submission.skill!.skillId == 'orange.reviewed-patch') {
+          final permission = submission.editing;
+          if (permission == null || transport is! PatchSkillCommands) {
+            throw StateError('缺少本次补丁的编辑授权');
+          }
+          created = await (transport as PatchSkillCommands).startPatchSkill(
+            submission.workspace,
+            submission.id,
+            submission.prompt,
+            submission.skill!,
+            permission,
+          );
+        } else {
+          created = await (transport as LocalSkillCommands).startSkill(
+            submission.workspace,
+            submission.id,
+            submission.prompt,
+            submission.skill!,
+          );
+        }
       } else if (submission.memory != null) {
         final transport = commands;
         if (transport is! MemoryAgentCommands) {

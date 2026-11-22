@@ -22,6 +22,16 @@ Future<ModelServiceView> configureModelService({
   osVersion: osVersion,
 );
 
+Future<ModelServiceView> selectModelProfile({
+  required String handle,
+  required String profileId,
+  required String expectedRevision,
+}) => RustLib.instance.api.crateApiHostSelectModelProfile(
+  handle: handle,
+  profileId: profileId,
+  expectedRevision: expectedRevision,
+);
+
 Future<ModelServiceView> inspectModelService({required String handle}) =>
     RustLib.instance.api.crateApiHostInspectModelService(handle: handle);
 
@@ -36,6 +46,16 @@ Future<ModelServiceView> cancelModelStart({
   requestId: requestId,
 );
 
+Future<ModelServiceView> cancelModelStartForProfile({
+  required String handle,
+  required String requestId,
+  required String selectionRevision,
+}) => RustLib.instance.api.crateApiHostCancelModelStartForProfile(
+  handle: handle,
+  requestId: requestId,
+  selectionRevision: selectionRevision,
+);
+
 /// Downloads the fixed model from its reviewed catalog. Callers cannot supply a URI, file name or digest.
 Future<ModelServiceView> downloadModel({
   required String handle,
@@ -43,6 +63,16 @@ Future<ModelServiceView> downloadModel({
 }) => RustLib.instance.api.crateApiHostDownloadModel(
   handle: handle,
   operationId: operationId,
+);
+
+Future<ModelServiceView> downloadModelForProfile({
+  required String handle,
+  required String operationId,
+  required String selectionRevision,
+}) => RustLib.instance.api.crateApiHostDownloadModelForProfile(
+  handle: handle,
+  operationId: operationId,
+  selectionRevision: selectionRevision,
 );
 
 /// Fences a pending download for this host. Verified cache content is retained.
@@ -65,6 +95,18 @@ Future<ModelServiceView> importModel({
   selectedFile: selectedFile,
 );
 
+Future<ModelServiceView> importModelForProfile({
+  required String handle,
+  required String operationId,
+  required String selectedFile,
+  required String selectionRevision,
+}) => RustLib.instance.api.crateApiHostImportModelForProfile(
+  handle: handle,
+  operationId: operationId,
+  selectedFile: selectedFile,
+  selectionRevision: selectionRevision,
+);
+
 /// Stops further file reads and drains the owned import before native scope release.
 Future<void> closeModelImport({
   required String handle,
@@ -80,6 +122,16 @@ Future<ModelServiceView> startModelService({
 }) => RustLib.instance.api.crateApiHostStartModelService(
   handle: handle,
   requestId: requestId,
+);
+
+Future<ModelServiceView> startModelServiceForProfile({
+  required String handle,
+  required String requestId,
+  required String selectionRevision,
+}) => RustLib.instance.api.crateApiHostStartModelServiceForProfile(
+  handle: handle,
+  requestId: requestId,
+  selectionRevision: selectionRevision,
 );
 
 Future<ModelServiceView> stopModelService({
@@ -150,6 +202,24 @@ Future<String> setLocalSkillEnabled({
   digest: digest,
   expectedRevision: expectedRevision,
   enabled: enabled,
+);
+
+Future<AgentRunView> startLocalPatchSkillRun({
+  required String handle,
+  required String workspaceId,
+  required String requestId,
+  required String prompt,
+  required LocalSkillSelection selection,
+  required String editingConsentId,
+  required String editingVersion,
+}) => RustLib.instance.api.crateApiHostStartLocalPatchSkillRun(
+  handle: handle,
+  workspaceId: workspaceId,
+  requestId: requestId,
+  prompt: prompt,
+  selection: selection,
+  editingConsentId: editingConsentId,
+  editingVersion: editingVersion,
 );
 
 Future<AgentRunView> startLocalSkillRun({
@@ -1876,6 +1946,7 @@ class LocalPackageReview {
 }
 
 class LocalSkillChoice {
+  final String? requiredModelProfile;
   final String skillId;
   final String version;
   final String digest;
@@ -1887,6 +1958,7 @@ class LocalSkillChoice {
   final String revision;
 
   const LocalSkillChoice({
+    this.requiredModelProfile,
     required this.skillId,
     required this.version,
     required this.digest,
@@ -1900,6 +1972,7 @@ class LocalSkillChoice {
 
   @override
   int get hashCode =>
+      requiredModelProfile.hashCode ^
       skillId.hashCode ^
       version.hashCode ^
       digest.hashCode ^
@@ -1915,6 +1988,7 @@ class LocalSkillChoice {
       identical(this, other) ||
       other is LocalSkillChoice &&
           runtimeType == other.runtimeType &&
+          requiredModelProfile == other.requiredModelProfile &&
           skillId == other.skillId &&
           version == other.version &&
           digest == other.digest &&
@@ -1993,12 +2067,14 @@ class LocalSourceReference {
 }
 
 class ModelConnectionView {
+  final bool? qualifiedSkills;
   final String modelId;
   final String displayName;
   final int contextTokens;
   final String verification;
 
   const ModelConnectionView({
+    this.qualifiedSkills,
     required this.modelId,
     required this.displayName,
     required this.contextTokens,
@@ -2007,6 +2083,7 @@ class ModelConnectionView {
 
   @override
   int get hashCode =>
+      qualifiedSkills.hashCode ^
       modelId.hashCode ^
       displayName.hashCode ^
       contextTokens.hashCode ^
@@ -2017,6 +2094,7 @@ class ModelConnectionView {
       identical(this, other) ||
       other is ModelConnectionView &&
           runtimeType == other.runtimeType &&
+          qualifiedSkills == other.qualifiedSkills &&
           modelId == other.modelId &&
           displayName == other.displayName &&
           contextTokens == other.contextTokens &&
@@ -2024,6 +2102,10 @@ class ModelConnectionView {
 }
 
 class ModelServiceView {
+  final int? inferenceThreads;
+  final String? profileId;
+  final String? selectionRevision;
+  final String? modelSha256;
   final String phase;
   final String modelName;
   final String modelBytes;
@@ -2032,6 +2114,10 @@ class ModelServiceView {
   final String? failure;
 
   const ModelServiceView({
+    this.inferenceThreads,
+    this.profileId,
+    this.selectionRevision,
+    this.modelSha256,
     required this.phase,
     required this.modelName,
     required this.modelBytes,
@@ -2042,6 +2128,10 @@ class ModelServiceView {
 
   @override
   int get hashCode =>
+      inferenceThreads.hashCode ^
+      profileId.hashCode ^
+      selectionRevision.hashCode ^
+      modelSha256.hashCode ^
       phase.hashCode ^
       modelName.hashCode ^
       modelBytes.hashCode ^
@@ -2054,6 +2144,10 @@ class ModelServiceView {
       identical(this, other) ||
       other is ModelServiceView &&
           runtimeType == other.runtimeType &&
+          inferenceThreads == other.inferenceThreads &&
+          profileId == other.profileId &&
+          selectionRevision == other.selectionRevision &&
+          modelSha256 == other.modelSha256 &&
           phase == other.phase &&
           modelName == other.modelName &&
           modelBytes == other.modelBytes &&

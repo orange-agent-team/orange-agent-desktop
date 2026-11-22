@@ -59,6 +59,7 @@ async fn advance_base(
     Ok(())
 }
 pub(super) struct ModelConnection {
+    pub identity: Option<orange_protocol::local_model::LocalModelIdentity>,
     pub view: ModelConnectionView,
     pub gateway: Box<dyn ModelGateway>,
 }
@@ -427,26 +428,34 @@ impl HostRegistry {
             if latest != record || latest["instance_id"] != instance {
                 return Err(failure("MODEL_SERVICE_CHANGED"));
             }
-            let id = format!(
-                "local-{}",
-                orange_protocol::request_digest(
-                    "desktop-model-v1",
-                    &(
-                        alias.clone(),
-                        context,
-                        &profile["model_sha256"],
-                        &profile["executable_sha256"]
-                    )
-                )
-                .map_err(|_| failure("INVALID_MODEL_SERVICE"))?
-            );
+            let identity = orange_protocol::local_model::LocalModelIdentity {
+                alias: alias.clone(),
+                context_tokens: context,
+                model_sha256: profile["model_sha256"]
+                    .as_str()
+                    .ok_or_else(|| failure("INVALID_MODEL_SERVICE"))?
+                    .into(),
+                executable_sha256: profile["executable_sha256"]
+                    .as_str()
+                    .ok_or_else(|| failure("INVALID_MODEL_SERVICE"))?
+                    .into(),
+            };
+            let id = identity
+                .connection_id()
+                .map_err(|_| failure("INVALID_MODEL_SERVICE"))?;
             let view = ModelConnectionView {
+                qualified_skills: Some(
+                    identity
+                        .matches_local_7b()
+                        .map_err(|_| failure("INVALID_MODEL_SERVICE"))?,
+                ),
                 model_id: id.clone(),
                 display_name: alias.clone(),
                 context_tokens: context,
                 verification: "local-development-configuration".into(),
             };
             host.model = Some(ModelConnection {
+                identity: Some(identity),
                 view: view.clone(),
                 gateway: Box::new(LocalGateway { id, alias, client }),
             });
@@ -527,7 +536,14 @@ impl HostRegistry {
                 model_version: model.view.model_id.clone(),
                 max_steps: 30,
                 max_invocations: 20,
-                max_output_tokens: 256,
+                max_output_tokens: if selection
+                    .skill
+                    .is_some_and(|(pin, _)| pin.id == "orange.reviewed-patch")
+                {
+                    512
+                } else {
+                    256
+                },
                 deadline_unix: now()? + 900,
             },
             Err(error) => return Err(engine_error(error)),
@@ -585,14 +601,32 @@ impl HostRegistry {
                 return Err(failure("SKILL_ACTIVATION_CHANGED"));
             }
             if create.is_some()
-                || selection.editing.is_some()
+                || (pin.id == "orange.reviewed-patch") != selection.editing.is_some()
                 || selection.memory.is_some()
                 || interactive
             {
                 return Err(failure("INVALID_SKILL_SELECTION"));
             }
+            let identity = model
+                .identity
+                .as_ref()
+                .ok_or_else(|| failure("MODEL_IDENTITY_REQUIRED"))?;
+            let authority = orange_agent_runtime::engine::AgentAuthority::read(&grant);
+            #[cfg(target_vendor = "apple")]
+            let authority = if let Some(edit) = &editing {
+                authority.with_editing(edit)
+            } else {
+                authority
+            };
             host.journal
-                .start_agent_skill_reviewed(&config, pin, Some(revision), prompt.to_owned(), &grant)
+                .start_agent_skill_on_local_model(
+                    &config,
+                    pin,
+                    Some(revision),
+                    prompt.to_owned(),
+                    authority,
+                    identity,
+                )
                 .map_err(engine_error)?;
         } else if let Some(selection) = selection.memory {
             let task = task_memory::TaskMemory::derive(host, selection)?;
@@ -1019,6 +1053,7 @@ pub(crate) async fn list_local_skills(
         Ok(rows
             .into_iter()
             .map(|row| crate::api::host::LocalSkillChoice {
+                required_model_profile: row.required_model_profile.map(str::to_owned),
                 skill_id: row.pin.id,
                 version: row.pin.version,
                 digest: row.pin.digest,
@@ -1067,6 +1102,7 @@ pub(crate) async fn start_local_skill_run(
     request_id: String,
     prompt: String,
     selection: crate::api::host::LocalSkillSelection,
+    editing: Option<(String, String)>,
 ) -> Result<AgentRunView, BridgeError> {
     let revision = selection
         .activation_revision
@@ -1080,17 +1116,22 @@ pub(crate) async fn start_local_skill_run(
             version: selection.version,
             digest: selection.digest,
         };
-        rt.block_on(host.start_run_mode(
-            &handle,
-            &workspace_id,
-            &request_id,
-            &prompt,
-            false,
-            WriteSelection {
-                skill: Some((&pin, revision)),
-                ..Default::default()
-            },
-        ))
+        rt.block_on(
+            host.start_run_mode(
+                &handle,
+                &workspace_id,
+                &request_id,
+                &prompt,
+                false,
+                WriteSelection {
+                    skill: Some((&pin, revision)),
+                    editing: editing
+                        .as_ref()
+                        .map(|(id, version)| (id.as_str(), version.as_str())),
+                    ..Default::default()
+                },
+            ),
+        )
     })
     .await
 }

@@ -103,7 +103,9 @@ async fn install_tool(
     let handle = handle.to_owned();
     crate::actor::call(handle.clone(), move |host, _| {
         host.current(&handle)?.model = Some(ModelConnection {
+            identity: None,
             view: ModelConnectionView {
+                qualified_skills: None,
                 model_id: "test-only-model".into(),
                 display_name: "explicit fixture".into(),
                 context_tokens: 4096,
@@ -1056,7 +1058,9 @@ fn install_question_gateway(registry: &mut HostRegistry, handle: &str, calls: Ar
         .current(handle)
         .expect("question fixture operation succeeds")
         .model = Some(ModelConnection {
+        identity: None,
         view: ModelConnectionView {
+            qualified_skills: None,
             model_id: "question-model-fixture".into(),
             display_name: "Explicit question transport fixture".into(),
             context_tokens: 4096,
@@ -1404,7 +1408,9 @@ async fn protected_unicode_aliases_never_reach_desktop_approval() {
             expected_result: "must never read protected content",
         });
         registry.current(&h).expect("host").model = Some(ModelConnection {
+            identity: None,
             view: ModelConnectionView {
+                qualified_skills: None,
                 model_id: "unicode-fixture".into(),
                 display_name: "explicit fixture".into(),
                 context_tokens: 4096,

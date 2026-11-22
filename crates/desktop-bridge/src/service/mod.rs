@@ -2,8 +2,10 @@
 mod bundle;
 mod io;
 mod owner;
+mod selection;
 pub(crate) use bundle::Bundle;
 pub(crate) use owner::{Client, Settings};
+pub(crate) use selection::{Profile, Selection};
 
 impl Settings {
     pub(crate) fn prepare(
@@ -14,23 +16,8 @@ impl Settings {
         runtime: &str,
     ) -> Result<Self, crate::api::host::BridgeError> {
         let bundle = Bundle::open(contents, os, runtime)?;
-        let root = io::directory(&host_root.join("m"))?;
-        let cache = io::directory(&host_root.join("models"))?;
-        let ipc = io::directory(ipc)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::ffi::OsStrExt;
-            if ipc.join("engine.sock").as_os_str().as_bytes().len() > 100 {
-                return Err(crate::host::failure("MODEL_IPC_PATH_TOO_LONG"));
-            }
-        }
-        Ok(Self {
-            bundle,
-            root,
-            cache,
-            ipc,
-            startup_seconds: 120,
-        })
+        let base_ipc = io::directory(ipc)?;
+        Self::for_selection(host_root, bundle, &base_ipc, Selection::load(host_root)?)
     }
     pub(crate) async fn check_installed(&self) -> Result<bool, crate::api::host::BridgeError> {
         let path = self.cache.join(format!("{}.gguf", self.bundle.model_sha));
@@ -40,7 +27,7 @@ impl Settings {
             Ok(_) => {
                 let cache = orange_model_runtime::cache::ModelCache::new(
                     &self.cache,
-                    2 * 1024 * 1024 * 1024,
+                    self.selection.profile.quota(),
                 )
                 .map_err(cache_error)?;
                 cache
@@ -57,6 +44,7 @@ pub(crate) fn cache_error(
 ) -> crate::api::host::BridgeError {
     use orange_model_runtime::cache::CacheError;
     crate::host::failure(match error {
+        CacheError::LocalFileRequired => "MODEL_PROFILE_IMPORT_ONLY",
         CacheError::Cancelled => "MODEL_IMPORT_CANCELLED",
         CacheError::Redirect => "MODEL_DOWNLOAD_SOURCE_DENIED",
         CacheError::Connection => "MODEL_DOWNLOAD_CONNECTION",

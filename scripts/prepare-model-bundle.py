@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--build-manifest', type=Path, required=True)
     parser.add_argument('--backend-checkout', type=Path, required=True)
     parser.add_argument('--test-model', type=Path)
+    parser.add_argument('--target-dir', type=Path, default=ROOT/'.local/model-host-target', help='Explicit Cargo build cache for the independently imported helper source')
     args = parser.parse_args()
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
         raise RuntimeError('This preparer certifies only the available macOS ARM64 target')
@@ -36,9 +37,9 @@ def main():
     commit = approved['backend']['commit']
     subprocess.run(['git', '-C', str(args.backend_checkout), 'cat-file', '-e', commit + '^{commit}'], check=True)
     environment, tools = tool_environment()
-    environment['CARGO_TARGET_DIR'] = str(ROOT / '.local/model-host-target')
+    environment['CARGO_TARGET_DIR'] = str(args.target_dir.resolve())
     subprocess.run([str(tools['cargo']), 'build', '--manifest-path', str(ROOT / runtime['vendor_directory'] / 'Cargo.toml'), '-p', 'orange-model-runtime', '--bin', 'orange-model-host', '--locked', '--offline'], env=environment, check=True)
-    host = ROOT / '.local/model-host-target/debug/orange-model-host'
+    host = args.target_dir.resolve() / 'debug/orange-model-host'
     STAGED.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='model-bundle-stage-', dir=STAGED.parent) as temporary:
         stage = Path(temporary) / 'payload'
