@@ -1,0 +1,24 @@
+{
+  "requirement": "PRD-004",
+  "money_unit": "microcredit",
+  "text_case": {
+    "input": "联系 private-fixture@example.test，会议在周五。",
+    "rules": ["private-fixture", "private-fixture@example.test"],
+    "reviewed_text": "联系 [已遮盖]，会议在周五。",
+    "remaining_context": "会议在周五",
+    "upload_maximum": "0",
+    "source_change_invalidates_preview": true
+  },
+  "audio_example": {"duration_ms":"11000","price_per_minute":"12000","maximum":"2200"},
+  "budget_example": {
+    "owner_kind": "team", "root": "same-root", "limit":"10000","spent":"2200","other_holds":"1000","next_maximum":"3000","next_actual":"1400",
+    "available_before":"6800","available_after_maximum":"3800","two_steps_maximum":"5200","available_after_settlement":"5400",
+    "member_may_view_full_wallet": false
+  },
+  "resource_states": [
+    {"situation":"missing_weights","selected":"download_or_import","send_workspace":false,"submit_job":false},
+    {"situation":"insufficient_resources","selected":"change_local_profile","send_workspace":false,"submit_job":false},
+    {"situation":"local_unavailable","selected":"review_remote","send_workspace":false,"submit_job":false},
+    {"situation":"any_local_failure","selected":"exit","send_workspace":false,"submit_job":false}
+  ]
+}

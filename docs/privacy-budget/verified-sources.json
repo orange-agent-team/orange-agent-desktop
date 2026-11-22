@@ -1,0 +1,151 @@
+{
+  "data": [
+    {
+      "file": "evidence/privacy-budget-visible-transfer.json",
+      "sha256": "436d45fa715f2c045c3c99656c20f4cb4be6fbda1c21e9c7771f409ee9f7c504",
+      "assertions": [
+        "\"disclosed_before_upload\": true",
+        "\"plaintext_warning_visible\": true",
+        "\"upload_maximum_microcredits\": \"0\"",
+        "\"payer_and_node_shown\": true",
+        "\"original_quote_deadline_visible\": true"
+      ]
+    },
+    {
+      "file": "prd004-visible-risk-and-quote-real-browser.log",
+      "sha256": "a147c86a7f6012a3e5f5883838eab7c74618d32156eb69645b12a81aeb3a4ba3",
+      "assertions": [
+        "test result: ok. 1 passed; 0 failed",
+        "member_personal_wallet_unchanged",
+        "PASS actual Chrome/User API/Worker/fixed model"
+      ]
+    },
+    {
+      "file": "evidence/text-transfer-privacy.json",
+      "sha256": "1fcf2aaed5b9f40231c35f6384c47f14933039b258e9284d4b52f5ff72f7ad43",
+      "assertions": [
+        "Actual PUT hash equals the reviewed UTF-8 model request",
+        "Raw literal did not occur in authenticated business requests or in sessionStorage"
+      ]
+    }
+  ],
+  "quote": [
+    {
+      "file": "evidence/privacy-budget-visible-transfer.json",
+      "sha256": "436d45fa715f2c045c3c99656c20f4cb4be6fbda1c21e9c7771f409ee9f7c504",
+      "assertions": [
+        "\"disclosed_before_upload\": true",
+        "\"plaintext_warning_visible\": true",
+        "\"upload_maximum_microcredits\": \"0\"",
+        "\"payer_and_node_shown\": true",
+        "\"original_quote_deadline_visible\": true"
+      ]
+    },
+    {
+      "file": "evidence/original-quote-funding.json",
+      "sha256": "d4d1d3646b155c80d2351f66fa9a795a212f61cbecd4b53e6babafc742ba53a8",
+      "assertions": [
+        "Personal original quote compared against actual wallet",
+        "Second hosted model turn checked the original root budget"
+      ]
+    },
+    {
+      "file": "quote-funding-hosted-original-budget-retry.log",
+      "sha256": "5ef4c3de2c558ccf388236b6c7c9329ecaf48d78482003c9a124aa4900b671f1",
+      "assertions": [
+        "PASS hosted model Run, actual CPU provider and development ledger"
+      ]
+    },
+    {
+      "file": "audio-quote-recovery-real-asr.log",
+      "sha256": "ffb62128f7c9936669e5b10bb5d50ca18ba01f2725b3c24681f5f2b38950a50c",
+      "assertions": [
+        "\"transcription_quote_recovered\":true",
+        "\"mutations_on_reload\":0",
+        "\"confirmed_limit\":\"2200\"",
+        "\"submit_calls\":1"
+      ]
+    }
+  ],
+  "fallback": [
+    {
+      "file": "evidence/desktop-catalog-system-download.json",
+      "sha256": "c6f06b5d0ba70d5cc497b26997452af291db74a2fc18b0a690b71dd1472eabc6",
+      "assertions": [
+        "cancelled queued identity refused",
+        "Model service remained stopped"
+      ]
+    },
+    {
+      "file": "evidence/DESKTOP-CATALOG-DOWNLOAD-001-1.log",
+      "sha256": "607bb3ecd353a6072d8e423ebbc9c7d1a34ebbd72f8e371acc02ad4c00802972",
+      "assertions": [
+        "All tests passed!",
+        "PASS reviewed original model"
+      ]
+    },
+    {
+      "file": "prd004-localonly-resource-ui.log",
+      "sha256": "c8f4e0aff2689e769be765f223d9f7cdc53341d37f59702513793ee3c33543a6",
+      "assertions": [
+        "resource choices leave an uninstalled local-only model idle",
+        "All tests passed!"
+      ]
+    }
+  ],
+  "review": [
+    {
+      "file": "evidence/text-transfer-privacy.json",
+      "sha256": "1fcf2aaed5b9f40231c35f6384c47f14933039b258e9284d4b52f5ff72f7ad43",
+      "assertions": [
+        "Actual PUT hash equals the reviewed UTF-8 model request",
+        "Raw literal did not occur in authenticated business requests or in sessionStorage"
+      ]
+    },
+    {
+      "file": "evidence/privacy-budget-visible-transfer.json",
+      "sha256": "436d45fa715f2c045c3c99656c20f4cb4be6fbda1c21e9c7771f409ee9f7c504",
+      "assertions": [
+        "\"disclosed_before_upload\": true",
+        "\"plaintext_warning_visible\": true",
+        "\"upload_maximum_microcredits\": \"0\"",
+        "\"payer_and_node_shown\": true",
+        "\"original_quote_deadline_visible\": true"
+      ]
+    },
+    {
+      "file": "prd004-visible-risk-and-quote-real-browser.log",
+      "sha256": "a147c86a7f6012a3e5f5883838eab7c74618d32156eb69645b12a81aeb3a4ba3",
+      "assertions": [
+        "test result: ok. 1 passed; 0 failed",
+        "member_personal_wallet_unchanged",
+        "PASS actual Chrome/User API/Worker/fixed model"
+      ]
+    },
+    {
+      "file": "quote-funding-hosted-original-budget-retry.log",
+      "sha256": "5ef4c3de2c558ccf388236b6c7c9329ecaf48d78482003c9a124aa4900b671f1",
+      "assertions": [
+        "PASS hosted model Run, actual CPU provider and development ledger"
+      ]
+    },
+    {
+      "file": "team-text-live-revocation.log",
+      "sha256": "762e9e848de8455e1d56ceb320130143217fe6f85677fed57e173ab6068695a0",
+      "assertions": [
+        "\"revoked_open_text_form\":true",
+        "\"unsent_input_writes\":0"
+      ]
+    },
+    {
+      "file": "audio-quote-recovery-real-asr.log",
+      "sha256": "ffb62128f7c9936669e5b10bb5d50ca18ba01f2725b3c24681f5f2b38950a50c",
+      "assertions": [
+        "\"transcription_quote_recovered\":true",
+        "\"mutations_on_reload\":0",
+        "\"confirmed_limit\":\"2200\"",
+        "\"submit_calls\":1"
+      ]
+    }
+  ]
+}

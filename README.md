@@ -27,3 +27,5 @@ Rust Host及生成的FRB接口另已实现Run创建/查看/批准/推进/取消�
 文件创建集成候选现已包含独立目录同意、默认关闭的会话写入能力、完整新文件提案与逐次批准。参见[创建权限与恢复边界](docs/file-creation.md)。9项Rust宿主、严格Clippy、17项组件及5项原生测试通过；默认无权重开发制品已校验，实际系统目录选择器因电脑操作通道故障尚未验证；不能视为生产认证或完整工具范围。
 
 工具契约快照候选固定Runtime97fdddb；输入/输出schema、工具版本与审批契约在派发和恢复时检查。真实旧Runtime到schema7的CLI恢复、真实7B创建场景及5项原生消费者场景已有证据。托管模型完整验收和默认无权重包恢复已通过；并发执行器、插件处理器和完整工具范围未因此完成。参见[工具契约与升级](docs/tool-contract-upgrade.md)。
+
+隐私与预算体验的产品验收材料包括[数据去向与授权](docs/privacy-budget/01-data-decisions.md)、[报价确认稿](docs/privacy-budget/02-quote-confirmation.md)、[缺资源状态稿](docs/privacy-budget/03-resource-fallback.md)和[场景走查](docs/privacy-budget/04-scenario-review.md)。

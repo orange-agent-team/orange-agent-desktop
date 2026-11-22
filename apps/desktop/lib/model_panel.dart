@@ -39,7 +39,19 @@ class ModelPanel extends StatelessWidget {
                   describeModelFailureCode(view!.failure!),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
-              const Text('使用本机 CPU；只接受当前清单中的模型文件。'),
+              const Text('本机 CPU 处理会话文本和获准读取的文件，平台算力费用为 0。'),
+              if (view != null && (!view.installed || view.failure != null))
+                const ExpansionTile(
+                  title: Text('本机资源不足时的选择'),
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        '可下载或导入清单中的模型，也可以稍后继续。需要租用算力时，在用户 Web 重新选择可发送的内容和付款预算；批准上传前，桌面工作区文件和会话文本留在本机。',
+                      ),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
