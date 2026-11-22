@@ -519,7 +519,7 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          '19533647c8f3d50885f7a8b19a0707f93edc6682',
+          '938bc63654127951ae52810ba91f44af4eafecf2',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(

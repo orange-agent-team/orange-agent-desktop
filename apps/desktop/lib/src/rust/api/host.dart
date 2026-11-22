@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -102,6 +102,36 @@ Future<ModelConnectionView> connectLocalModel({
 
 Future<void> disconnectLocalModel({required String handle}) =>
     RustLib.instance.api.crateApiHostDisconnectLocalModel(handle: handle);
+
+Future<LocalPackageReview> reviewLocalPackage({
+  required String handle,
+  required String manifest,
+}) => RustLib.instance.api.crateApiHostReviewLocalPackage(
+  handle: handle,
+  manifest: manifest,
+);
+
+Future<String> installLocalPackage({
+  required String handle,
+  required String manifest,
+  required String digest,
+  required String installationRevision,
+}) => RustLib.instance.api.crateApiHostInstallLocalPackage(
+  handle: handle,
+  manifest: manifest,
+  digest: digest,
+  installationRevision: installationRevision,
+);
+
+Future<String> uninstallLocalPackage({
+  required String handle,
+  required LocalSkillSelection selection,
+  required String installationRevision,
+}) => RustLib.instance.api.crateApiHostUninstallLocalPackage(
+  handle: handle,
+  selection: selection,
+  installationRevision: installationRevision,
+);
 
 Future<List<LocalSkillChoice>> listLocalSkills({required String handle}) =>
     RustLib.instance.api.crateApiHostListLocalSkills(handle: handle);
@@ -1788,6 +1818,61 @@ class HostView {
           runtimeSourceCommit == other.runtimeSourceCommit &&
           availableReadTools == other.availableReadTools &&
           availableEditTools == other.availableEditTools;
+}
+
+class LocalPackageReview {
+  final String skillId;
+  final String version;
+  final String digest;
+  final String scenario;
+  final String displayName;
+  final String instruction;
+  final List<String> tools;
+  final bool installed;
+  final String installationRevision;
+  final String activationRevision;
+
+  const LocalPackageReview({
+    required this.skillId,
+    required this.version,
+    required this.digest,
+    required this.scenario,
+    required this.displayName,
+    required this.instruction,
+    required this.tools,
+    required this.installed,
+    required this.installationRevision,
+    required this.activationRevision,
+  });
+
+  @override
+  int get hashCode =>
+      skillId.hashCode ^
+      version.hashCode ^
+      digest.hashCode ^
+      scenario.hashCode ^
+      displayName.hashCode ^
+      instruction.hashCode ^
+      tools.hashCode ^
+      installed.hashCode ^
+      installationRevision.hashCode ^
+      activationRevision.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LocalPackageReview &&
+          runtimeType == other.runtimeType &&
+          skillId == other.skillId &&
+          version == other.version &&
+          digest == other.digest &&
+          scenario == other.scenario &&
+          displayName == other.displayName &&
+          instruction == other.instruction &&
+          tools == other.tools &&
+          installed == other.installed &&
+          installationRevision == other.installationRevision &&
+          activationRevision == other.activationRevision;
 }
 
 class LocalSkillChoice {

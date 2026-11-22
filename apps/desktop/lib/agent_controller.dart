@@ -35,6 +35,12 @@ abstract interface class AgentCommands {
   Future<api.AgentRunView> cancel(String id);
 }
 
+abstract interface class LocalPackageCommands {
+  Future<api.LocalPackageReview> reviewPackage(String manifest);
+  Future<void> installPackage(String manifest, api.LocalPackageReview review);
+  Future<void> uninstallPackage(api.LocalPackageReview review);
+}
+
 abstract interface class LocalSkillCommands {
   Future<List<api.LocalSkillChoice>> listSkills();
   Future<String> setSkillEnabled(api.LocalSkillChoice choice, bool enabled);
@@ -98,11 +104,42 @@ class NativeAgentCommands
     implements
         AgentCommands,
         LocalSkillCommands,
+        LocalPackageCommands,
         EditingAgentCommands,
         MemoryAgentCommands,
         MemoryRecoveryCommands {
   NativeAgentCommands(this.handle);
   final String handle;
+  @override
+  Future<api.LocalPackageReview> reviewPackage(String manifest) =>
+      api.reviewLocalPackage(handle: handle, manifest: manifest);
+  @override
+  Future<void> installPackage(
+    String manifest,
+    api.LocalPackageReview review,
+  ) async {
+    await api.installLocalPackage(
+      handle: handle,
+      manifest: manifest,
+      digest: review.digest,
+      installationRevision: review.installationRevision,
+    );
+  }
+
+  @override
+  Future<void> uninstallPackage(api.LocalPackageReview review) async {
+    await api.uninstallLocalPackage(
+      handle: handle,
+      installationRevision: review.installationRevision,
+      selection: api.LocalSkillSelection(
+        skillId: review.skillId,
+        version: review.version,
+        digest: review.digest,
+        activationRevision: review.activationRevision,
+      ),
+    );
+  }
+
   @override
   Future<List<api.LocalSkillChoice>> listSkills() =>
       api.listLocalSkills(handle: handle);

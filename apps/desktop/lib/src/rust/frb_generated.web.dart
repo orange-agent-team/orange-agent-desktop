@@ -234,6 +234,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<WorkspaceView> dco_decode_list_workspace_view(dynamic raw);
 
   @protected
+  LocalPackageReview dco_decode_local_package_review(dynamic raw);
+
+  @protected
   LocalSkillChoice dco_decode_local_skill_choice(dynamic raw);
 
   @protected
@@ -672,6 +675,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<WorkspaceView> sse_decode_list_workspace_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  LocalPackageReview sse_decode_local_package_review(
     SseDeserializer deserializer,
   );
 
@@ -1226,6 +1234,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_workspace_view(
     List<WorkspaceView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_local_package_review(
+    LocalPackageReview self,
     SseSerializer serializer,
   );
 

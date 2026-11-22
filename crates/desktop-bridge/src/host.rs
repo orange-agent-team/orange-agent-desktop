@@ -66,6 +66,10 @@ pub(crate) use creation::{
 };
 mod llama_memory;
 mod runs;
+mod skill_packages;
+pub(crate) use skill_packages::{
+    install_local_package, review_local_package, uninstall_local_package,
+};
 mod task_memory;
 pub(crate) use managed::{
     cancel_model_start, close_model_download, close_model_import, configure_model_service,
@@ -690,7 +694,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "19533647c8f3d50885f7a8b19a0707f93edc6682"
+            "938bc63654127951ae52810ba91f44af4eafecf2"
         );
         assert_eq!(
             registry

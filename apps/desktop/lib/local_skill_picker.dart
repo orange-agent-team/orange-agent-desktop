@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'agent_controller.dart';
+import 'local_package_dialog.dart';
 import 'src/rust/api/host.dart';
 
 class LocalSkillPicker extends StatelessWidget {
@@ -52,6 +53,37 @@ class LocalSkillPicker extends StatelessWidget {
             ),
           ),
         ),
+        if (controller.commands case final LocalPackageCommands packages)
+          Wrap(
+            children: [
+              TextButton(
+                onPressed: locked || controller.skillBusy
+                    ? null
+                    : () async {
+                        final changed = await manageLocalPackage(
+                          context,
+                          packages,
+                        );
+                        if (changed) await controller.refreshSkills();
+                      },
+                child: const Text('安装本地模板'),
+              ),
+              if (selected != null && selected.skillId.startsWith('local.'))
+                TextButton(
+                  onPressed: locked || controller.skillBusy
+                      ? null
+                      : () async {
+                          final changed = await manageLocalPackage(
+                            context,
+                            packages,
+                            remove: selected,
+                          );
+                          if (changed) await controller.refreshSkills();
+                        },
+                  child: const Text('卸载此版本'),
+                ),
+            ],
+          ),
         if (controller.skillError != null) Text(controller.skillError!),
         if (controller.skillError != null)
           TextButton(

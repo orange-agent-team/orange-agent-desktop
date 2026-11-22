@@ -56,7 +56,7 @@ def main():
             command[3]='integration_test/local_skills_test.dart'
             result=subprocess.run(command,cwd=APP,env=environment,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=900)
             print(result.stdout,end='',flush=True);result.check_returncode()
-            if '"nativeSkillSummary":true' not in result.stdout or '"verifiedFileReference":true' not in result.stdout or 'All tests passed!' not in result.stdout:
+            if '"reviewCancelInstallRunUninstall":true' not in result.stdout or '"nativeSkillSummary":true' not in result.stdout or '"verifiedFileReference":true' not in result.stdout or 'All tests passed!' not in result.stdout:
                 raise RuntimeError('The native desktop template acceptance did not complete')
         elif args.download_only:
             command[3]='integration_test/model_download_test.dart'

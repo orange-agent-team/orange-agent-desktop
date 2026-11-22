@@ -105,6 +105,61 @@ void main() {
       await tester.pumpAndSettle();
       await click(find.text(workspace.displayPath).last);
       await tester.pumpAndSettle();
+      final manifest = jsonEncode({
+        'id': 'local.delivery-desk',
+        'version': '1.0.0',
+        'name': '交货报告',
+        'instruction': 'Summarize the input in one sentence, preserving the exact day and quantity.',
+        'scenario': 'AU-02',
+        'tools': [],
+      });
+      Future<void> reviewPackage() async {
+        await click(find.widgetWithText(TextButton, '安装本地模板'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('local-package-manifest')),
+          manifest,
+        );
+        await click(find.text('审核模板'));
+        await until(
+          tester,
+          () => find.text('确认安装').evaluate().isNotEmpty,
+          handle: h,
+        );
+      }
+
+      await reviewPackage();
+      await click(find.text('关闭'));
+      await tester.pumpAndSettle();
+      expect(
+        (await host.listLocalSkills(handle: h))
+            .where((v) => v.skillId == 'local.delivery-desk'),
+        isEmpty,
+      );
+      await reviewPackage();
+      await click(find.text('确认安装'));
+      await waitFor(
+        () => agent.skills.any(
+          (v) => v.skillId == 'local.delivery-desk' && !v.enabled,
+        ),
+      );
+      await select('交货报告');
+      await enterEditablePrompt(tester, 'There will be 18 crates on Tuesday.');
+      await click(find.widgetWithText(FilledButton, '开始会话'));
+      await waitFor(() => agent.view?.phase == 'completed' && !agent.busy);
+      expect(agent.view!.finalText!.toLowerCase(), contains('tuesday'));
+      expect(agent.view!.finalText!, contains('18'));
+      await click(find.text('卸载此版本'));
+      await until(
+        tester,
+        () => find.text('确认卸载').evaluate().isNotEmpty,
+        handle: h,
+      );
+      await click(find.text('确认卸载'));
+      await waitFor(
+        () => !agent.skills.any((v) => v.skillId == 'local.delivery-desk'),
+      );
+      expect(find.text('所选模板版本不可用'), findsOneWidget);
       await select('文本摘要');
       await enterEditablePrompt(
         tester,
@@ -188,6 +243,7 @@ void main() {
       debugPrint(
         jsonEncode({
           'nativeSkillSummary': true,
+          'reviewCancelInstallRunUninstall': true,
           'verifiedFileReference': true,
           'changedSourceHidden': true,
           'staleActivationDenied': true,

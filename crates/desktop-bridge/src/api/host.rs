@@ -186,6 +186,40 @@ pub struct LocalSkillChoice {
     pub enabled: bool,
     pub revision: String,
 }
+#[derive(Debug, Clone)]
+pub struct LocalPackageReview {
+    pub skill_id: String,
+    pub version: String,
+    pub digest: String,
+    pub scenario: String,
+    pub display_name: String,
+    pub instruction: String,
+    pub tools: Vec<String>,
+    pub installed: bool,
+    pub installation_revision: String,
+    pub activation_revision: String,
+}
+pub async fn review_local_package(
+    handle: String,
+    manifest: String,
+) -> Result<LocalPackageReview, BridgeError> {
+    crate::host::review_local_package(handle, manifest).await
+}
+pub async fn install_local_package(
+    handle: String,
+    manifest: String,
+    digest: String,
+    installation_revision: String,
+) -> Result<String, BridgeError> {
+    crate::host::install_local_package(handle, manifest, digest, installation_revision).await
+}
+pub async fn uninstall_local_package(
+    handle: String,
+    selection: LocalSkillSelection,
+    installation_revision: String,
+) -> Result<String, BridgeError> {
+    crate::host::uninstall_local_package(handle, selection, installation_revision).await
+}
 pub async fn list_local_skills(handle: String) -> Result<Vec<LocalSkillChoice>, BridgeError> {
     crate::host::list_local_skills(handle).await
 }

@@ -592,7 +592,7 @@ impl HostRegistry {
                 return Err(failure("INVALID_SKILL_SELECTION"));
             }
             host.journal
-                .start_agent_skill(&config, pin, prompt.to_owned(), &grant)
+                .start_agent_skill_reviewed(&config, pin, Some(revision), prompt.to_owned(), &grant)
                 .map_err(engine_error)?;
         } else if let Some(selection) = selection.memory {
             let task = task_memory::TaskMemory::derive(host, selection)?;
