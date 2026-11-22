@@ -26,7 +26,9 @@ def main():
     parser.add_argument('--ui-memory-only',action='store_true',help='Verify real packaged model read/write and explicit memory approval')
     parser.add_argument('--download-only',action='store_true',help='Verify local consent, cancellation and the pinned download API using preverified cache content')
     parser.add_argument('--live-download',action='store_true',help='Also fetch the fixed public GGUF to an empty disposable cache')
+    parser.add_argument('--skills-only',action='store_true',help='Verify actual native template enablement, execution and source references')
     args=parser.parse_args()
+    if args.skills_only and (args.ui_search_only or args.ui_memory_only or args.download_only):parser.error('Choose one targeted scenario')
     if args.live_download and not args.download_only:parser.error('--live-download requires --download-only')
     if args.download_only and (args.ui_search_only or args.ui_memory_only):parser.error('Choose one targeted scenario')
     if args.ui_search_only and args.ui_memory_only:parser.error('Choose one targeted scenario')
@@ -50,7 +52,13 @@ def main():
     try:
         environment,tools=tool_environment()
         command=[str(tools['flutter']),'--suppress-analytics','test','integration_test/managed_model_test.dart','-d','macos','--no-pub']
-        if args.download_only:
+        if args.skills_only:
+            command[3]='integration_test/local_skills_test.dart'
+            result=subprocess.run(command,cwd=APP,env=environment,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=900)
+            print(result.stdout,end='',flush=True);result.check_returncode()
+            if '"nativeSkillSummary":true' not in result.stdout or '"verifiedFileReference":true' not in result.stdout or 'All tests passed!' not in result.stdout:
+                raise RuntimeError('The native desktop template acceptance did not complete')
+        elif args.download_only:
             command[3]='integration_test/model_download_test.dart'
             if args.live_download:command.append('--dart-define=ORANGE_TEST_LIVE_DOWNLOAD=true')
             result=subprocess.run(command,cwd=APP,env=environment,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=1600)
@@ -77,7 +85,9 @@ def main():
         verify_bundle(STAGED)
         if digest(STAGED/'manifest.json')!=expected:raise RuntimeError('Test bundle changed unexpectedly; original retained at '+str(backup))
         shutil.rmtree(STAGED);os.replace(backup,STAGED);invalidate_hook();shutil.rmtree(temporary)
-    if args.download_only:
+    if args.skills_only:
+        print("PASS real macOS Flutter template selection, activation, scoped inference, read approval and checked local source",flush=True)
+    elif args.download_only:
         print('PASS reviewed original model, isolated desktop state and native verified cache',flush=True)
     elif args.ui_memory_only:
         print('PASS real packaged CPU inference, separate memory read/write approvals, SQLite commit and parent withdrawal')

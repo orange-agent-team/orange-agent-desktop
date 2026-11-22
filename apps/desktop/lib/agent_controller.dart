@@ -35,6 +35,17 @@ abstract interface class AgentCommands {
   Future<api.AgentRunView> cancel(String id);
 }
 
+abstract interface class LocalSkillCommands {
+  Future<List<api.LocalSkillChoice>> listSkills();
+  Future<String> setSkillEnabled(api.LocalSkillChoice choice, bool enabled);
+  Future<api.AgentRunView> startSkill(
+    String workspace,
+    String id,
+    String prompt,
+    api.LocalSkillChoice choice,
+  );
+}
+
 abstract interface class EditingAgentCommands {
   Future<api.AgentRunView> startEditing(
     String workspace,
@@ -86,11 +97,43 @@ abstract interface class MemoryRecoveryCommands {
 class NativeAgentCommands
     implements
         AgentCommands,
+        LocalSkillCommands,
         EditingAgentCommands,
         MemoryAgentCommands,
         MemoryRecoveryCommands {
   NativeAgentCommands(this.handle);
   final String handle;
+  @override
+  Future<List<api.LocalSkillChoice>> listSkills() =>
+      api.listLocalSkills(handle: handle);
+  @override
+  Future<String> setSkillEnabled(api.LocalSkillChoice choice, bool enabled) =>
+      api.setLocalSkillEnabled(
+        handle: handle,
+        skillId: choice.skillId,
+        version: choice.version,
+        digest: choice.digest,
+        expectedRevision: choice.revision,
+        enabled: enabled,
+      );
+  @override
+  Future<api.AgentRunView> startSkill(
+    String workspace,
+    String id,
+    String prompt,
+    api.LocalSkillChoice choice,
+  ) => api.startLocalSkillRun(
+    handle: handle,
+    workspaceId: workspace,
+    requestId: id,
+    prompt: prompt,
+    selection: api.LocalSkillSelection(
+      skillId: choice.skillId,
+      version: choice.version,
+      digest: choice.digest,
+      activationRevision: choice.revision,
+    ),
+  );
   @override
   Future<List<mem.UncertainMemoryWrite>> uncertain(String run) =>
       mem.uncertainTaskWrites(handle: handle, runId: run, limit: 100);
@@ -307,6 +350,50 @@ String toolDisplayName(String name) => name == 'memory_read'
 class AgentController extends ChangeNotifier {
   AgentController(this.commands, {required this.serviceDirectory});
   final AgentCommands commands;
+  List<api.LocalSkillChoice> skills = [];
+  bool skillBusy = false;
+  String? skillError;
+  bool get supportsSkills => commands is LocalSkillCommands;
+  Future<void> refreshSkills() async {
+    if (!_alive || skillBusy || !supportsSkills) return;
+    skillBusy = true;
+    skillError = null;
+    _changed();
+    try {
+      final rows = await (commands as LocalSkillCommands).listSkills();
+      if (_alive) skills = rows;
+    } catch (_) {
+      if (_alive) {
+        skills = [];
+        skillError = '无法读取当前宿主的模板目录。';
+      }
+    } finally {
+      skillBusy = false;
+      _changed();
+    }
+  }
+
+  Future<void> toggleSkill(api.LocalSkillChoice choice) async {
+    if (!_alive || skillBusy || !supportsSkills) return;
+    skillBusy = true;
+    skillError = null;
+    _changed();
+    final transport = commands as LocalSkillCommands;
+    try {
+      await transport.setSkillEnabled(choice, !choice.enabled);
+      final rows = await transport.listSkills();
+      if (_alive) skills = rows;
+    } catch (_) {
+      if (_alive) {
+        skills = [];
+        skillError = '模板状态已变化，请重新读取后核对。';
+      }
+    } finally {
+      skillBusy = false;
+      _changed();
+    }
+  }
+
   final Future<String> Function() serviceDirectory;
   api.ModelConnectionView? model;
   api.AgentRunView? view;
@@ -320,6 +407,7 @@ class AgentController extends ChangeNotifier {
     String id,
     String prompt,
     bool allowQuestions,
+    api.LocalSkillChoice? skill,
     api.CreationAccessView? creation,
     api.EditingAccessView? editing,
     mem.TaskMemorySelection? memory,
@@ -621,6 +709,7 @@ class AgentController extends ChangeNotifier {
     String workspace,
     String prompt, {
     bool allowQuestions = false,
+    api.LocalSkillChoice? skill,
     api.CreationAccessView? creation,
     api.EditingAccessView? editing,
     mem.TaskMemorySelection? memory,
@@ -635,9 +724,25 @@ class AgentController extends ChangeNotifier {
     final random = Random.secure();
     final id =
         'run-${List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
+    if (skill != null) {
+      if (!supportsSkills ||
+          !skills.any(
+            (v) =>
+                v.digest == skill.digest &&
+                v.enabled &&
+                v.revision == skill.revision,
+          )) {
+        return;
+      }
+      allowQuestions = false;
+      creation = null;
+      editing = null;
+      memory = null;
+    }
     memoryRequirements = [];
     usesMemory = memory != null;
     _submission = (
+      skill: skill,
       memory: memory,
       workspace: workspace,
       id: id,
@@ -663,7 +768,18 @@ class AgentController extends ChangeNotifier {
     _changed();
     try {
       final api.AgentRunView created;
-      if (submission.memory != null) {
+      if (submission.skill != null) {
+        final transport = commands;
+        if (transport is! LocalSkillCommands) {
+          throw UnsupportedError('Local skill transport unavailable');
+        }
+        created = await (transport as LocalSkillCommands).startSkill(
+          submission.workspace,
+          submission.id,
+          submission.prompt,
+          submission.skill!,
+        );
+      } else if (submission.memory != null) {
         final transport = commands;
         if (transport is! MemoryAgentCommands) {
           throw UnsupportedError('Memory transport unavailable');
@@ -963,6 +1079,8 @@ class AgentController extends ChangeNotifier {
 String describeAgentError(Object error) {
   if (error is! api.BridgeError) return '操作结果尚未确认，请核对状态后重试。';
   return switch (error.code) {
+    'SKILL_ACTIVATION_CHANGED' => '所选模板已停用或启用修订已变化。请核对原运行，再选择当前模板版本。',
+    'INVALID_SKILL_SELECTION' => '模板选择与当前宿主的目录不一致。',
     'MODEL_NOT_CONFIGURED' ||
     'MODEL_SERVICE_UNAVAILABLE' => '没有可用的本地模型，请先连接模型服务。',
     'INVALID_MODEL_SERVICE' ||

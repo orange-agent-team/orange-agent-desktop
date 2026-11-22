@@ -138,6 +138,8 @@ pub struct UserQuestionGroupView {
 }
 #[derive(Debug, Clone)]
 pub struct AgentRunView {
+    pub source_references: Option<Vec<LocalSourceReference>>,
+
     /// Immutable Run capability; never inferred from a pending tool name.
     pub creation_consent_id: Option<String>,
     pub editing_consent_id: Option<String>,
@@ -163,6 +165,63 @@ pub async fn connect_local_model(
 }
 pub async fn disconnect_local_model(handle: String) -> Result<(), BridgeError> {
     crate::host::disconnect_local_model(handle).await
+}
+#[derive(Debug, Clone)]
+pub struct LocalSourceReference {
+    pub path: String,
+    pub sha256: String,
+    pub start_byte: String,
+    pub end_byte: String,
+    pub line: Option<String>,
+}
+#[derive(Debug, Clone)]
+pub struct LocalSkillChoice {
+    pub skill_id: String,
+    pub version: String,
+    pub digest: String,
+    pub scenario: String,
+    pub display_name: String,
+    pub instruction: String,
+    pub tools: Vec<String>,
+    pub enabled: bool,
+    pub revision: String,
+}
+pub async fn list_local_skills(handle: String) -> Result<Vec<LocalSkillChoice>, BridgeError> {
+    crate::host::list_local_skills(handle).await
+}
+pub async fn set_local_skill_enabled(
+    handle: String,
+    skill_id: String,
+    version: String,
+    digest: String,
+    expected_revision: String,
+    enabled: bool,
+) -> Result<String, BridgeError> {
+    crate::host::set_local_skill_enabled(
+        handle,
+        skill_id,
+        version,
+        digest,
+        expected_revision,
+        enabled,
+    )
+    .await
+}
+#[derive(Debug, Clone)]
+pub struct LocalSkillSelection {
+    pub skill_id: String,
+    pub version: String,
+    pub digest: String,
+    pub activation_revision: String,
+}
+pub async fn start_local_skill_run(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    prompt: String,
+    selection: LocalSkillSelection,
+) -> Result<AgentRunView, BridgeError> {
+    crate::host::start_local_skill_run(handle, workspace_id, request_id, prompt, selection).await
 }
 pub async fn start_run(
     handle: String,

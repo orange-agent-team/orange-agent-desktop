@@ -18,6 +18,7 @@ use tokio::sync::watch;
 
 #[derive(Default)]
 pub(super) struct WriteSelection<'a> {
+    pub skill: Option<(&'a orange_agent_runtime::skills::SkillPin, i64)>,
     pub memory: Option<&'a crate::api::memory::TaskMemorySelection>,
     pub creation: Option<(&'a str, &'a str)>,
     pub editing: Option<(&'a str, &'a str)>,
@@ -154,7 +155,20 @@ fn project(
             })
         })
         .collect::<Result<Vec<_>, BridgeError>>()?;
+    let source_references = (!view.source_references.is_empty()).then(|| {
+        view.source_references
+            .into_iter()
+            .map(|r| crate::api::host::LocalSourceReference {
+                path: r.path,
+                sha256: r.sha256,
+                start_byte: r.start_byte,
+                end_byte: r.end_byte,
+                line: r.line,
+            })
+            .collect()
+    });
     Ok(AgentRunView {
+        source_references,
         creation_consent_id,
         editing_consent_id,
         run_id: view.run_id,
@@ -560,7 +574,27 @@ impl HostRegistry {
         if selection.editing.is_some() {
             return Err(failure("EDITING_UNAVAILABLE_ON_TARGET"));
         }
-        if let Some(selection) = selection.memory {
+        if let Some((pin, revision)) = selection.skill {
+            let active = host
+                .journal
+                .skills(LOCAL_OWNER)
+                .map_err(engine_error)?
+                .into_iter()
+                .any(|row| row.pin == *pin && row.enabled && row.revision == revision);
+            if !active {
+                return Err(failure("SKILL_ACTIVATION_CHANGED"));
+            }
+            if create.is_some()
+                || selection.editing.is_some()
+                || selection.memory.is_some()
+                || interactive
+            {
+                return Err(failure("INVALID_SKILL_SELECTION"));
+            }
+            host.journal
+                .start_agent_skill(&config, pin, prompt.to_owned(), &grant)
+                .map_err(engine_error)?;
+        } else if let Some(selection) = selection.memory {
             let task = task_memory::TaskMemory::derive(host, selection)?;
             let mut authority = task.authority(&grant);
             if let Some(create) = &create {
@@ -795,6 +829,15 @@ impl HostRegistry {
             host.journal
                 .agent_view_authorized_scopes(LOCAL_OWNER, run, task.authority(&grant))
                 .await
+        } else if host
+            .journal
+            .run_skill(LOCAL_OWNER, run)
+            .map_err(engine_error)?
+            .is_some()
+        {
+            host.journal
+                .agent_view_authorized(LOCAL_OWNER, run, &grant)
+                .await
         } else {
             host.journal.agent_view(LOCAL_OWNER, run)
         }
@@ -869,7 +912,13 @@ impl HostRegistry {
             .journal
             .agent_view(LOCAL_OWNER, run)
             .map_err(engine_error)?;
-        let view = if view.final_text.is_some()
+        let is_skill = host
+            .journal
+            .run_skill(LOCAL_OWNER, run)
+            .map_err(engine_error)?
+            .is_some();
+        let view = if is_skill
+            || view.final_text.is_some()
             || !view.pending.is_empty()
             || view.user_question.is_some()
         {
@@ -955,6 +1004,93 @@ pub(crate) async fn disconnect_local_model(handle: String) -> Result<(), BridgeE
     crate::actor::call(handle.clone(), move |host, _| {
         host.current(&handle)?.model = None;
         Ok(())
+    })
+    .await
+}
+pub(crate) async fn list_local_skills(
+    handle: String,
+) -> Result<Vec<crate::api::host::LocalSkillChoice>, BridgeError> {
+    crate::actor::call(handle.clone(), move |host, _| {
+        let rows = host
+            .current(&handle)?
+            .journal
+            .skills(LOCAL_OWNER)
+            .map_err(engine_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| crate::api::host::LocalSkillChoice {
+                skill_id: row.pin.id,
+                version: row.pin.version,
+                digest: row.pin.digest,
+                display_name: row.name,
+                scenario: row.scenario,
+                instruction: row.instruction,
+                tools: row.tools,
+                revision: row.revision.to_string(),
+                enabled: row.enabled,
+            })
+            .collect())
+    })
+    .await
+}
+pub(crate) async fn set_local_skill_enabled(
+    handle: String,
+    skill_id: String,
+    version: String,
+    digest: String,
+    revision: String,
+    enabled: bool,
+) -> Result<String, BridgeError> {
+    let expected = revision
+        .parse::<i64>()
+        .ok()
+        .filter(|v| *v >= 0 && v.to_string() == revision)
+        .ok_or_else(|| failure("INVALID_SKILL_SELECTION"))?;
+    crate::actor::call(handle.clone(), move |host, _| {
+        let pin = orange_agent_runtime::skills::SkillPin {
+            id: skill_id,
+            version,
+            digest,
+        };
+        Ok(host
+            .current(&handle)?
+            .journal
+            .set_skill_enabled(LOCAL_OWNER, &pin, expected, enabled)
+            .map_err(engine_error)?
+            .to_string())
+    })
+    .await
+}
+pub(crate) async fn start_local_skill_run(
+    handle: String,
+    workspace_id: String,
+    request_id: String,
+    prompt: String,
+    selection: crate::api::host::LocalSkillSelection,
+) -> Result<AgentRunView, BridgeError> {
+    let revision = selection
+        .activation_revision
+        .parse::<i64>()
+        .ok()
+        .filter(|r| *r > 0 && r.to_string() == selection.activation_revision)
+        .ok_or_else(|| failure("INVALID_SKILL_SELECTION"))?;
+    crate::actor::call(handle.clone(), move |host, rt| {
+        let pin = orange_agent_runtime::skills::SkillPin {
+            id: selection.skill_id,
+            version: selection.version,
+            digest: selection.digest,
+        };
+        rt.block_on(host.start_run_mode(
+            &handle,
+            &workspace_id,
+            &request_id,
+            &prompt,
+            false,
+            WriteSelection {
+                skill: Some((&pin, revision)),
+                ..Default::default()
+            },
+        ))
     })
     .await
 }
@@ -1050,6 +1186,7 @@ pub(crate) async fn start_creation_run(
             &prompt,
             interactive,
             WriteSelection {
+                skill: None,
                 memory: None,
                 creation: Some((&consent, &version)),
                 editing: None,

@@ -42,7 +42,10 @@
     "ExportRestorationAccessView",
     "ExportRestorationReviewView",
     "ExportRestorationOutcomeView",
-    "ExportRestorationInspectionView"
+    "ExportRestorationInspectionView",
+    "LocalSkillChoice",
+    "LocalSourceReference",
+    "LocalSkillSelection"
   ],
   "public_functions": [
     "advanceRun",
@@ -124,7 +127,10 @@
     "inspectExportRestoration",
     "suspendExportRestoration",
     "downloadModel",
-    "closeModelDownload"
+    "closeModelDownload",
+    "listLocalSkills",
+    "setLocalSkillEnabled",
+    "startLocalSkillRun"
   ],
   "additional_public_modules": {
     "memory": {

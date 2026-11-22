@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -102,6 +102,39 @@ Future<ModelConnectionView> connectLocalModel({
 
 Future<void> disconnectLocalModel({required String handle}) =>
     RustLib.instance.api.crateApiHostDisconnectLocalModel(handle: handle);
+
+Future<List<LocalSkillChoice>> listLocalSkills({required String handle}) =>
+    RustLib.instance.api.crateApiHostListLocalSkills(handle: handle);
+
+Future<String> setLocalSkillEnabled({
+  required String handle,
+  required String skillId,
+  required String version,
+  required String digest,
+  required String expectedRevision,
+  required bool enabled,
+}) => RustLib.instance.api.crateApiHostSetLocalSkillEnabled(
+  handle: handle,
+  skillId: skillId,
+  version: version,
+  digest: digest,
+  expectedRevision: expectedRevision,
+  enabled: enabled,
+);
+
+Future<AgentRunView> startLocalSkillRun({
+  required String handle,
+  required String workspaceId,
+  required String requestId,
+  required String prompt,
+  required LocalSkillSelection selection,
+}) => RustLib.instance.api.crateApiHostStartLocalSkillRun(
+  handle: handle,
+  workspaceId: workspaceId,
+  requestId: requestId,
+  prompt: prompt,
+  selection: selection,
+);
 
 Future<AgentRunView> startRun({
   required String handle,
@@ -859,6 +892,8 @@ Future<void> suspendExportRestoration({
 );
 
 class AgentRunView {
+  final List<LocalSourceReference>? sourceReferences;
+
   /// Immutable Run capability; never inferred from a pending tool name.
   final String? creationConsentId;
   final String? editingConsentId;
@@ -875,6 +910,7 @@ class AgentRunView {
   final String? failure;
 
   const AgentRunView({
+    this.sourceReferences,
     this.creationConsentId,
     this.editingConsentId,
     required this.runId,
@@ -892,6 +928,7 @@ class AgentRunView {
 
   @override
   int get hashCode =>
+      sourceReferences.hashCode ^
       creationConsentId.hashCode ^
       editingConsentId.hashCode ^
       runId.hashCode ^
@@ -911,6 +948,7 @@ class AgentRunView {
       identical(this, other) ||
       other is AgentRunView &&
           runtimeType == other.runtimeType &&
+          sourceReferences == other.sourceReferences &&
           creationConsentId == other.creationConsentId &&
           editingConsentId == other.editingConsentId &&
           runId == other.runId &&
@@ -1750,6 +1788,123 @@ class HostView {
           runtimeSourceCommit == other.runtimeSourceCommit &&
           availableReadTools == other.availableReadTools &&
           availableEditTools == other.availableEditTools;
+}
+
+class LocalSkillChoice {
+  final String skillId;
+  final String version;
+  final String digest;
+  final String scenario;
+  final String displayName;
+  final String instruction;
+  final List<String> tools;
+  final bool enabled;
+  final String revision;
+
+  const LocalSkillChoice({
+    required this.skillId,
+    required this.version,
+    required this.digest,
+    required this.scenario,
+    required this.displayName,
+    required this.instruction,
+    required this.tools,
+    required this.enabled,
+    required this.revision,
+  });
+
+  @override
+  int get hashCode =>
+      skillId.hashCode ^
+      version.hashCode ^
+      digest.hashCode ^
+      scenario.hashCode ^
+      displayName.hashCode ^
+      instruction.hashCode ^
+      tools.hashCode ^
+      enabled.hashCode ^
+      revision.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LocalSkillChoice &&
+          runtimeType == other.runtimeType &&
+          skillId == other.skillId &&
+          version == other.version &&
+          digest == other.digest &&
+          scenario == other.scenario &&
+          displayName == other.displayName &&
+          instruction == other.instruction &&
+          tools == other.tools &&
+          enabled == other.enabled &&
+          revision == other.revision;
+}
+
+class LocalSkillSelection {
+  final String skillId;
+  final String version;
+  final String digest;
+  final String activationRevision;
+
+  const LocalSkillSelection({
+    required this.skillId,
+    required this.version,
+    required this.digest,
+    required this.activationRevision,
+  });
+
+  @override
+  int get hashCode =>
+      skillId.hashCode ^
+      version.hashCode ^
+      digest.hashCode ^
+      activationRevision.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LocalSkillSelection &&
+          runtimeType == other.runtimeType &&
+          skillId == other.skillId &&
+          version == other.version &&
+          digest == other.digest &&
+          activationRevision == other.activationRevision;
+}
+
+class LocalSourceReference {
+  final String path;
+  final String sha256;
+  final String startByte;
+  final String endByte;
+  final String? line;
+
+  const LocalSourceReference({
+    required this.path,
+    required this.sha256,
+    required this.startByte,
+    required this.endByte,
+    this.line,
+  });
+
+  @override
+  int get hashCode =>
+      path.hashCode ^
+      sha256.hashCode ^
+      startByte.hashCode ^
+      endByte.hashCode ^
+      line.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LocalSourceReference &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          sha256 == other.sha256 &&
+          startByte == other.startByte &&
+          endByte == other.endByte &&
+          line == other.line;
 }
 
 class ModelConnectionView {

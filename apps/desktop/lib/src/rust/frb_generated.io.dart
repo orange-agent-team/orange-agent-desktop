@@ -43,6 +43,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ExportOutcomeView dco_decode_box_autoadd_export_outcome_view(dynamic raw);
 
   @protected
+  LocalSkillSelection dco_decode_box_autoadd_local_skill_selection(dynamic raw);
+
+  @protected
   MemoryEdit dco_decode_box_autoadd_memory_edit(dynamic raw);
 
   @protected
@@ -178,6 +181,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_list_export_retirement_outcome_view(dynamic raw);
 
   @protected
+  List<LocalSkillChoice> dco_decode_list_local_skill_choice(dynamic raw);
+
+  @protected
+  List<LocalSourceReference> dco_decode_list_local_source_reference(
+    dynamic raw,
+  );
+
+  @protected
   List<MemoryMemberView> dco_decode_list_memory_member_view(dynamic raw);
 
   @protected
@@ -219,6 +230,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<WorkspaceView> dco_decode_list_workspace_view(dynamic raw);
+
+  @protected
+  LocalSkillChoice dco_decode_local_skill_choice(dynamic raw);
+
+  @protected
+  LocalSkillSelection dco_decode_local_skill_selection(dynamic raw);
+
+  @protected
+  LocalSourceReference dco_decode_local_source_reference(dynamic raw);
 
   @protected
   MemoryAccessView dco_decode_memory_access_view(dynamic raw);
@@ -302,6 +322,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String>? dco_decode_opt_list_String(dynamic raw);
+
+  @protected
+  List<LocalSourceReference>? dco_decode_opt_list_local_source_reference(
+    dynamic raw,
+  );
 
   @protected
   OwnerEntry dco_decode_owner_entry(dynamic raw);
@@ -408,6 +433,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExportOutcomeView sse_decode_box_autoadd_export_outcome_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  LocalSkillSelection sse_decode_box_autoadd_local_skill_selection(
     SseDeserializer deserializer,
   );
 
@@ -575,6 +605,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   sse_decode_list_export_retirement_outcome_view(SseDeserializer deserializer);
 
   @protected
+  List<LocalSkillChoice> sse_decode_list_local_skill_choice(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<LocalSourceReference> sse_decode_list_local_source_reference(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<MemoryMemberView> sse_decode_list_memory_member_view(
     SseDeserializer deserializer,
   );
@@ -630,6 +670,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<WorkspaceView> sse_decode_list_workspace_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  LocalSkillChoice sse_decode_local_skill_choice(SseDeserializer deserializer);
+
+  @protected
+  LocalSkillSelection sse_decode_local_skill_selection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  LocalSourceReference sse_decode_local_source_reference(
     SseDeserializer deserializer,
   );
 
@@ -723,6 +776,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String>? sse_decode_opt_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<LocalSourceReference>? sse_decode_opt_list_local_source_reference(
+    SseDeserializer deserializer,
+  );
 
   @protected
   OwnerEntry sse_decode_owner_entry(SseDeserializer deserializer);
@@ -860,6 +918,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_export_outcome_view(
     ExportOutcomeView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_local_skill_selection(
+    LocalSkillSelection self,
     SseSerializer serializer,
   );
 
@@ -1074,6 +1138,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_local_skill_choice(
+    List<LocalSkillChoice> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_local_source_reference(
+    List<LocalSourceReference> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_memory_member_view(
     List<MemoryMemberView> self,
     SseSerializer serializer,
@@ -1148,6 +1224,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_workspace_view(
     List<WorkspaceView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_local_skill_choice(
+    LocalSkillChoice self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_local_skill_selection(
+    LocalSkillSelection self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_local_source_reference(
+    LocalSourceReference self,
     SseSerializer serializer,
   );
 
@@ -1270,6 +1364,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_list_String(List<String>? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_list_local_source_reference(
+    List<LocalSourceReference>? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_owner_entry(OwnerEntry self, SseSerializer serializer);

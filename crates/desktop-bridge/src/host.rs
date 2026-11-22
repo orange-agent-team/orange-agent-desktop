@@ -74,8 +74,9 @@ pub(crate) use managed::{
 };
 pub(crate) use runs::{
     advance_run, answer_user_question, approve_creation_tool, approve_tool, cancel_run,
-    connect_local_model, disconnect_local_model, inspect_run, start_creation_run,
-    start_interactive_run, start_run,
+    connect_local_model, disconnect_local_model, inspect_run, list_local_skills,
+    set_local_skill_enabled, start_creation_run, start_interactive_run, start_local_skill_run,
+    start_run,
 };
 
 pub(crate) fn failure(code: &str) -> BridgeError {
@@ -689,7 +690,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "fcc2300c89303ce908452941bd789a167bb542a5"
+            "19533647c8f3d50885f7a8b19a0707f93edc6682"
         );
         assert_eq!(
             registry

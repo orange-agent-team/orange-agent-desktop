@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'agent_controller.dart';
+import 'local_skill_picker.dart';
 import 'src/rust/api/memory.dart' as mem;
 import 'question_panel.dart';
 import 'src/rust/api/host.dart';
@@ -30,6 +31,7 @@ class AgentPanel extends StatefulWidget {
 class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
   final prompt = TextEditingController();
   String? selected;
+  String? selectedSkillDigest;
   bool allowMemory = false, writeMemory = false;
   bool allowQuestions = false, allowCreation = false, allowEditing = false;
   AgentController get controller => widget.controller;
@@ -37,11 +39,20 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) controller.refreshSkills();
+    });
   }
 
   @override
   void didUpdateWidget(covariant AgentPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, controller)) {
+      selectedSkillDigest = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) controller.refreshSkills();
+      });
+    }
     if (oldWidget.memory?.sessionToken != widget.memory?.sessionToken) {
       allowMemory = false;
       writeMemory = false;
@@ -117,6 +128,10 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
           .firstOrNull;
       final run = controller.view;
       final busy = controller.busy || controller.cancelling;
+      final chosenSkill = controller.skills
+          .where((v) => v.digest == selectedSkillDigest)
+          .firstOrNull;
+      final templateSelected = selectedSkillDigest != null;
       final pending = run?.pending ?? const <ToolApprovalView>[];
       return Card(
         child: Padding(
@@ -197,72 +212,85 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                   border: OutlineInputBorder(),
                 ),
               ),
-              CheckboxListTile(
-                title: const Text('允许任务询问补充信息'),
-                value: allowQuestions,
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-                onChanged:
-                    busy || controller.active || controller.startUnconfirmed
-                    ? null
-                    : (value) =>
-                          setState(() => allowQuestions = value ?? false),
-              ),
-              CheckboxListTile(
-                title: const Text('允许提出新建文件请求'),
-                subtitle: Text(
-                  creation == null
-                      ? '请先在创建权限区域选择同一文件夹；每个文件仍需单独批准。'
-                      : '只允许创建新文件，不覆盖现有内容。每次创建前会显示完整路径和内容。',
+              if (controller.supportsSkills)
+                LocalSkillPicker(
+                  controller: controller,
+                  selectedDigest: selectedSkillDigest,
+                  locked:
+                      busy || controller.active || controller.startUnconfirmed,
+                  onChanged: (digest) =>
+                      setState(() => selectedSkillDigest = digest),
                 ),
-                value: allowCreation && creation != null,
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-                onChanged:
-                    creation == null ||
-                        busy ||
-                        controller.active ||
-                        controller.startUnconfirmed
-                    ? null
-                    : (value) => setState(() => allowCreation = value ?? false),
-              ),
-              CheckboxListTile(
-                title: const Text('允许提出修改现有文件请求'),
-                subtitle: Text(
-                  editing == null
-                      ? '请先单独选择同一文件夹的编辑权限；每次修改仍须批准。'
-                      : '每次先读取实际差异，不会因打开此选项自动执行。',
-                ),
-                value: allowEditing && editing != null,
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-                onChanged:
-                    editing == null ||
-                        busy ||
-                        controller.active ||
-                        controller.startUnconfirmed
-                    ? null
-                    : (value) => setState(() => allowEditing = value ?? false),
-              ),
-              if (widget.memory != null) ...[
+              if (!templateSelected) ...[
                 CheckboxListTile(
-                  value: allowMemory,
-                  title: Text('允许本次任务读取记忆空间 ${widget.memory!.scopeId}'),
-                  onChanged: busy || controller.active
+                  title: const Text('允许任务询问补充信息'),
+                  value: allowQuestions,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged:
+                      busy || controller.active || controller.startUnconfirmed
                       ? null
-                      : (v) => setState(() {
-                          allowMemory = v ?? false;
-                          writeMemory = false;
-                        }),
+                      : (value) =>
+                            setState(() => allowQuestions = value ?? false),
                 ),
-                if (allowMemory && widget.memoryWrite)
+                CheckboxListTile(
+                  title: const Text('允许提出新建文件请求'),
+                  subtitle: Text(
+                    creation == null
+                        ? '请先在创建权限区域选择同一文件夹；每个文件仍需单独批准。'
+                        : '只允许创建新文件，不覆盖现有内容。每次创建前会显示完整路径和内容。',
+                  ),
+                  value: allowCreation && creation != null,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged:
+                      creation == null ||
+                          busy ||
+                          controller.active ||
+                          controller.startUnconfirmed
+                      ? null
+                      : (value) =>
+                            setState(() => allowCreation = value ?? false),
+                ),
+                CheckboxListTile(
+                  title: const Text('允许提出修改现有文件请求'),
+                  subtitle: Text(
+                    editing == null
+                        ? '请先单独选择同一文件夹的编辑权限；每次修改仍须批准。'
+                        : '每次先读取实际差异，不会因打开此选项自动执行。',
+                  ),
+                  value: allowEditing && editing != null,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged:
+                      editing == null ||
+                          busy ||
+                          controller.active ||
+                          controller.startUnconfirmed
+                      ? null
+                      : (value) =>
+                            setState(() => allowEditing = value ?? false),
+                ),
+                if (widget.memory != null) ...[
                   CheckboxListTile(
-                    value: writeMemory,
-                    title: const Text('允许提出记忆修改，逐次确认'),
+                    value: allowMemory,
+                    title: Text('允许本次任务读取记忆空间 ${widget.memory!.scopeId}'),
                     onChanged: busy || controller.active
                         ? null
-                        : (v) => setState(() => writeMemory = v ?? false),
+                        : (v) => setState(() {
+                            allowMemory = v ?? false;
+                            writeMemory = false;
+                          }),
                   ),
+                  if (allowMemory && widget.memoryWrite)
+                    CheckboxListTile(
+                      value: writeMemory,
+                      title: const Text('允许提出记忆修改，逐次确认'),
+                      onChanged: busy || controller.active
+                          ? null
+                          : (v) => setState(() => writeMemory = v ?? false),
+                    ),
+                ],
               ],
               const SizedBox(height: 12),
               Wrap(
@@ -274,6 +302,9 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                         busy ||
                             controller.active ||
                             controller.startUnconfirmed ||
+                            (templateSelected &&
+                                (controller.skillBusy ||
+                                    chosenSkill?.enabled != true)) ||
                             controller.model == null ||
                             selectedId == null ||
                             prompt.text.trim().isEmpty
@@ -281,6 +312,7 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                         : () => controller.start(
                             selectedId,
                             prompt.text,
+                            skill: chosenSkill,
                             allowQuestions: allowQuestions,
                             memory: allowMemory && widget.memory != null
                                 ? mem.TaskMemorySelection(
@@ -514,6 +546,14 @@ class _AgentPanelState extends State<AgentPanel> with WidgetsBindingObserver {
                   ),
                 if (pending.isNotEmpty && !controller.supportedPreview)
                   const Text('当前版本无法批准此工具权限，请停止会话。'),
+                if (run.finalText != null &&
+                    (run.sourceReferences?.isNotEmpty ?? false)) ...[
+                  Text('已核对的来源', style: Theme.of(context).textTheme.titleSmall),
+                  for (final ref in run.sourceReferences!)
+                    SelectableText(
+                      '${ref.path} · 字节 [${ref.startByte}, ${ref.endByte}) · SHA-256 ${ref.sha256}',
+                    ),
+                ],
                 if (run.finalText != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),

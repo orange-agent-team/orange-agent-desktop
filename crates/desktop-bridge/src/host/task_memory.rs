@@ -117,6 +117,7 @@ impl HostRegistry {
             prompt,
             interactive,
             runs::WriteSelection {
+                skill: None,
                 memory: Some(selection),
                 creation: selection
                     .creation

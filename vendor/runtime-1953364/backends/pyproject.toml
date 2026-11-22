@@ -1,0 +1,20 @@
+[project]
+name = "orange-inference-backends"
+version = "0.3.2"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.optional-dependencies]
+transcription = ["faster-whisper==1.2.1", "numpy==2.2.6"]
+embedding = [
+    "numpy==2.2.6",
+    "onnxruntime==1.23.2",
+    "tokenizers==0.22.1",
+]
+
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["orange_inference_backends"]

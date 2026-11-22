@@ -394,6 +394,7 @@ pub(crate) async fn start_editing_run(
                 &prompt,
                 interactive,
                 runs::WriteSelection {
+                    skill: None,
                     memory: None,
                     creation: creation
                         .as_ref()
