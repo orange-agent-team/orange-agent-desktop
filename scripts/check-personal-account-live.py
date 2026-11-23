@@ -63,6 +63,7 @@ def main():
     cli.add_argument("--server-repo",type=Path,required=True,help="Fixed server checkout providing the development DB helpers")
     cli.add_argument("--server-binary",type=Path,required=True,help="Locally built orange-user-api")
     cli.add_argument("--environment",type=Path,required=True)
+    cli.add_argument("--native-app",action="store_true",help="Launch the native macOS Flutter application and drive its real controls")
     cli.add_argument("--bridge",type=Path,help="Framework executable extracted from this desktop commit")
     args=cli.parse_args();private=args.environment.resolve();binary=args.server_binary.resolve(strict=True)
     sys.path.insert(0,str(args.server_repo.resolve()/"scripts"))
@@ -72,7 +73,11 @@ def main():
     env,tools=tool_environment()
     env.update(CARGO_NET_OFFLINE="true",CARGO_INCREMENTAL="0")
     env.setdefault("CARGO_BUILD_JOBS","2")
-    if args.bridge:
+    if args.native_app and args.bridge:raise ValueError("Choose native application or explicit framework")
+    if args.native_app:
+        if platform.system()!="Darwin":raise ValueError("macOS app qualification required")
+        library=None
+    elif args.bridge:
         library=args.bridge.resolve(strict=True)
     else:
         subprocess.run([tools["cargo"],"build","--locked","--offline","-p","orange-desktop-bridge"],cwd=ROOT,env=env,check=True)
@@ -109,11 +114,22 @@ def main():
                     raise RuntimeError("Could not issue the scoped fixture")
                 return kid,value
             wallet,wkey=issue("wallet:read");budget,bkey=issue("budgets:read")
-            runtime=dict(env,ORANGE_TEST_ACCOUNT_LIBRARY=str(library),ORANGE_TEST_ACCOUNT_WALLET_KEY=wkey,
-                         ORANGE_TEST_ACCOUNT_BUDGET_KEY=bkey,ORANGE_TEST_ACCOUNT_DIRECTORY=str(tmp),ORANGE_TEST_ACCOUNT_OWNER=uid)
+            runtime=dict(env,ORANGE_TEST_ACCOUNT_DIRECTORY=str(tmp))
+            if args.native_app:
+                # Only the host-side driver opens this private, one-use file. No tokens in
+                # application build definitions, command arguments or driver communications logs.
+                transient=tmp/"driver-input.json";transient.touch(mode=0o600)
+                transient.write_text(json.dumps({"wallet":wkey,"budgets":bkey}))
+                command=[tools["flutter"],"--suppress-analytics","drive","--no-pub","-d","macos",
+                         "--target=test_driver/personal_account_app.dart","--driver=test_driver/personal_account_driver.dart"]
+                marker="NATIVE_ACCOUNT_WINDOW_CONFIRMED"
+            else:
+                runtime.update(ORANGE_TEST_ACCOUNT_LIBRARY=str(library),ORANGE_TEST_ACCOUNT_WALLET_KEY=wkey,
+                               ORANGE_TEST_ACCOUNT_BUDGET_KEY=bkey,ORANGE_TEST_ACCOUNT_OWNER=uid)
+                command=[tools["flutter"],"--suppress-analytics","test","--no-pub","--reporter","expanded","acceptance/personal_account_test.dart"]
+                marker="All tests passed!"
             with tempfile.TemporaryFile() as output:
-                child=subprocess.Popen([tools["flutter"],"--suppress-analytics","test","--no-pub","--reporter","expanded",
-                    "acceptance/personal_account_test.dart"],cwd=APP,env=runtime,stdout=output,stderr=subprocess.STDOUT)
+                child=subprocess.Popen(command,cwd=APP,env=runtime,stdout=output,stderr=subprocess.STDOUT)
                 revoked=False
                 try:
                     deadline=time.monotonic()+900
@@ -125,11 +141,12 @@ def main():
                         time.sleep(.05)
                     output.seek(0);log=output.read().decode(errors="replace")
                     print(log.replace(wkey,"[redacted]").replace(bkey,"[redacted]").replace(cookie,"[redacted]").replace(csrf,"[redacted]"),flush=True)
-                    if child.returncode or not revoked or "All tests passed!" not in log or counts["budgets"]<3 or counts["wallet"]<3:
+                    if child.returncode or not revoked or marker not in log or counts["budgets"]<(1 if args.native_app else 3) or counts["wallet"]<(2 if args.native_app else 3):
                         raise RuntimeError("Incomplete native/Flutter qualification")
                 finally:
                     if child.poll() is None:child.terminate();child.wait(timeout=15)
             if manage(budget,"DELETE")!=204:raise RuntimeError("Budget credential cleanup failed")
-            print("PASS actual Flutter panel, Rust bridge, validated local TLS, exact wallet and paged budgets, scope denial, live revocation and view clearing")
+            if args.native_app:print("PASS actual macOS application, native controls, exact live wallet, post-revocation denial and read-only budgets")
+            else:print("PASS actual Flutter panel, Rust bridge, validated local TLS, exact wallet and paged budgets, scope denial, live revocation and view clearing")
 if __name__=="__main__":
     main()

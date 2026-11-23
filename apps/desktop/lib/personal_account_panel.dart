@@ -185,6 +185,7 @@ class _PersonalAccountPanelState extends State<PersonalAccountPanel>
                 title: const Text('本机开发证书'),
                 children: [
                   TextField(
+                    key: const ValueKey('personal-account-ca'),
                     controller: _certificate,
                     maxLength: 16384,
                     maxLines: 3,
@@ -197,6 +198,7 @@ class _PersonalAccountPanelState extends State<PersonalAccountPanel>
                 ],
               ),
             TextField(
+              key: const ValueKey('personal-account-key'),
               controller: _keyText,
               maxLength: 105,
               obscureText: true,
@@ -207,6 +209,7 @@ class _PersonalAccountPanelState extends State<PersonalAccountPanel>
               onChanged: (_) => setState(_clear),
             ),
             DropdownButton<String>(
+              key: const ValueKey('personal-account-scope'),
               value: _scope,
               items: const [
                 DropdownMenuItem(value: 'wallet', child: Text('个人钱包')),

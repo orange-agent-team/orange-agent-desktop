@@ -15,7 +15,7 @@
     "crates/desktop-bridge/src/api/mod.rs": "04ff82ba447aed8d097e4d05130d59a2c381f31a0e5c04cc1c4e390a64474e54",
     "crates/desktop-bridge/src/api/host.rs": "1d1a228a5c116b9bf2e0dc985a4ced1317cd533ff39ecb1c33cdad5dc0b69f4e",
     "apps/desktop/flutter_rust_bridge.yaml": "afd300908942aab6ffcccf880fb16aae8cb6b738365bd96190f77a052c1860bb",
-    "apps/desktop/pubspec.lock": "f21742a97d2b7109c429899ef2ede4d95e4e9d71f93363f9dcbd00cc959689c9",
+    "apps/desktop/pubspec.lock": "05b956c54a5447c9eebd9d6f3170fafd5fa327cd179795ac51e6f42f55703106",
     "crates/desktop-bridge/src/api/account.rs": "fd72ff08059dcf7577c1a50902691c3cd88a78bd65af0281db2bc48cbb0506fd",
     "crates/desktop-bridge/src/api/memory.rs": "6614d10e82e8a64294e61c43198e47f1e12ef36497707efbb7da1583ccb315b1",
     "config/personal-account-origin.json": "c15beecfcc36eeff19eb419fb2109e97a7c89a4687af0f1a0fa840495a8dcbe3",
