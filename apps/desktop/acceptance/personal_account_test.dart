@@ -149,6 +149,7 @@ void main() {
       }
 
       await visible(find.text('本机开发证书'));
+      await tester.ensureVisible(find.text('本机开发证书'));
       await tester.tap(find.text('本机开发证书'));
       await tester.pumpAndSettle();
       Finder input(String label) => find.byWidgetPredicate(
@@ -156,7 +157,9 @@ void main() {
             widget is TextField && widget.decoration?.labelText == label,
       );
       await tester.enterText(input('公开 TLS 证书（PEM）'), ca);
+      await tester.ensureVisible(input('个人只读密钥'));
       await tester.enterText(input('个人只读密钥'), budgetKey);
+      await tester.ensureVisible(find.byType(DropdownButton<String>));
       await tester.tap(find.byType(DropdownButton<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('个人预算').last);
