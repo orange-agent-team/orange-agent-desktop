@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'src/rust/api/host.dart';
 import 'src/rust/frb_generated.dart';
 import 'local_agent_shell.dart';
+import 'desktop_connection.dart';
 
 Future<String> applicationDataDirectory() async {
   if (Platform.isMacOS) {
@@ -30,17 +31,21 @@ Future<String> applicationDataDirectory() async {
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final nativeReady = RustLib.init();
-  runApp(
-    OrangeDesktopApp(
-      connect: () async {
-        await nativeReady;
-        return initializeHost(
-          applicationDataDirectory: await applicationDataDirectory(),
-        );
-      },
+  final connection = DesktopConnection(
+    initializeBridge: () async {
+      try {
+        await RustLib.init();
+      } catch (_) {
+        // FRB may have opened its ports before running the Rust initializer.
+        if (RustLib.instance.initialized) RustLib.dispose();
+        rethrow;
+      }
+    },
+    openHost: () async => initializeHost(
+      applicationDataDirectory: await applicationDataDirectory(),
     ),
   );
+  runApp(OrangeDesktopApp(connect: connection.connect));
 }
 
 class OrangeDesktopApp extends StatefulWidget {
@@ -56,12 +61,7 @@ class OrangeDesktopApp extends StatefulWidget {
 }
 
 class _OrangeDesktopAppState extends State<OrangeDesktopApp> {
-  late Future<HostView> host;
-  @override
-  void initState() {
-    super.initState();
-    host = widget.connect();
-  }
+  Future<HostView>? host;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -79,7 +79,7 @@ class _OrangeDesktopAppState extends State<OrangeDesktopApp> {
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: FutureBuilder<HostView>(
-              future: host,
+              future: host ??= Future.sync(widget.connect),
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
                   return const Column(
@@ -92,24 +92,41 @@ class _OrangeDesktopAppState extends State<OrangeDesktopApp> {
                   );
                 }
                 if (snapshot.hasError || !snapshot.hasData) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.lock_outline, size: 40),
-                      const SizedBox(height: 20),
-                      const Text('本地记录暂时无法打开'),
-                      const SizedBox(height: 8),
-                      const Text(
-                        '请确认没有其他 Orange Agent 实例占用记录，并检查应用数据目录权限。',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        onPressed: () =>
-                            setState(() => host = widget.connect()),
-                        child: const Text('重试'),
-                      ),
-                    ],
+                  final error = snapshot.error;
+                  final bridgeError = error is BridgeStartupFailure;
+                  final busy =
+                      error is BridgeError && error.code == 'HOST_BUSY';
+                  return SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          bridgeError
+                              ? Icons.extension_off
+                              : Icons.lock_outline,
+                          size: 40,
+                        ),
+                        const SizedBox(height: 20),
+                        Text(bridgeError ? '本地运行组件未能启动' : '本地记录暂时无法打开'),
+                        const SizedBox(height: 8),
+                        Text(
+                          bridgeError
+                              ? '请确认应用安装完整，再重试加载。'
+                              : busy
+                              ? '其他 Orange Agent 进程正在使用本地记录。关闭该进程后可以重试。'
+                              : '请确认应用数据目录可用，并检查目录权限。',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton(
+                          autofocus: true,
+                          onPressed: () => setState(() {
+                            host = null;
+                          }),
+                          child: const Text('重试'),
+                        ),
+                      ],
+                    ),
                   );
                 }
                 final info = snapshot.requireData;
