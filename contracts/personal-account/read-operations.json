@@ -1,0 +1,283 @@
+{
+  "paths": {
+    "/api/v1/automation/account/wallet": {
+      "get": {
+        "operationId": "readAutomationWallet",
+        "security": [
+          {
+            "PersonalAutomationKey": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Requires wallet:read. Browser cookies are refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Current authority or transaction rejected. Retry a mutation only with its original key and body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/automation/account/budgets": {
+      "get": {
+        "operationId": "readAutomationBudgets",
+        "security": [
+          {
+            "PersonalAutomationKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Requires budgets:read. Browser cookies are refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalBudgetList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Current authority or transaction rejected. Retry a mutation only with its original key and body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "request_id",
+          "retry_class"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "retry_class": {
+            "type": "string"
+          }
+        }
+      },
+      "WalletView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "user_id",
+          "owner_id",
+          "gift",
+          "earned",
+          "purchased",
+          "reserved_gift",
+          "reserved_earned",
+          "reserved_purchased",
+          "pending_earned"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          },
+          "owner_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          },
+          "gift": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          },
+          "earned": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          },
+          "purchased": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          },
+          "reserved_gift": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          },
+          "reserved_earned": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          },
+          "reserved_purchased": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          },
+          "pending_earned": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          }
+        }
+      },
+      "PersonalBudgetList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "user_id",
+          "owner_id",
+          "data",
+          "next_cursor"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          },
+          "owner_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          },
+          "data": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/BudgetView"
+            }
+          },
+          "next_cursor": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.:-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "BudgetView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "root_budget_id",
+          "scope_id",
+          "limit",
+          "spent",
+          "reserved",
+          "status"
+        ],
+        "properties": {
+          "root_budget_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          },
+          "scope_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.:-]+$"
+          },
+          "limit": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          },
+          "spent": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          },
+          "reserved": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$",
+            "description": "Canonical microcredits. Checked Rust money also rejects values above 9223372036854775807. Never a JS number."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closing",
+              "closed"
+            ]
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "PersonalAutomationKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "oa1.<canonical-uuidv4>.<64-lowercase-hex>"
+      }
+    }
+  }
+}

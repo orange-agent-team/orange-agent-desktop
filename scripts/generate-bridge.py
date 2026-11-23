@@ -20,7 +20,7 @@ if rust_hash!=dart_hash:raise SystemExit('Rust/Dart codegen hash mismatch')
 files=[rust_file,*sorted((APP/'lib/src/rust').rglob('*.dart'))]
 inputs=[ROOT/'Cargo.toml',ROOT/'Cargo.lock',ROOT/'config/runtime.lock.json',ROOT/'config/bridge-tools.lock.json',ROOT/'crates/desktop-bridge/Cargo.toml',ROOT/'crates/desktop-bridge/rust-toolchain.toml',ROOT/'crates/desktop-bridge/src/lib.rs',ROOT/'crates/desktop-bridge/src/host.rs',ROOT/'crates/desktop-bridge/src/actor.rs',ROOT/'crates/desktop-bridge/src/host/runs.rs',ROOT/'crates/desktop-bridge/src/api/mod.rs',ROOT/'crates/desktop-bridge/src/api/host.rs',APP/'flutter_rust_bridge.yaml',APP/'pubspec.lock']
 inputs.extend(sorted((ROOT/'crates/desktop-bridge/src/api').rglob('*.rs')))
-inputs.extend([ROOT/'scripts/bridge_surface.py',ROOT/'scripts/generate-bridge.py'])
+inputs.extend([ROOT/'config/personal-account-origin.json',ROOT/'scripts/bridge_surface.py',ROOT/'scripts/generate-bridge.py'])
 inputs.extend(sorted((ROOT/'crates/desktop-bridge/src/service').rglob('*.rs')))
 inputs.extend(sorted((ROOT/'crates/desktop-bridge/src/host').rglob('*.rs')))
 inputs.extend(sorted((ROOT/'crates/desktop-bridge/src/actor').rglob('*.rs')))

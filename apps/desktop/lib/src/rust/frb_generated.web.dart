@@ -6,6 +6,7 @@
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
+import 'api/account.dart';
 import 'api/host.dart';
 import 'api/memory.dart';
 
@@ -209,6 +210,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<RemoteBudgetView> dco_decode_list_remote_budget_view(dynamic raw);
+
+  @protected
   List<RunSummary> dco_decode_list_run_summary(dynamic raw);
 
   @protected
@@ -337,6 +341,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   OwnerEntry dco_decode_owner_entry(dynamic raw);
 
   @protected
+  PersonalApiEndpoint dco_decode_personal_api_endpoint(dynamic raw);
+
+  @protected
   RecoveryDecisionView dco_decode_recovery_decision_view(dynamic raw);
 
   @protected
@@ -355,6 +362,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RecoveryWriteAccessView dco_decode_recovery_write_access_view(dynamic raw);
+
+  @protected
+  RemoteBudgetPage dco_decode_remote_budget_page(dynamic raw);
+
+  @protected
+  RemoteBudgetView dco_decode_remote_budget_view(dynamic raw);
+
+  @protected
+  RemoteWalletView dco_decode_remote_wallet_view(dynamic raw);
 
   @protected
   RemovalReview dco_decode_removal_review(dynamic raw);
@@ -646,6 +662,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<RemoteBudgetView> sse_decode_list_remote_budget_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<RunSummary> sse_decode_list_run_summary(SseDeserializer deserializer);
 
   @protected
@@ -796,6 +817,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   OwnerEntry sse_decode_owner_entry(SseDeserializer deserializer);
 
   @protected
+  PersonalApiEndpoint sse_decode_personal_api_endpoint(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RecoveryDecisionView sse_decode_recovery_decision_view(
     SseDeserializer deserializer,
   );
@@ -824,6 +850,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RecoveryWriteAccessView sse_decode_recovery_write_access_view(
     SseDeserializer deserializer,
   );
+
+  @protected
+  RemoteBudgetPage sse_decode_remote_budget_page(SseDeserializer deserializer);
+
+  @protected
+  RemoteBudgetView sse_decode_remote_budget_view(SseDeserializer deserializer);
+
+  @protected
+  RemoteWalletView sse_decode_remote_wallet_view(SseDeserializer deserializer);
 
   @protected
   RemovalReview sse_decode_removal_review(SseDeserializer deserializer);
@@ -1196,6 +1231,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_remote_budget_view(
+    List<RemoteBudgetView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_run_summary(
     List<RunSummary> self,
     SseSerializer serializer,
@@ -1391,6 +1432,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_owner_entry(OwnerEntry self, SseSerializer serializer);
 
   @protected
+  void sse_encode_personal_api_endpoint(
+    PersonalApiEndpoint self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_recovery_decision_view(
     RecoveryDecisionView self,
     SseSerializer serializer,
@@ -1423,6 +1470,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_recovery_write_access_view(
     RecoveryWriteAccessView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_remote_budget_page(
+    RemoteBudgetPage self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_remote_budget_view(
+    RemoteBudgetView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_remote_wallet_view(
+    RemoteWalletView self,
     SseSerializer serializer,
   );
 

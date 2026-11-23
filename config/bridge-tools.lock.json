@@ -189,6 +189,19 @@
         "suspendAccess",
         "uncertainTaskWrites"
       ]
+    },
+    "account": {
+      "classes": [
+        "PersonalApiEndpoint",
+        "RemoteBudgetPage",
+        "RemoteBudgetView",
+        "RemoteWalletView"
+      ],
+      "functions": [
+        "personalApiEndpoint",
+        "readPersonalBudgets",
+        "readPersonalWallet"
+      ]
     }
   }
 }

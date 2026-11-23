@@ -1,0 +1,7 @@
+{
+  "producer_repository": "orange-agent-server",
+  "producer_commit": "512548ae0e0f662411149e8891a6736b20e138cf",
+  "source": "contracts/openapi/account.v1.json",
+  "producer_sha256": "ea430e09926600f8faf60bdfe23a524af58d8ceb296496ec8383083a4ff4d1ac",
+  "snapshot_sha256": "2a6c2ea1c39563aa611e55eb8c5c25e969e159c74d03d275eec787f7c155142e"
+}

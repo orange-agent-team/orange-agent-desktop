@@ -6,6 +6,7 @@ import 'creation_panel.dart';
 import 'editing_panel.dart';
 import 'model_controller.dart';
 import 'model_panel.dart';
+import 'personal_account_panel.dart';
 import 'memory_controller.dart';
 import 'memory_panel.dart';
 import 'recovery_controller.dart';
@@ -128,6 +129,8 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
         ModelPanel(controller: models!),
         const SizedBox(height: 16),
       ],
+      PersonalAccountPanel(handle: widget.host.handle),
+      const SizedBox(height: 16),
       WorkspacePanel(
         host: widget.host,
         onChanged: changed,

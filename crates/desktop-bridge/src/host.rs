@@ -9,6 +9,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use uuid::Uuid;
+pub(crate) mod account;
 mod creation;
 #[cfg(target_vendor = "apple")]
 mod editing;
