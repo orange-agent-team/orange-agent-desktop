@@ -125,9 +125,7 @@ class _OrangeDesktopAppState extends State<OrangeDesktopApp> {
                         style: Theme.of(context).textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        '这是桌面端开发预览。可导入本地模型，按授权读取、新建和修改文件，并检查中断编辑；云端账户仍待接入。',
-                      ),
+                      const Text('可导入本地模型，按授权处理文件，或用个人只读密钥查看钱包和预算。'),
                       const SizedBox(height: 28),
                       LocalAgentShell(
                         key: ValueKey(info.handle),

@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_driver/driver_extension.dart';
-import 'package:orange_desktop/personal_account_panel.dart';
+import 'package:orange_desktop/main.dart' show OrangeDesktopApp;
 import 'package:orange_desktop/src/rust/api/host.dart' as host;
 import 'package:orange_desktop/src/rust/frb_generated.dart';
 
@@ -34,12 +34,9 @@ Future<void> main() async {
       applicationDataDirectory: await state.resolveSymbolicLinks(),
     );
     runApp(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: PersonalAccountPanel(handle: session.handle),
-          ),
-        ),
+      OrangeDesktopApp(
+        connect: () async => session,
+        modelServiceDirectory: () async => '${state.path}/model-service',
       ),
     );
     await WidgetsBinding.instance.endOfFrame;
