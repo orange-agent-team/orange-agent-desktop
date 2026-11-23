@@ -17,17 +17,29 @@ void main() {
   final budgetKey = environment['ORANGE_TEST_ACCOUNT_BUDGET_KEY']!;
   final ca = File('${root.path}/ca.pem').readAsStringSync();
   late api.HostView host;
+  var opened = false;
   setUpAll(() async {
     await RustLib.init(
       externalLibrary: ExternalLibrary.open(
         environment['ORANGE_TEST_ACCOUNT_LIBRARY']!,
       ),
     );
-    final journal = Directory('${root.path}/host')..createSync();
-    host = await api.initializeHost(applicationDataDirectory: journal.path);
+    final journal = Directory('${root.path}/host');
+    try {
+      host = await api.initializeHost(
+        applicationDataDirectory: journal.resolveSymbolicLinksSync(),
+      );
+      opened = true;
+    } on api.BridgeError catch (e) {
+      throw StateError(
+        'Private native test host refused initialization: ${e.code}',
+      );
+    }
   });
   tearDownAll(() async {
-    await api.closeHost(handle: host.handle);
+    if (opened) {
+      await api.closeHost(handle: host.handle);
+    }
     RustLib.dispose();
   });
   test('native bridge verifies TLS and returns scoped decimal wallet and budget pages', () async {

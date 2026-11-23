@@ -80,7 +80,8 @@ def main():
         library=Path(meta["target_directory"])/"debug"/("liborange_desktop_bridge.dylib" if platform.system()=="Darwin" else "liborange_desktop_bridge.so")
     reserve_origins(43122)
     with database(private/"database-url","orange_desktop_keys_") as (_,url),tempfile.TemporaryDirectory() as path:
-        tmp=Path(path)
+        tmp=Path(path).resolve(strict=True)
+        (tmp/"host").mkdir(mode=0o700)
         subprocess.run([sys.executable,ROOT/"scripts/prepare-personal-account-dev-tls.py","--output",tmp/"tls"],check=True)
         shutil.copyfile(tmp/"tls/ca.pem",tmp/"ca.pem")
         uid=str(uuid.uuid4());session_id=str(uuid.uuid4());cookie,csrf=secrets.token_hex(32),secrets.token_hex(32)
