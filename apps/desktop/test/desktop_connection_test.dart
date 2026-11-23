@@ -25,8 +25,9 @@ void main() {
         if (++loads == 1) await load.future;
       },
       openHost: () async {
-        if (++opens == 1)
+        if (++opens == 1) {
           throw const BridgeError(code: 'HOST_BUSY', correlationId: 'first');
+        }
         return host;
       },
     );
