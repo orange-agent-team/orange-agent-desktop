@@ -13,3 +13,9 @@ python3.12 scripts/prepare-personal-account-dev-tls.py --output .local/personal-
 Wallet 密钥访问 GET /api/v1/automation/account/wallet，Budgets 密钥访问 GET /api/v1/automation/account/budgets。FRB 暴露 personalApiEndpoint、readPersonalWallet 和 readPersonalBudgets 三个调用。每次读取独立验证当前 Host 句柄，固定目标、方法和凭据用途。预算翻页接受经过校验的游标及 1 至 100 的页大小。单次响应最多 64 KiB；同进程最多同时进行四次账户读取。UI 在折叠、切换 Host 或应用进入非活跃状态时清除令牌和结果，晚到响应须匹配原界面代次。密钥仅用于个人元数据读取，无法据此签发密钥、提交任务或付款。
 
 [锁定的生产者契约](../config/personal-api-contract.lock.json) · [本地读取接口快照](../contracts/personal-account/read-operations.json)
+
+可在桌面和服务端各完成本地双构建后执行下列验收。命令核验归档摘要，解出实际服务端和桌面框架，检查应用签名和桥 ABI，使用独立临时数据库读回金额、分页和撤销结果，最后驱动同一桌面源码构建的 macOS 测试窗口。
+
+```sh
+python3.12 scripts/check-installed-personal-account.py --server-repo ../orange-agent-server --environment ../orange-agent-server/.local --native-app
+```
