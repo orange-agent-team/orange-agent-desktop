@@ -149,8 +149,12 @@ void main() {
       }
 
       await visible(find.text('本机开发证书'));
+      // The endpoint can arrive on the first animation frame of the outer tile.
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('本机开发证书'));
-      await tester.tap(find.text('本机开发证书'));
+      await tester.pumpAndSettle();
+      await visible(find.text('本机开发证书').hitTestable());
+      await tester.tap(find.text('本机开发证书').hitTestable());
       await tester.pumpAndSettle();
       Finder input(String label) => find.byWidgetPredicate(
         (widget) =>
