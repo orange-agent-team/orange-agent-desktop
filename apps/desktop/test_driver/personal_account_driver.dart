@@ -24,7 +24,12 @@ Future<void> main() async {
     await d.enterText(value, timeout: wait);
   }
 
+  var attached = false;
   try {
+    attached = await d.requestData('wait-ready', timeout: wait) == 'ready';
+    if (!attached) {
+      throw StateError('Native fixture did not initialize');
+    }
     await tap(find.text('个人平台账户'));
     await tap(find.text('本机开发证书'));
     await type('personal-account-ca', ca);
@@ -54,7 +59,9 @@ Future<void> main() async {
     stdout.writeln('NATIVE_ACCOUNT_WINDOW_CONFIRMED');
   } finally {
     try {
-      await d.requestData('close-fixture', timeout: wait);
+      if (attached) {
+        await d.requestData('close-fixture', timeout: wait);
+      }
     } finally {
       await d.close();
     }
