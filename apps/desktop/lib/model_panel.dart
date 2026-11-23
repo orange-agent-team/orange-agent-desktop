@@ -80,7 +80,7 @@ class ModelPanel extends StatelessWidget {
                                 builder: (dialog) => AlertDialog(
                                   title: const Text('下载本地模型'),
                                   content: Text(
-                                    '从 Hugging Face 的固定模型版本下载 ${view.modelName}（${view.modelBytes} 字节）。下载完成后会核对文件摘要。工作区文件和会话文本保留在本机。',
+                                    '从 Hugging Face 下载审核版本的 ${view.modelName}（${view.modelBytes} 字节）。来源不可用时，可从已固定同一文件的 ModelScope 官方来源续传。完成后会核对文件摘要。工作区文件和会话文本保留在本机。',
                                   ),
                                   actions: [
                                     TextButton(

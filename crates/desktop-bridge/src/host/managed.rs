@@ -3,7 +3,7 @@ use crate::{
     api::host::ModelServiceView,
     service::{Client, Settings, cache_error},
 };
-use orange_model_runtime::cache::ModelCache;
+use orange_model_runtime::cache::{CacheError, ModelCache};
 
 impl HostRegistry {
     async fn configure_service(
@@ -216,10 +216,25 @@ pub(crate) async fn download_model(
     // No database actor or UI queue is held during transport. The cache independently
     // owns the digest lock, resumable partial and verified atomic publication.
     // ModelCache itself owns bounded retries, range validation and digest verification.
+    let transfer = async {
+        match cache.ensure(&spec).await {
+            Ok(artifact) => Ok(artifact),
+            Err(error) if origin_unavailable(&error) => {
+                let Some(alternate) = settings.bundle.alternate_spec()? else {
+                    return Err(cache_error(error));
+                };
+                eprintln!(
+                    "Reviewed model primary source unavailable; trying the pinned publisher alternate"
+                );
+                cache.ensure(&alternate).await.map_err(cache_error)
+            }
+            Err(error) => Err(cache_error(error)),
+        }
+    };
     let verified = tokio::select! {
         biased;
         _=cancelled.changed()=>false,
-        result=cache.ensure(&spec)=>{result.map_err(cache_error)?;true}
+        result=transfer=>{result?;true}
     };
     if !verified && !settings.check_installed().await? {
         return Err(failure("MODEL_DOWNLOAD_CANCELLED"));
@@ -278,4 +293,29 @@ pub(crate) async fn stop_model_service(
         rt.block_on(host.stop_service(&handle, &instance))
     })
     .await
+}
+
+fn origin_unavailable(error: &CacheError) -> bool {
+    matches!(
+        error,
+        CacheError::Timeout
+            | CacheError::Connection
+            | CacheError::Transport
+            | CacheError::Incomplete
+            | CacheError::Http(403 | 404 | 408 | 410 | 429 | 500..=599)
+    )
+}
+
+#[cfg(test)]
+mod origin_failover_tests {
+    use super::*;
+    #[test]
+    fn only_source_unavailability_can_switch_to_the_reviewed_alternate() {
+        assert!(origin_unavailable(&CacheError::Http(503)));
+        assert!(origin_unavailable(&CacheError::Timeout));
+        assert!(!origin_unavailable(&CacheError::Integrity));
+        assert!(!origin_unavailable(&CacheError::Protocol));
+        assert!(!origin_unavailable(&CacheError::Redirect));
+        assert!(!origin_unavailable(&CacheError::Http(401)));
+    }
 }

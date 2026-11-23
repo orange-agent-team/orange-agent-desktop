@@ -46,6 +46,51 @@ fn catalog_model_url(repo: &str, revision: &str, file: &str) -> Result<String, B
     Ok(url.into())
 }
 
+fn official_alternate(
+    model: &Value,
+    digest: &str,
+    bytes: u64,
+    file: &str,
+) -> Result<Option<ArtifactSpec>, BridgeError> {
+    let Some(alt) = model
+        .get("official_alternates")
+        .and_then(|v| v.get("modelscope"))
+    else {
+        return Ok(None);
+    };
+    let invalid = || failure("MODEL_CATALOG_INVALID");
+    let repo = alt["repository"].as_str().ok_or_else(invalid)?;
+    let revision = alt["revision"].as_str().ok_or_else(invalid)?;
+    if alt["sha256"].as_str() != Some(digest)
+        || alt["bytes"].as_u64() != Some(bytes)
+        || model["repository"].as_str() != Some(repo)
+        || model["file"].as_str() != Some(file)
+        || alt["verified_redirect_host"].as_str() != Some("cdn-lfs-cn-1.modelscope.cn")
+        || alt["source"].as_str() != Some(format!("https://modelscope.cn/models/{repo}").as_str())
+    {
+        return Err(invalid());
+    }
+    // Apply the same publisher, revision and filename validation as the primary catalogue.
+    catalog_model_url(repo, revision, file)?;
+    let (publisher, repository) = repo.split_once('/').ok_or_else(invalid)?;
+    let mut url = reqwest::Url::parse("https://modelscope.cn/").map_err(|_| invalid())?;
+    url.path_segments_mut()
+        .map_err(|_| invalid())?
+        .extend(["api", "v1", "models", publisher, repository, "repo"]);
+    url.query_pairs_mut()
+        .append_pair("Revision", revision)
+        .append_pair("FilePath", file);
+    ArtifactSpec::new(
+        url.as_str(),
+        digest,
+        bytes,
+        &["modelscope.cn", "cdn-lfs-cn-1.modelscope.cn"],
+        b"GGUF",
+    )
+    .map(Some)
+    .map_err(|_| invalid())
+}
+
 pub(super) fn catalog() -> Result<Value, BridgeError> {
     serde_json::from_str(include_str!(env!("ORANGE_DESKTOP_MODEL_CATALOG")))
         .map_err(|_| failure("MODEL_CATALOG_INVALID"))
@@ -179,6 +224,14 @@ impl Bundle {
         io::hash_file(&self.helper, &self.helper_sha, self.helper_bytes)?;
         io::hash_file(&self.backend, &self.backend_sha, self.backend_bytes)
     }
+    pub fn alternate_spec(&self) -> Result<Option<ArtifactSpec>, BridgeError> {
+        official_alternate(
+            &catalog()?["model"],
+            &self.model_sha,
+            self.model_bytes,
+            &self.model_name,
+        )
+    }
     pub fn spec(&self) -> Result<ArtifactSpec, BridgeError> {
         ArtifactSpec::new(
             &self.model_url,
@@ -246,5 +299,33 @@ mod tests {
             .code,
             "MODEL_INTEGRITY"
         );
+    }
+}
+
+#[cfg(test)]
+mod alternate_tests {
+    use super::*;
+    #[test]
+    fn exact_alternate_requires_the_same_publisher_digest_length_and_fixed_revision() {
+        let model = catalog().expect("pinned catalogue")["model"].clone();
+        let digest = model["sha256"].as_str().expect("digest");
+        let bytes = model["bytes"].as_u64().expect("size");
+        let file = model["file"].as_str().expect("file");
+        assert!(
+            official_alternate(&model, digest, bytes, file)
+                .expect("valid pin")
+                .is_some()
+        );
+        assert!(official_alternate(&model, &"a".repeat(64), bytes, file).is_err());
+        assert!(official_alternate(&model, digest, bytes - 1, file).is_err());
+        for (field, value) in [
+            ("revision", "main"),
+            ("repository", "other/repo"),
+            ("verified_redirect_host", "example.invalid"),
+        ] {
+            let mut bad = model.clone();
+            bad["official_alternates"]["modelscope"][field] = Value::String(value.into());
+            assert!(official_alternate(&bad, digest, bytes, file).is_err());
+        }
     }
 }
