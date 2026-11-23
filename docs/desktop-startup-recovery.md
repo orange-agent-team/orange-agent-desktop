@@ -2,4 +2,4 @@
 
 本地运行组件加载失败后，“重试”会重新加载桥接库。加载成功后，如果日志目录不可用或已经由另一个 Orange Agent 进程占用，修复目录或关闭占用者后即可重试打开本地记录。已经启动的运行组件可继续使用，多次点击会共享同一次连接尝试。错误页面支持通过键盘重试，且不会显示私有路径或异常正文。
 
-在已准备锁定 Flutter、Rust 和依赖缓存的 macOS ARM64 工作树运行 `python3.12 scripts/check-startup-retry.py`。验收包括同一尝试合并、键盘重试、实际缺失的动态库、不可用的文件路径、随后成功打开的私有目录与读取真实 Rust Host。使用 `--installed-bridge` 可进一步验证本次发行归档内的动态库。
+在已准备锁定 Flutter、Rust 和依赖缓存的 macOS ARM64 工作树运行 `python3.12 scripts/check-startup-retry.py`。验收包括同一尝试合并、键盘重试、实际缺失的动态库、不可用的文件路径、随后成功打开的私有目录与读取真实 Rust Host。使用 `--bridge-library` 可进一步验证本次发行归档内的动态库。
