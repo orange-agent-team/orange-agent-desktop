@@ -1,0 +1,5 @@
+{
+  "source_commit": "39530d4d01fbe565ccc1418398ac3b454cab9cc7",
+  "fixture": "contracts/fixtures/job-input-interop.v1.json",
+  "sha256": "e56294c016283b529129af5c8acb059d580ef677f6aef56ef8678e3af0c7f07d"
+}
