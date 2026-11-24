@@ -1,0 +1,51 @@
+[package]
+name = "orange-model-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+process-test-fixture = []
+embedding-host = ["dep:axum", "dep:tempfile"]
+image-host = ["dep:png", "dep:tempfile"]
+
+[[bin]]
+name = "orange-image"
+required-features = ["image-host"]
+
+[[bin]]
+name = "orange-embedding-host"
+required-features = ["embedding-host"]
+
+[[bin]]
+name = "model-process-fixture"
+required-features = ["process-test-fixture"]
+
+[[test]]
+name = "supervisor"
+required-features = ["process-test-fixture"]
+
+[dependencies]
+png = { version = "=0.18.1", optional = true }
+axum = { workspace = true, optional = true }
+jsonschema.workspace = true
+orange-domain.workspace = true
+orange-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+sha2.workspace = true
+hex.workspace = true
+libc.workspace = true
+rustix.workspace = true
+uuid.workspace = true
+tempfile = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

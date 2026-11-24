@@ -202,6 +202,20 @@
         "readPersonalBudgets",
         "readPersonalWallet"
       ]
+    },
+    "knowledge": {
+      "classes": [
+        "KnowledgeHit",
+        "KnowledgePage",
+        "KnowledgePassage",
+        "KnowledgeSelection"
+      ],
+      "functions": [
+        "closeKnowledgeCollection",
+        "openKnowledgeCollection",
+        "readKnowledgeCitation",
+        "searchSelectedKnowledge"
+      ]
     }
   }
 }

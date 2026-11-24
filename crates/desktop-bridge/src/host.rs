@@ -19,6 +19,7 @@ mod export_inspection;
 mod export_restoration;
 #[cfg(target_vendor = "apple")]
 mod export_retirement;
+pub(crate) mod knowledge;
 pub(crate) mod memory;
 #[cfg(target_vendor = "apple")]
 pub(crate) use export_restoration::*;
@@ -96,6 +97,8 @@ struct Host {
     journal: Journal,
     grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
     access_tokens: std::collections::HashMap<String, String>,
+    knowledge: std::collections::HashMap<String, knowledge::Session>,
+    closed_knowledge: std::collections::HashSet<String>,
     creations: std::collections::HashMap<String, creation::CreationSession>,
     memories: std::collections::HashMap<String, memory::MemorySession>,
     #[cfg(target_vendor = "apple")]
@@ -196,6 +199,8 @@ impl HostRegistry {
             view: view.clone(),
             journal,
             grants: std::collections::HashMap::new(),
+            knowledge: std::collections::HashMap::new(),
+            closed_knowledge: std::collections::HashSet::new(),
             access_tokens: std::collections::HashMap::new(),
             creations: std::collections::HashMap::new(),
             memories: std::collections::HashMap::new(),
@@ -299,6 +304,26 @@ impl HostRegistry {
             return Err(failure("WORKSPACE_SELECTION_CLOSED"));
         }
         let session_token = request.to_owned();
+        if host.access_tokens.get(&view.workspace_id) == Some(&session_token)
+            && controls
+                .workspaces
+                .get(&view.workspace_id)
+                .is_some_and(|signal| {
+                    signal.version == view.version
+                        && signal.session_token == session_token
+                        && !signal.grant.is_revoked()
+                })
+            && host
+                .grants
+                .get(&view.workspace_id)
+                .is_some_and(|current| !current.is_revoked())
+        {
+            // Replaying a lost authorization reply keeps the grant that owns the active read leases.
+            return Ok(project_workspace(host, view));
+        }
+        if host.access_tokens.get(&view.workspace_id) != Some(&session_token) {
+            knowledge::forget_workspace(host, &view.workspace_id);
+        }
         host.grants.insert(view.workspace_id.clone(), grant.clone());
         host.access_tokens
             .insert(view.workspace_id.clone(), session_token.clone());
@@ -334,6 +359,7 @@ impl HostRegistry {
             .journal
             .open_workspace(LOCAL_OWNER, id)
             .map_err(workspace_error)?;
+        knowledge::forget_workspace(host, id);
         host.grants.insert(id.into(), grant.clone());
         let session_token = Uuid::new_v4().to_string();
         host.access_tokens.insert(id.into(), session_token.clone());
@@ -379,6 +405,7 @@ impl HostRegistry {
             .map_err(workspace_error)?;
         host.grants.remove(id);
         host.access_tokens.remove(id);
+        knowledge::forget_workspace(host, id);
         signals
             .lock()
             .map_err(|_| failure("HOST_INTERNAL"))?
@@ -438,6 +465,7 @@ impl HostRegistry {
             grant.request_revoke();
         }
         host.access_tokens.remove(id);
+        knowledge::forget_workspace(host, id);
         let mut controls = signals.lock().map_err(|_| failure("HOST_INTERNAL"))?;
         controls.workspaces.remove(id);
         for run in runs {
@@ -695,7 +723,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "938bc63654127951ae52810ba91f44af4eafecf2"
+            "006ff38a3624cdd96e6d576afc3a4f5ca78b81ce"
         );
         assert_eq!(
             registry

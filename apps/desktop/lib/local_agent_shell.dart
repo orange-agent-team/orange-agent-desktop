@@ -8,6 +8,7 @@ import 'model_controller.dart';
 import 'model_panel.dart';
 import 'personal_account_panel.dart';
 import 'memory_controller.dart';
+import 'knowledge_panel.dart';
 import 'memory_panel.dart';
 import 'recovery_controller.dart';
 import 'recovery_panel.dart';
@@ -38,6 +39,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
   late final RetentionController retention;
   late final MemoryController memory;
   ModelController? models;
+  final knowledgePanel = GlobalKey<KnowledgePanelState>();
   List<WorkspaceView> workspaces = [];
   List<CreationAccessView> creations = [];
   List<EditingAccessView> editings = [];
@@ -135,6 +137,7 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
         host: widget.host,
         onChanged: changed,
         onAccessStopping: (id) {
+          knowledgePanel.currentState?.workspaceStopping(id);
           controller.hideContent(stoppingWorkspace: id);
           recovery.workspaceStopping(id);
           retention.workspaceStopping(id);
@@ -157,6 +160,12 @@ class _LocalAgentShellState extends State<LocalAgentShell> {
             );
           }
         },
+      ),
+      const SizedBox(height: 16),
+      KnowledgePanel(
+        key: knowledgePanel,
+        handle: widget.host.handle,
+        workspaces: workspaces,
       ),
       const SizedBox(height: 16),
       CreationPanel(

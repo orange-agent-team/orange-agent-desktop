@@ -5,6 +5,7 @@
 
 import 'api/account.dart';
 import 'api/host.dart';
+import 'api/knowledge.dart';
 import 'api/memory.dart';
 
 import 'dart:async';
@@ -44,6 +45,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ExportOutcomeView dco_decode_box_autoadd_export_outcome_view(dynamic raw);
 
   @protected
+  KnowledgeSelection dco_decode_box_autoadd_knowledge_selection(dynamic raw);
+
+  @protected
   LocalSkillSelection dco_decode_box_autoadd_local_skill_selection(dynamic raw);
 
   @protected
@@ -71,6 +75,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TaskMemorySelection dco_decode_box_autoadd_task_memory_selection(dynamic raw);
+
+  @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
 
   @protected
   UserQuestionGroupView dco_decode_box_autoadd_user_question_group_view(
@@ -159,6 +166,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  KnowledgeHit dco_decode_knowledge_hit(dynamic raw);
+
+  @protected
+  KnowledgePage dco_decode_knowledge_page(dynamic raw);
+
+  @protected
+  KnowledgePassage dco_decode_knowledge_passage(dynamic raw);
+
+  @protected
+  KnowledgeSelection dco_decode_knowledge_selection(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
@@ -180,6 +199,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   List<ExportRetirementOutcomeView>
   dco_decode_list_export_retirement_outcome_view(dynamic raw);
+
+  @protected
+  List<KnowledgeHit> dco_decode_list_knowledge_hit(dynamic raw);
 
   @protected
   List<LocalSkillChoice> dco_decode_list_local_skill_choice(dynamic raw);
@@ -323,6 +345,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
   UserQuestionGroupView? dco_decode_opt_box_autoadd_user_question_group_view(
     dynamic raw,
   );
@@ -456,6 +481,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  KnowledgeSelection sse_decode_box_autoadd_knowledge_selection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   LocalSkillSelection sse_decode_box_autoadd_local_skill_selection(
     SseDeserializer deserializer,
   );
@@ -495,6 +525,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TaskMemorySelection sse_decode_box_autoadd_task_memory_selection(
     SseDeserializer deserializer,
   );
+
+  @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
   UserQuestionGroupView sse_decode_box_autoadd_user_question_group_view(
@@ -593,6 +626,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
+  KnowledgeHit sse_decode_knowledge_hit(SseDeserializer deserializer);
+
+  @protected
+  KnowledgePage sse_decode_knowledge_page(SseDeserializer deserializer);
+
+  @protected
+  KnowledgePassage sse_decode_knowledge_passage(SseDeserializer deserializer);
+
+  @protected
+  KnowledgeSelection sse_decode_knowledge_selection(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
@@ -622,6 +669,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   List<ExportRetirementOutcomeView>
   sse_decode_list_export_retirement_outcome_view(SseDeserializer deserializer);
+
+  @protected
+  List<KnowledgeHit> sse_decode_list_knowledge_hit(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<LocalSkillChoice> sse_decode_list_local_skill_choice(
@@ -799,6 +851,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   UserQuestionGroupView? sse_decode_opt_box_autoadd_user_question_group_view(
     SseDeserializer deserializer,
   );
@@ -965,6 +1020,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_knowledge_selection(
+    KnowledgeSelection self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_local_skill_selection(
     LocalSkillSelection self,
     SseSerializer serializer,
@@ -1017,6 +1078,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     TaskMemorySelection self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_user_question_group_view(
@@ -1142,6 +1206,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
+  void sse_encode_knowledge_hit(KnowledgeHit self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_knowledge_page(KnowledgePage self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_knowledge_passage(
+    KnowledgePassage self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_knowledge_selection(
+    KnowledgeSelection self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
@@ -1177,6 +1259,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_export_retirement_outcome_view(
     List<ExportRetirementOutcomeView> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_knowledge_hit(
+    List<KnowledgeHit> self,
     SseSerializer serializer,
   );
 
@@ -1410,6 +1498,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     RunPermissionSelection? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_user_question_group_view(
