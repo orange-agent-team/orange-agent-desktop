@@ -311,6 +311,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MemorySummary dco_decode_memory_summary(dynamic raw);
 
   @protected
+  ModelCacheView dco_decode_model_cache_view(dynamic raw);
+
+  @protected
   ModelConnectionView dco_decode_model_connection_view(dynamic raw);
 
   @protected
@@ -807,6 +810,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MemorySummary sse_decode_memory_summary(SseDeserializer deserializer);
+
+  @protected
+  ModelCacheView sse_decode_model_cache_view(SseDeserializer deserializer);
 
   @protected
   ModelConnectionView sse_decode_model_connection_view(
@@ -1446,6 +1452,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_memory_summary(MemorySummary self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_model_cache_view(
+    ModelCacheView self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_model_connection_view(

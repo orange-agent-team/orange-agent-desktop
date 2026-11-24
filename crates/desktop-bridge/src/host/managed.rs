@@ -1,9 +1,9 @@
 use super::*;
 use crate::{
-    api::host::ModelServiceView,
+    api::host::{ModelCacheView, ModelServiceView},
     service::{Client, Settings, cache_error},
 };
-use orange_model_runtime::cache::{CacheError, ModelCache};
+use orange_model_runtime::cache::{CacheError, CacheState, ModelCache, StagingCleanup};
 
 impl HostRegistry {
     async fn configure_service(
@@ -75,19 +75,19 @@ impl HostRegistry {
         request: &str,
     ) -> Result<ModelServiceView, BridgeError> {
         let service = self.service(handle)?;
-        let installed = match service.settings().check_installed().await {
+        let installed = match service.settings().verified_weight().await {
             Ok(value) => value,
             Err(error) => {
                 service.installed(false)?;
                 return Err(error);
             }
         };
-        if !installed {
+        let Some(weight) = installed else {
             service.installed(false)?;
             return Err(failure("MODEL_NOT_INSTALLED"));
-        }
+        };
         service.installed(true)?;
-        let view = service.start(request).await?;
+        let view = service.start(request, weight).await?;
         if view.phase == "ready" {
             let root = service.settings().root.clone();
             self.connect_managed_gateway(handle, &root).await?;
@@ -156,6 +156,49 @@ pub(crate) async fn configure_model_service(
 pub(crate) async fn inspect_model_service(handle: String) -> Result<ModelServiceView, BridgeError> {
     crate::actor::model_service(&handle)?.view()
 }
+pub(crate) async fn inspect_model_cache(handle: String) -> Result<ModelCacheView, BridgeError> {
+    let client = crate::actor::model_service(&handle)?;
+    let settings = client.settings();
+    let state = ModelCache::observe(&settings.cache, &settings.bundle.spec()?)
+        .await
+        .map_err(cache_error)?;
+    // Hashing may have outlived the initiating host handle.
+    crate::actor::model_service(&handle)?;
+    Ok(ModelCacheView {
+        state: match state.state {
+            CacheState::Absent => "absent",
+            CacheState::Staged => "staged",
+            CacheState::Verified => "verified",
+            CacheState::Invalid => "invalid",
+        }
+        .into(),
+        sha256: state.sha256,
+        expected_bytes: state.expected_bytes.to_string(),
+        download_staging_bytes: state.download_staging_bytes.map(|v| v.to_string()),
+        import_staging_bytes: state.import_staging_bytes.map(|v| v.to_string()),
+        read_lease_observed: state.read_lease_observed,
+    })
+}
+pub(crate) async fn discard_model_staging(handle: String) -> Result<ModelCacheView, BridgeError> {
+    let current = handle.clone();
+    crate::actor::call(handle.clone(), move |host, _| {
+        let client = host.service(&current)?;
+        let settings = client.settings();
+        let cache =
+            ModelCache::new(&settings.cache, 2 * 1024 * 1024 * 1024).map_err(cache_error)?;
+        match cache
+            .discard_staging(&settings.bundle.spec()?)
+            .map_err(cache_error)?
+        {
+            StagingCleanup::Released { .. } => Ok(()),
+            StagingCleanup::RetainedForSubscribers | StagingCleanup::WriterBusy => {
+                Err(failure("MODEL_CACHE_BUSY"))
+            }
+        }
+    })
+    .await?;
+    inspect_model_cache(handle).await
+}
 pub(crate) async fn current_model_connection(
     handle: String,
 ) -> Result<crate::api::host::ModelConnectionView, BridgeError> {
@@ -201,7 +244,7 @@ pub(crate) async fn download_model(
     handle: String,
     operation: String,
 ) -> Result<ModelServiceView, BridgeError> {
-    let mut cancelled = crate::actor::download_signal(&handle, &operation)?;
+    let cancelled = crate::actor::download_signal(&handle, &operation)?;
     let checked = handle.clone();
     let client = crate::actor::call(handle.clone(), move |host, _| host.service(&checked)).await?;
     if !matches!(client.view()?.phase.as_str(), "idle" | "stopped") {
@@ -216,28 +259,26 @@ pub(crate) async fn download_model(
     // No database actor or UI queue is held during transport. The cache independently
     // owns the digest lock, resumable partial and verified atomic publication.
     // ModelCache itself owns bounded retries, range validation and digest verification.
-    let transfer = async {
-        match cache.ensure(&spec).await {
-            Ok(artifact) => Ok(artifact),
-            Err(error) if origin_unavailable(&error) => {
-                let Some(alternate) = settings.bundle.alternate_spec()? else {
-                    return Err(cache_error(error));
-                };
-                eprintln!(
-                    "Reviewed model primary source unavailable; trying the pinned publisher alternate"
-                );
-                cache.ensure(&alternate).await.map_err(cache_error)
-            }
-            Err(error) => Err(cache_error(error)),
+    let result = match cache.ensure_with_cancel(&spec, cancelled.clone()).await {
+        Err(error) if origin_unavailable(&error) => {
+            let Some(alternate) = settings.bundle.alternate_spec()? else {
+                return Err(cache_error(error));
+            };
+            eprintln!(
+                "Reviewed model primary source unavailable; trying the pinned publisher alternate"
+            );
+            cache.ensure_with_cancel(&alternate, cancelled).await
         }
+        result => result,
     };
-    let verified = tokio::select! {
-        biased;
-        _=cancelled.changed()=>false,
-        result=transfer=>{result?;true}
-    };
-    if !verified && !settings.check_installed().await? {
-        return Err(failure("MODEL_DOWNLOAD_CANCELLED"));
+    match result {
+        Ok(_) => {}
+        Err(CacheError::Cancelled) => {
+            if !settings.check_installed().await? {
+                return Err(failure("MODEL_DOWNLOAD_CANCELLED"));
+            }
+        }
+        Err(error) => return Err(cache_error(error)),
     }
     let checked = handle.clone();
     crate::actor::call(handle, move |host, _| {

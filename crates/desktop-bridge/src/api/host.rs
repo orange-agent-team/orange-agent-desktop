@@ -61,6 +61,23 @@ pub struct ModelServiceView {
     pub instance_id: Option<String>,
     pub failure: Option<String>,
 }
+/// A point-in-time observation of the fixed model for the current host.
+#[derive(Debug, Clone)]
+pub struct ModelCacheView {
+    pub state: String,
+    pub sha256: String,
+    pub expected_bytes: String,
+    pub download_staging_bytes: Option<String>,
+    pub import_staging_bytes: Option<String>,
+    pub read_lease_observed: Option<bool>,
+}
+pub async fn inspect_model_cache(handle: String) -> Result<ModelCacheView, BridgeError> {
+    crate::host::inspect_model_cache(handle).await
+}
+/// Remove only inactive staging for the bundle-pinned model.
+pub async fn discard_model_staging(handle: String) -> Result<ModelCacheView, BridgeError> {
+    crate::host::discard_model_staging(handle).await
+}
 /// Paths and OS version come from the trusted native application environment.
 pub async fn configure_model_service(
     handle: String,

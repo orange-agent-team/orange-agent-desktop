@@ -597,6 +597,51 @@ void main() {
             });
         await tester.pumpWidget(OrangeDesktopApp(connect: () async => host));
         await until(tester, () => find.text('导入模型文件').evaluate().isNotEmpty);
+        Future<void> press(String label) async {
+          final button = find.text(label);
+          await tester.ensureVisible(button);
+          await tester.tap(button);
+          await tester.pump();
+        }
+
+        await press('核对权重缓存');
+        await until(tester, () => find.text('缓存中尚无权重').evaluate().isNotEmpty);
+        final emptyCache = await inspectModelCache(handle: host.handle);
+        expect(emptyCache.state, 'absent');
+        final cacheRoot = Directory('${data.path}/models');
+        final prefix = File('${cacheRoot.path}/${emptyCache.sha256}.part');
+        final localImport = File(
+          '${cacheRoot.path}/${emptyCache.sha256}.import',
+        );
+        final unrelated = File('${cacheRoot.path}/${'a' * 64}.part');
+        await prefix.writeAsBytes([1, 2, 3, 4, 5]);
+        await localImport.writeAsBytes([6, 7, 8]);
+        await unrelated.writeAsBytes([9]);
+        await press('核对权重缓存');
+        await until(
+          tester,
+          () => find
+              .text('下载暂存 5 / ${emptyCache.expectedBytes} 字节')
+              .evaluate()
+              .isNotEmpty,
+        );
+        expect(
+          find.text('导入暂存 3 / ${emptyCache.expectedBytes} 字节'),
+          findsOneWidget,
+        );
+        await press('清除未完成的模型文件');
+        await press('保留暂存');
+        await tester.pumpAndSettle();
+        expect(await prefix.exists(), isTrue);
+        await press('清除未完成的模型文件');
+        await press('确认清除');
+        await until(
+          tester,
+          () => find.text('已核对，本机没有该模型的暂存数据。').evaluate().isNotEmpty,
+        );
+        expect(await prefix.exists(), isFalse);
+        expect(await localImport.exists(), isFalse);
+        expect(await unrelated.readAsBytes(), [9]);
         await tester.ensureVisible(find.text('导入模型文件'));
         await tester.tap(find.text('导入模型文件'));
         await until(
@@ -607,6 +652,12 @@ void main() {
         await tester.ensureVisible(find.text('启动本地模型'));
         await tester.tap(find.text('启动本地模型'));
         await until(tester, () => find.text('服务已就绪').evaluate().isNotEmpty);
+        await press('核对权重缓存');
+        await until(
+          tester,
+          () => find.text('检测到权重文件正在被读取').evaluate().isNotEmpty,
+        );
+        expect(find.text('权重摘要已核验'), findsOneWidget);
         await tester.ensureVisible(find.text('选择文件夹'));
         await tester.tap(find.text('选择文件夹'));
         await tester.pumpAndSettle();
@@ -732,6 +783,13 @@ void main() {
         await tester.ensureVisible(find.text('停止本地模型'));
         await tester.tap(find.text('停止本地模型'));
         await until(tester, () => find.text('服务已停止').evaluate().isNotEmpty);
+        final stoppedCache = await inspectModelCache(handle: host.handle);
+        expect(stoppedCache.state, 'verified');
+        expect(stoppedCache.readLeaseObserved, isFalse);
+        expect(stoppedCache.sha256, emptyCache.sha256);
+        debugPrint(
+          'PASS actual Flutter cache inspection, confirmed staging cleanup, unrelated bytes retained and active model lease released on stop',
+        );
         expect(
           (await inspectModelService(handle: host.handle)).phase,
           'stopped',

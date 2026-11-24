@@ -33,22 +33,21 @@ impl Settings {
         })
     }
     pub(crate) async fn check_installed(&self) -> Result<bool, crate::api::host::BridgeError> {
-        let path = self.cache.join(format!("{}.gguf", self.bundle.model_sha));
-        match std::fs::symlink_metadata(&path) {
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(_) => Err(crate::host::failure("MODEL_STORAGE_UNAVAILABLE")),
-            Ok(_) => {
-                let cache = orange_model_runtime::cache::ModelCache::new(
-                    &self.cache,
-                    2 * 1024 * 1024 * 1024,
-                )
+        Ok(self.verified_weight().await?.is_some())
+    }
+    pub(crate) async fn verified_weight(
+        &self,
+    ) -> Result<Option<orange_model_runtime::cache::VerifiedArtifact>, crate::api::host::BridgeError>
+    {
+        use orange_model_runtime::cache::{ArtifactSpec, CacheError, ModelCache};
+        let cache = ModelCache::new(&self.cache, 2 * 1024 * 1024 * 1024).map_err(cache_error)?;
+        let spec =
+            ArtifactSpec::local_only(&self.bundle.model_sha, self.bundle.model_bytes, b"GGUF")
                 .map_err(cache_error)?;
-                cache
-                    .import_file(&self.bundle.spec()?, &path)
-                    .await
-                    .map_err(cache_error)?;
-                Ok(true)
-            }
+        match cache.ensure(&spec).await {
+            Ok(weight) => Ok(Some(weight)),
+            Err(CacheError::LocalFileRequired) => Ok(None),
+            Err(e) => Err(cache_error(e)),
         }
     }
 }
@@ -58,6 +57,8 @@ pub(crate) fn cache_error(
     use orange_model_runtime::cache::CacheError;
     crate::host::failure(match error {
         CacheError::Cancelled => "MODEL_IMPORT_CANCELLED",
+        CacheError::RepresentationChanged => "MODEL_DOWNLOAD_REPRESENTATION_CHANGED",
+        CacheError::CleanupPending => "MODEL_CACHE_CLEANUP_PENDING",
         CacheError::Redirect => "MODEL_DOWNLOAD_SOURCE_DENIED",
         CacheError::Connection => "MODEL_DOWNLOAD_CONNECTION",
         CacheError::Timeout => "MODEL_DOWNLOAD_TIMEOUT",

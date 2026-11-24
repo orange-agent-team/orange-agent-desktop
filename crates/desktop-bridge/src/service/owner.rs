@@ -3,6 +3,7 @@ use crate::{
     api::host::{BridgeError, ModelServiceView},
     host::failure,
 };
+use orange_model_runtime::cache::VerifiedArtifact;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -57,6 +58,7 @@ struct Shared {
 enum Work {
     Start {
         index: usize,
+        weight: VerifiedArtifact,
         cancel: watch::Receiver<bool>,
         reply: oneshot::Sender<Result<ModelServiceView, BridgeError>>,
     },
@@ -74,6 +76,7 @@ pub(crate) struct Client {
     alive: Arc<AtomicBool>,
 }
 struct Owned {
+    _weight: VerifiedArtifact,
     child: Child,
     input: Option<ChildStdin>,
     output: BufReader<ChildStdout>,
@@ -332,7 +335,11 @@ impl Client {
         }
         Ok(target)
     }
-    pub async fn start(&self, request: &str) -> Result<ModelServiceView, BridgeError> {
+    pub async fn start(
+        &self,
+        request: &str,
+        weight: VerifiedArtifact,
+    ) -> Result<ModelServiceView, BridgeError> {
         if !orange_protocol::valid_id(request) {
             return Err(failure("INVALID_MODEL_REQUEST"));
         }
@@ -387,6 +394,7 @@ impl Client {
                 .queue
                 .try_send(Work::Start {
                     index,
+                    weight,
                     cancel: receiver,
                     reply,
                 })
@@ -540,6 +548,7 @@ async fn start_owned(
     state: &Arc<Mutex<Shared>>,
     owned: &mut Option<Owned>,
     index: usize,
+    weight: VerifiedArtifact,
     mut cancel: watch::Receiver<bool>,
     mut closing: watch::Receiver<bool>,
 ) -> Result<ModelServiceView, BridgeError> {
@@ -569,7 +578,7 @@ async fn start_owned(
     io::write_json(
         &settings.root.join("profile.json"),
         &serde_json::json!({"protocol":1,"runtime_directory":settings.root,"socket_directory":settings.ipc,"executable":settings.bundle.backend,"executable_sha256":settings.bundle.backend_sha,
-        "model":settings.cache.join(format!("{}.gguf",settings.bundle.model_sha)),"model_sha256":settings.bundle.model_sha,"model_bytes":settings.bundle.model_bytes,"model_version":ALIAS,"context_tokens":4096,"startup_timeout_seconds":settings.startup_seconds,"control_nonce":nonce,"instance_id":instance}),
+        "model":weight.path(),"model_sha256":settings.bundle.model_sha,"model_bytes":settings.bundle.model_bytes,"model_version":ALIAS,"context_tokens":4096,"startup_timeout_seconds":settings.startup_seconds,"control_nonce":nonce,"instance_id":instance}),
     )?;
     if *cancel.borrow() || *closing.borrow() {
         change(
@@ -604,6 +613,7 @@ async fn start_owned(
         .ok_or_else(|| failure("MODEL_START_FAILED"))?;
     let diagnostics = tokio::spawn(diagnostics::collect(error_output));
     *owned = Some(Owned {
+        _weight: weight,
         child,
         input: Some(input),
         output: BufReader::new(output),
@@ -676,8 +686,8 @@ async fn run(
             _=close.changed()=>break,
             command=queue.recv()=>match command {
                 None=>break,
-                Some(Work::Start{index,cancel,reply})=>{
-                    let result=start_owned(&settings,&state,&mut owned,index,cancel,close.clone()).await;
+                Some(Work::Start{index,weight,cancel,reply})=>{
+                    let result=start_owned(&settings,&state,&mut owned,index,weight,cancel,close.clone()).await;
                     if let Err(error)=&result {
                         if owned.is_some(){let _=stop_owned(&settings,&state,&mut owned).await;}
                         else {let phase=if error.code=="MODEL_RECOVERY_REQUIRED" || error.code=="MODEL_START_UNCONFIRMED" {"recovery_required"}else{"stopped"};let _=change(&settings,&state,index,phase,Some(&error.code));}
@@ -736,6 +746,20 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+    async fn test_weight(root: &std::path::Path) -> VerifiedArtifact {
+        use orange_model_runtime::cache::{ArtifactSpec, ModelCache};
+        use sha2::{Digest, Sha256};
+        let bytes = b"GGUF process fixture";
+        let digest = hex::encode(Sha256::digest(bytes));
+        let cache_root = root.join("test-verified-cache");
+        let cache = ModelCache::new(&cache_root, 4096).expect("owned test cache");
+        std::fs::write(cache_root.join(format!("{digest}.gguf")), bytes).expect("fixture bytes");
+        cache
+            .ensure(&ArtifactSpec::local_only(&digest, bytes.len() as u64, b"GGUF").expect("spec"))
+            .await
+            .expect("verified fixture")
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn completed_helper_failure_is_preserved_and_diagnostic_errors_never_leave_ready() {
@@ -809,6 +833,7 @@ mod tests {
                     .expect("owned diagnostic-path fault");
             }
             let mut owned = Some(Owned {
+                _weight: test_weight(&root).await,
                 child,
                 input,
                 output,
@@ -915,7 +940,7 @@ mod tests {
         };
         assert_eq!(
             client
-                .start("rejected-start")
+                .start("rejected-start", test_weight(&root).await)
                 .await
                 .expect_err("closed queue")
                 .code,
@@ -928,7 +953,7 @@ mod tests {
             Client::new(settings, true).expect("known not-dispatched outcome remains recoverable");
         assert_eq!(
             restarted
-                .start("rejected-start")
+                .start("rejected-start", test_weight(&root).await)
                 .await
                 .expect("idempotent rejected outcome")
                 .phase,

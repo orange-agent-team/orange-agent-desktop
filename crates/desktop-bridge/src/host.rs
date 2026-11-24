@@ -66,6 +66,7 @@ pub(crate) use creation::{
     authorize_creation_access, list_creation_access, revoke_creation_access,
     suspend_creation_selection,
 };
+pub(crate) use managed::{discard_model_staging, inspect_model_cache};
 mod llama_memory;
 mod runs;
 mod skill_packages;
@@ -727,7 +728,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "3a007ac99419c8825520bbc0f2ea7481b5a07f7c"
+            "1aed89aede3f9cb00a52b7a9e68bb3d9bff2a2bb"
         );
         assert_eq!(
             registry

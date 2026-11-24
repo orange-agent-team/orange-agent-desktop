@@ -13,6 +13,12 @@ class ModelController extends ChangeNotifier {
   final VoidCallback beforeStop;
   static const platform = MethodChannel('orange_agent/platform');
   api.ModelServiceView? view;
+  api.ModelCacheView? cacheView;
+  bool inspectingCache = false, clearingCache = false;
+  int _cacheGeneration = 0;
+  bool get hasStaging =>
+      cacheView?.downloadStagingBytes != null ||
+      cacheView?.importStagingBytes != null;
   String? error, notice;
   bool configuring = false,
       importing = false,
@@ -27,7 +33,12 @@ class ModelController extends ChangeNotifier {
   bool startUnconfirmed = false;
   Completer<void>? _configuration;
   bool get busy =>
-      configuring || importing || downloading || starting || stopping;
+      configuring ||
+      importing ||
+      downloading ||
+      starting ||
+      stopping ||
+      clearingCache;
   bool get canStop =>
       starting ||
       startUnconfirmed ||
@@ -51,6 +62,7 @@ class ModelController extends ChangeNotifier {
   bool current(int epoch) => _alive && epoch == _epoch;
   void publish(api.ModelServiceView value) {
     _reads++;
+    if (view?.installed != value.installed) invalidateCacheObservation();
     view = value;
     _lastInstance = value.instanceId ?? _lastInstance;
     if ({'idle', 'stopped', 'ready'}.contains(value.phase)) {
@@ -129,6 +141,7 @@ class ModelController extends ChangeNotifier {
   Future<void> importFile() async {
     if (!canInstall) return;
     final epoch = ++_epoch;
+    invalidateCacheObservation();
     importing = true;
     error = null;
     notice = null;
@@ -179,11 +192,66 @@ class ModelController extends ChangeNotifier {
     }
   }
 
+  void invalidateCacheObservation() {
+    _cacheGeneration++;
+    cacheView = null;
+    inspectingCache = false;
+  }
+
+  Future<void> inspectCache() async {
+    if (!_alive || view == null || inspectingCache || clearingCache) return;
+    final generation = ++_cacheGeneration;
+    inspectingCache = true;
+    error = null;
+    changed();
+    try {
+      final observed = await api.inspectModelCache(handle: handle);
+      if (_alive && generation == _cacheGeneration) cacheView = observed;
+    } catch (failure) {
+      if (_alive && generation == _cacheGeneration) {
+        cacheView = null;
+        error = describeModelError(failure);
+      }
+    } finally {
+      if (_alive && generation == _cacheGeneration) {
+        inspectingCache = false;
+        changed();
+      }
+    }
+  }
+
+  Future<void> discardStaging() async {
+    if (!_alive || view == null || busy || inspectingCache || !hasStaging) {
+      return;
+    }
+    final generation = ++_cacheGeneration;
+    clearingCache = true;
+    error = null;
+    notice = null;
+    changed();
+    try {
+      final observed = await api.discardModelStaging(handle: handle);
+      if (_alive && generation == _cacheGeneration) {
+        cacheView = observed;
+        notice = hasStaging ? '清理后检测到新的暂存数据。' : '已核对，本机没有该模型的暂存数据。';
+      }
+    } catch (failure) {
+      if (_alive && generation == _cacheGeneration) {
+        cacheView = null;
+        error = describeModelError(failure);
+      }
+    } finally {
+      clearingCache = false;
+      changed();
+    }
+  }
+
   Future<void> download() async {
     if (!canInstall) return;
     final operation = id();
     final epoch = ++_epoch;
     _downloadId = operation;
+    invalidateCacheObservation();
     downloading = true;
     error = null;
     notice = null;
@@ -423,6 +491,8 @@ String describeModelFailureCode(String code) {
     'MODEL_NOT_INSTALLED' => '请先导入清单中指定的模型文件。',
     'MODEL_INTEGRITY' => '文件或模型组件未通过完整性校验。',
     'MODEL_DOWNLOAD_CANCELLED' => '模型下载已停止，可重新选择下载以继续。自己的工作区仍在本机。',
+    'MODEL_CACHE_CLEANUP_PENDING' => '下载已停止，缓存仍有写入。稍后可核对并清除暂存。',
+    'MODEL_DOWNLOAD_REPRESENTATION_CHANGED' => '下载对象已经变更。请重新获取并核对模型。',
     'MODEL_DOWNLOAD_SOURCE_DENIED' => '模型下载地址不在当前目录允许的来源中。可导入已取得的同版本文件。',
     'MODEL_DOWNLOAD_CONNECTION' => '未能建立与模型来源的连接。',
     'MODEL_DOWNLOAD_TIMEOUT' => '模型传输超时。可重试以继续下载。',

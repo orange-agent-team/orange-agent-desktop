@@ -95,7 +95,7 @@ def package():
                 with tarfile.open(fileobj=stream) as tar:tar.extractall(tree,filter="data")
             (tree/".local").mkdir(mode=0o700)
             for name in ("toolchains","pub-cache","model-bundle"):
-                subprocess.run(["cp","-cR",ROOT/".local"/name,tree/".local"/name],check=True)
+                subprocess.run(["cp","-cR",(ROOT/".local"/name).resolve(strict=True),tree/".local"/name],check=True)
             env=dict(os.environ,SOURCE_DATE_EPOCH=epoch)
             subprocess.run([sys.executable,tree/"scripts/package-desktop-release.py","--build-checkout"],cwd=tree,env=env,check=True)
             app,=list((tree/"apps/desktop/build/macos/Build/Products/Release").glob("*.app"))

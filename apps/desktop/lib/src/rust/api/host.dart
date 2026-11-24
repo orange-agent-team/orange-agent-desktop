@@ -7,7 +7,14 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+
+Future<ModelCacheView> inspectModelCache({required String handle}) =>
+    RustLib.instance.api.crateApiHostInspectModelCache(handle: handle);
+
+/// Remove only inactive staging for the bundle-pinned model.
+Future<ModelCacheView> discardModelStaging({required String handle}) =>
+    RustLib.instance.api.crateApiHostDiscardModelStaging(handle: handle);
 
 /// Paths and OS version come from the trusted native application environment.
 Future<ModelServiceView> configureModelService({
@@ -1990,6 +1997,46 @@ class LocalSourceReference {
           startByte == other.startByte &&
           endByte == other.endByte &&
           line == other.line;
+}
+
+/// A point-in-time observation of the fixed model for the current host.
+class ModelCacheView {
+  final String state;
+  final String sha256;
+  final String expectedBytes;
+  final String? downloadStagingBytes;
+  final String? importStagingBytes;
+  final bool? readLeaseObserved;
+
+  const ModelCacheView({
+    required this.state,
+    required this.sha256,
+    required this.expectedBytes,
+    this.downloadStagingBytes,
+    this.importStagingBytes,
+    this.readLeaseObserved,
+  });
+
+  @override
+  int get hashCode =>
+      state.hashCode ^
+      sha256.hashCode ^
+      expectedBytes.hashCode ^
+      downloadStagingBytes.hashCode ^
+      importStagingBytes.hashCode ^
+      readLeaseObserved.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ModelCacheView &&
+          runtimeType == other.runtimeType &&
+          state == other.state &&
+          sha256 == other.sha256 &&
+          expectedBytes == other.expectedBytes &&
+          downloadStagingBytes == other.downloadStagingBytes &&
+          importStagingBytes == other.importStagingBytes &&
+          readLeaseObserved == other.readLeaseObserved;
 }
 
 class ModelConnectionView {

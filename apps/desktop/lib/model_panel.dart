@@ -10,6 +10,7 @@ class ModelPanel extends StatelessWidget {
     listenable: controller,
     builder: (context, _) {
       final view = controller.view;
+      final cache = controller.cacheView;
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -137,6 +138,72 @@ class ModelPanel extends StatelessWidget {
                     ),
                 ],
               ),
+              if (view != null)
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    TextButton(
+                      onPressed:
+                          controller.inspectingCache || controller.clearingCache
+                          ? null
+                          : controller.inspectCache,
+                      child: Text(
+                        controller.inspectingCache ? '正在核对缓存…' : '核对权重缓存',
+                      ),
+                    ),
+                    if (controller.hasStaging)
+                      TextButton(
+                        onPressed: controller.busy || controller.inspectingCache
+                            ? null
+                            : () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dialog) => AlertDialog(
+                                    title: const Text('清除模型暂存？'),
+                                    content: const Text(
+                                      '下次获取该模型时需要重新传输或导入这些未完成的字节。',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialog, false),
+                                        child: const Text('保留暂存'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialog, true),
+                                        child: const Text('确认清除'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed == true) {
+                                  await controller.discardStaging();
+                                }
+                              },
+                        child: const Text('清除未完成的模型文件'),
+                      ),
+                  ],
+                ),
+              if (cache != null) ...[
+                Text(switch (cache.state) {
+                  'absent' => '缓存中尚无权重',
+                  'staged' => '存在尚未校验的暂存文件',
+                  'verified' => '权重摘要已核验',
+                  'invalid' => '缓存文件未通过完整性校验',
+                  _ => '缓存状态未知',
+                }),
+                if (cache.downloadStagingBytes != null)
+                  Text(
+                    '下载暂存 ${cache.downloadStagingBytes} / ${cache.expectedBytes} 字节',
+                  ),
+                if (cache.importStagingBytes != null)
+                  Text(
+                    '导入暂存 ${cache.importStagingBytes} / ${cache.expectedBytes} 字节',
+                  ),
+                if (cache.readLeaseObserved == true) const Text('检测到权重文件正在被读取'),
+                SelectableText('SHA-256  ${cache.sha256}'),
+              ],
               if (controller.busy)
                 const Padding(
                   padding: EdgeInsets.only(top: 10),

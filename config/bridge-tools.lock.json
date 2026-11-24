@@ -46,7 +46,8 @@
     "LocalSkillChoice",
     "LocalSourceReference",
     "LocalSkillSelection",
-    "LocalPackageReview"
+    "LocalPackageReview",
+    "ModelCacheView"
   ],
   "public_functions": [
     "advanceRun",
@@ -134,7 +135,9 @@
     "startLocalSkillRun",
     "reviewLocalPackage",
     "installLocalPackage",
-    "uninstallLocalPackage"
+    "uninstallLocalPackage",
+    "inspectModelCache",
+    "discardModelStaging"
   ],
   "additional_public_modules": {
     "memory": {
