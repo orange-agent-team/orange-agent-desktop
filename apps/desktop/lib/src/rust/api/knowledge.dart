@@ -58,6 +58,52 @@ Future<void> closeKnowledgeCollection({
   selection: selection,
 );
 
+/// Save or reopen the exact file selection under a stable private name.
+Future<void> openSavedKnowledgeCollection({
+  required String handle,
+  required KnowledgeSelection selection,
+  required List<String> relativeFiles,
+  required String name,
+}) => RustLib.instance.api.crateApiKnowledgeOpenSavedKnowledgeCollection(
+  handle: handle,
+  selection: selection,
+  relativeFiles: relativeFiles,
+  name: name,
+);
+
+Future<List<String>> listSavedKnowledgeCollections({
+  required String handle,
+  required String workspaceId,
+  required String sessionToken,
+}) => RustLib.instance.api.crateApiKnowledgeListSavedKnowledgeCollections(
+  handle: handle,
+  workspaceId: workspaceId,
+  sessionToken: sessionToken,
+);
+
+Future<void> retireSavedKnowledgeCollection({
+  required String handle,
+  required String workspaceId,
+  required String sessionToken,
+  required String name,
+}) => RustLib.instance.api.crateApiKnowledgeRetireSavedKnowledgeCollection(
+  handle: handle,
+  workspaceId: workspaceId,
+  sessionToken: sessionToken,
+  name: name,
+);
+
+/// Retry only collection retirements already recorded by durable user consent.
+Future<void> reconcileSavedKnowledgeCleanup({required String handle}) => RustLib
+    .instance
+    .api
+    .crateApiKnowledgeReconcileSavedKnowledgeCleanup(handle: handle);
+
+Future<bool> savedKnowledgeCleanupPending({required String handle}) => RustLib
+    .instance
+    .api
+    .crateApiKnowledgeSavedKnowledgeCleanupPending(handle: handle);
+
 class KnowledgeHit {
   final String hitId;
   final String path;

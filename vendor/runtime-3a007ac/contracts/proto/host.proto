@@ -1,0 +1,122 @@
+syntax = "proto3";
+package orange.host.v1;
+import "google/protobuf/timestamp.proto";
+
+// A cloud Host owns an execution lease, not a GPU or financial lease.
+service RunStore {
+  rpc Claim(ClaimRequest) returns (RunAuthority);
+  rpc Renew(RunAuthority) returns (RunAuthority);
+  rpc AppendIntent(IntentRequest) returns (OperationRecord);
+  rpc AcquireDispatch(DispatchRequest) returns (DispatchPermit);
+  rpc CommitResult(ResultRequest) returns (OperationRecord);
+  rpc PendingOperations(RunAuthority) returns (PendingWork);
+  rpc GetOperationReceipt(OperationLookup) returns (OperationRecord);
+}
+message ClaimRequest { string run_id = 1; string host_instance_id = 2; string command_id = 3; uint64 expected_run_version = 4; }
+message RunAuthority {
+  string run_id = 1; string host_instance_id = 2; uint64 run_epoch = 3;
+  uint64 run_version = 4; string owner_scope_id = 5; string root_budget_id = 6;
+  google.protobuf.Timestamp expires_at = 7;
+}
+message IntentRequest {
+  RunAuthority authority = 1; string operation_id = 2; string invocation_id = 3;
+  string response_commit_id = 4; string tool_name = 5; string tool_version = 6;
+  string argument_digest = 7; string capability_snapshot_id = 8;
+  string execution_environment_id = 9; string policy_version = 10;
+  string approval_id = 11;
+}
+message OperationRecord {
+  string operation_id = 1; string run_id = 2; uint64 version = 3;
+  enum State { STATE_UNSPECIFIED = 0; INTENDED = 1; DISPATCHING = 2; SUCCEEDED = 3; FAILED = 4; UNKNOWN = 5; }
+  State state = 4; string argument_digest = 5; string result_artifact_id = 6;
+  string approval_id = 7; string approval_state = 8; string result_digest = 9;
+}
+message DispatchRequest { RunAuthority authority = 1; string operation_id = 2; uint64 expected_version = 3; string argument_digest = 4; }
+// The service must commit the dispatch fact before returning. Missing/invalid
+// lease, response_commit, live permission or approval means no permit.
+message DispatchPermit { RunAuthority authority = 1; OperationRecord operation = 2; google.protobuf.Timestamp expires_at = 3; string permit_id = 4; }
+message ResultRequest {
+  RunAuthority authority = 1; string operation_id = 2; uint64 expected_version = 3;
+  OperationRecord.State result_state = 4; string result_artifact_id = 5; string result_digest = 6;
+  bytes result_json = 7; string permit_id = 8;
+}
+
+// Dedicated platform Host control plane. Never mounted on the public Worker gateway.
+service PlatformHostPool {
+  rpc Poll(HostPollRequest) returns (HostPollResponse);
+  rpc ClaimWorkspace(ClaimWorkspaceRequest) returns (WorkspaceLease);
+  rpc RenewWorkspace(WorkspaceLease) returns (WorkspaceLease);
+  rpc ConfirmCleanup(WorkspaceCleanup) returns (CleanupReceipt);
+  rpc FetchWorkspaceInput(WorkspaceLease) returns (WorkspaceInput);
+  rpc ConfirmReady(WorkspaceReady) returns (WorkspaceReadyReceipt);
+  rpc StopWorkspace(WorkspaceStop) returns (WorkspaceReclaim);
+}
+message HostPollRequest {
+  string host_instance_id = 1;
+  string resource_profile_id = 2;
+  string attestation_digest = 3;
+  bool accept_reservations = 4;
+  uint32 input_protocol_version = 5;
+  uint32 runstore_version = 6;
+}
+message QueuedRun {
+  string run_id = 1;
+  string workspace_id = 2;
+  uint64 expected_run_version = 3;
+  google.protobuf.Timestamp workspace_expires_at = 4;
+  uint64 workspace_version = 5;
+}
+message HostPollResponse {
+  google.protobuf.Timestamp heartbeat_expires_at = 1;
+  QueuedRun assignment = 2;
+  WorkspaceReclaim reclaim = 3;
+}
+
+// A provisioning lease only authorizes lifecycle operations on one allocation.
+// It does not authorize model calls, tool dispatch, budget mutation or file access.
+message ClaimWorkspaceRequest {
+  string host_instance_id = 1; string run_id = 2; string workspace_id = 3;
+  uint64 expected_workspace_version = 4; string command_id = 5;
+}
+message WorkspaceLease {
+  string host_instance_id = 1; string run_id = 2; string workspace_id = 3;
+  string allocation_id = 4; uint64 epoch = 5; google.protobuf.Timestamp lease_until = 6;
+}
+message WorkspaceCleanup {
+  string host_instance_id = 1; string run_id = 2; string workspace_id = 3;
+  string allocation_id = 4; uint64 allocation_epoch = 5; string evidence_digest = 6;
+  bool sandbox_absent = 7; bool cgroup_absent = 8;
+}
+message CleanupReceipt { string receipt_id = 1; string workspace_id = 2; string evidence_digest = 3; }
+
+// Rediscover cleanup after a Host restart, including after its old lease timed out.
+message WorkspaceReclaim {
+  string run_id = 1; string workspace_id = 2; string allocation_id = 3; uint64 allocation_epoch = 4; string claim_command_id = 5;
+}
+
+message WorkspaceInput {
+  string receipt_id = 1; string allocation_id = 2; string artifact_id = 3; string version_id = 4;
+  string sha256 = 5; bytes content = 6;
+}
+message WorkspaceReady {
+  WorkspaceLease lease = 1; string input_receipt_id = 2; string input_sha256 = 3;
+  string sandbox_id = 4; string attestation_digest = 5; string materialization_digest = 6;
+}
+message WorkspaceReadyReceipt {
+  string receipt_id = 1; string workspace_id = 2; string allocation_id = 3; string sandbox_id = 4;
+  bool requires_run_authority = 5; uint64 run_version = 6;
+}
+
+// Stops further use of an original allocation. The capacity remains charged
+// until the independently checked cleanup receipt arrives.
+message WorkspaceStop {
+  string host_instance_id = 1; string run_id = 2; string workspace_id = 3; string allocation_id = 4;
+  uint64 allocation_epoch = 5;
+  enum Reason { UNSPECIFIED = 0; PREPARATION_FAILED = 1; HOST_SHUTDOWN = 2; LEASE_LOST = 3; }
+  Reason reason = 6;
+}
+
+message ProposedTool { IntentRequest intent = 1; bytes arguments_json = 2; OperationRecord record = 3; }
+message PendingWork { repeated ProposedTool tools = 1; }
+
+message OperationLookup { string host_instance_id=1; string run_id=2; string workspace_id=3; string allocation_id=4; uint64 run_epoch=5; string operation_id=6; string permit_id=7; }

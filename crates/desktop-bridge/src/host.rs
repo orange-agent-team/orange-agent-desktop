@@ -94,6 +94,7 @@ pub(crate) fn failure(code: &str) -> BridgeError {
 struct Host {
     root: PathBuf,
     view: HostView,
+    knowledge_cleanup_pending: bool,
     journal: Journal,
     grants: std::collections::HashMap<String, workspace::WorkspaceGrant>,
     access_tokens: std::collections::HashMap<String, String>,
@@ -162,12 +163,13 @@ impl HostRegistry {
             }
             return Ok(host.view.clone());
         }
-        let journal = Journal::open(&root.join("host.sqlite")).map_err(|error| {
+        let mut journal = Journal::open(&root.join("host.sqlite")).map_err(|error| {
             failure(match error {
                 orange_agent_runtime::JournalError::Busy => "HOST_BUSY",
                 _ => "PRIVATE_STORAGE_OR_HOST_LOCK",
             })
         })?;
+        let knowledge_cleanup_pending = journal.reconcile_saved_knowledge().is_err();
         let lock: serde_json::Value = serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../config/runtime.lock.json"
@@ -197,6 +199,7 @@ impl HostRegistry {
         self.host = Some(Host {
             root,
             view: view.clone(),
+            knowledge_cleanup_pending,
             journal,
             grants: std::collections::HashMap::new(),
             knowledge: std::collections::HashMap::new(),
@@ -406,6 +409,7 @@ impl HostRegistry {
         host.grants.remove(id);
         host.access_tokens.remove(id);
         knowledge::forget_workspace(host, id);
+        host.knowledge_cleanup_pending = host.journal.reconcile_saved_knowledge().is_err();
         signals
             .lock()
             .map_err(|_| failure("HOST_INTERNAL"))?
@@ -723,7 +727,7 @@ mod tests {
         assert!(registry.inspect("another-handle").is_err());
         assert_eq!(
             first.runtime_source_commit,
-            "006ff38a3624cdd96e6d576afc3a4f5ca78b81ce"
+            "3a007ac99419c8825520bbc0f2ea7481b5a07f7c"
         );
         assert_eq!(
             registry
@@ -743,6 +747,91 @@ mod tests {
         let second = registry.initialize(&path).expect("reopen");
         assert_ne!(first.handle, second.handle);
         assert!(registry.close(&first.handle).is_err());
+    }
+    #[cfg(unix)]
+    #[test]
+    fn pending_saved_index_cleanup_survives_restart_and_leaves_other_host_functions_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temporary = tempfile::tempdir()?;
+        let private = temporary.path().join("private");
+        let work = temporary.path().join("manuals");
+        std::fs::create_dir(&work)?;
+        let mut registry = HostRegistry::default();
+        let first = registry.initialize(&private).expect("open isolated host");
+        let row = registry
+            .authorize_workspace(&first.handle, "permit", &work)
+            .expect("workspace");
+        {
+            let host = registry.current(&first.handle).expect("live host");
+            let grant = host
+                .grants
+                .get(&row.workspace_id)
+                .expect("current OS grant");
+            host.journal.open_saved_knowledge(
+                &row.workspace_id,
+                grant,
+                "notes",
+                vec!["manual.txt".into()],
+            )?;
+        }
+        let authority = std::fs::read_dir(&private)?
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .map(|entry| entry.path())
+            .find(|p| {
+                p.file_name()
+                    .is_some_and(|n| n.to_string_lossy().contains("knowledge-authority-"))
+                    && p.extension().is_some_and(|e| e == "sqlite")
+            })
+            .expect("test-owned authority");
+        let original = std::fs::read(&authority)?;
+        std::fs::write(&authority, b"corrupt owned fixture")?;
+        let revoked = registry
+            .revoke_workspace(&first.handle, &row.workspace_id, &row.permission_version)
+            .expect("durable revocation");
+        assert!(!revoked.permission_active);
+        assert!(
+            registry
+                .current(&first.handle)
+                .expect("host state")
+                .knowledge_cleanup_pending
+        );
+        registry.close(&first.handle).expect("close");
+        let second = registry.initialize(&private).expect("degraded startup");
+        assert!(
+            registry
+                .current(&second.handle)
+                .expect("reopened state")
+                .knowledge_cleanup_pending
+        );
+        assert_eq!(
+            registry
+                .validate_amount(&second.handle, "25")
+                .expect("unrelated host operation"),
+            "25"
+        );
+        let host = registry.current(&second.handle).expect("current host");
+        assert!(
+            host.journal
+                .open_workspace(LOCAL_OWNER, &row.workspace_id)
+                .is_err()
+        );
+        std::fs::write(&authority, original)?;
+        host.journal.reconcile_saved_knowledge()?;
+        registry.close(&second.handle).expect("close after repair");
+        let third = registry.initialize(&private).expect("cleanup complete");
+        assert!(
+            !registry
+                .current(&third.handle)
+                .expect("repaired state")
+                .knowledge_cleanup_pending
+        );
+        assert!(
+            registry
+                .restore_workspace(&third.handle, &row.workspace_id)
+                .is_err()
+        );
+        Ok(())
     }
     #[cfg(unix)]
     #[test]

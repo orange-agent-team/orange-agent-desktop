@@ -29,6 +29,8 @@ def main():
                         "--target=test_driver/knowledge_app.dart","--driver=test_driver/knowledge_driver.dart"],cwd=APP,env=env,check=True,timeout=900)
     print(json.dumps({"runtime_source":json.loads((ROOT/"config/runtime.lock.json").read_bytes())["origin_commit"],"bridge_sha256":digest(lib),
                       "supplied_library":bool(args.bridge_library),"native_window":args.native_app,"workspace_selection":"owned development fixture",
-                      "typed_native_calls":True,"old_content_hidden":True,"closed_selection_replay_denied":True}))
+                      "typed_native_calls":True,"old_content_hidden":True,"closed_selection_replay_denied":True,
+                      "saved_citation_after_host_restart":True,"stale_access_token_denied":True,"permanent_name_withdrawal":True}))
+    print("PASS native host restart, fresh OS grant, recovered citation and saved index withdrawal")
     print("PASS Flutter knowledge selection, live Rust retrieval, hidden stale content and enforced OS grant")
 if __name__=="__main__":main()

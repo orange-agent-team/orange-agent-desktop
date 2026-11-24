@@ -14,19 +14,7 @@ import 'package:orange_desktop/src/rust/frb_generated.dart';
 
 import 'local_model_fixture.dart';
 
-Future<HostView> reopenHost(String directory) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 3));
-  while (true) {
-    try {
-      return await initializeHost(applicationDataDirectory: directory);
-    } on BridgeError catch (error) {
-      if (error.code != 'HOST_BUSY' || DateTime.now().isAfter(deadline)) {
-        rethrow;
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-    }
-  }
-}
+import 'reopen_host.dart';
 
 Future<void> settle(WidgetTester tester, String checkpoint) async {
   debugPrint(jsonEncode({'nativeCheckpoint': checkpoint}));
@@ -519,7 +507,7 @@ void main() {
         openHandle = host.handle;
         expect(
           host.runtimeSourceCommit,
-          '006ff38a3624cdd96e6d576afc3a4f5ca78b81ce',
+          '3a007ac99419c8825520bbc0f2ea7481b5a07f7c',
         );
         expect(host.contractVersion, 'desktop-host.v1');
         expect(

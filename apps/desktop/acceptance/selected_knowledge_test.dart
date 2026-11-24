@@ -9,10 +9,14 @@ import 'package:orange_desktop/src/rust/api/host.dart' as host;
 import 'package:orange_desktop/src/rust/api/knowledge.dart' as api;
 import 'package:orange_desktop/src/rust/frb_generated.dart';
 
+import '../integration_test/reopen_host.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory temp, first, second;
   late host.HostView session;
+  String? activeHandle;
+  Directory? ownedTemp;
   late host.WorkspaceView origin, uiSpace;
   setUpAll(() async {
     await RustLib.init(
@@ -21,11 +25,13 @@ void main() {
       ),
     );
     temp = await Directory.systemTemp.createTemp('orange-desktop-knowledge-');
+    ownedTemp = temp;
     first = await Directory('${temp.path}/first').create();
     second = await Directory('${temp.path}/second').create();
     session = await host.initializeHost(
       applicationDataDirectory: '${temp.resolveSymbolicLinksSync()}/host',
     );
+    activeHandle = session.handle;
     origin = await host.authorizeWorkspace(
       handle: session.handle,
       requestId: 'knowledge-workspace-first',
@@ -38,9 +44,12 @@ void main() {
     );
   });
   tearDownAll(() async {
-    await host.closeHost(handle: session.handle);
-    RustLib.dispose();
-    await temp.delete(recursive: true);
+    try {
+      if (activeHandle != null) await host.closeHost(handle: activeHandle!);
+    } finally {
+      RustLib.dispose();
+      if (ownedTemp != null) await ownedTemp!.delete(recursive: true);
+    }
   });
 
   test('native selection binds files, actual OS access session and citation version', () async {
@@ -199,4 +208,93 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+  test('restart requires OS reselection before reading a saved citation, then permanent withdrawal survives restart', () async {
+    final directory = await Directory('${temp.path}/saved').create();
+    final document = File('${directory.path}/schedule.txt');
+    await document.writeAsString('Orchard meeting in April.');
+    final state = '${temp.resolveSymbolicLinksSync()}/host';
+    var workspace = await host.authorizeWorkspace(
+      handle: session.handle,
+      requestId: 'saved-qa',
+      selectedDirectory: directory.resolveSymbolicLinksSync(),
+    );
+    api.KnowledgeSelection selection(String id) => api.KnowledgeSelection(
+      workspaceId: workspace.workspaceId,
+      sessionToken: workspace.sessionToken!,
+      collectionId: id,
+    );
+    Future<List<String>> names(String token) =>
+        api.listSavedKnowledgeCollections(
+          handle: session.handle,
+          workspaceId: workspace.workspaceId,
+          sessionToken: token,
+        );
+    Future<void> open(api.KnowledgeSelection binding) =>
+        api.openSavedKnowledgeCollection(
+          handle: session.handle,
+          selection: binding,
+          relativeFiles: ['schedule.txt'],
+          name: 'calendar',
+        );
+    Future<void> denied(Future<dynamic> call, String code) async {
+      await expectLater(
+        call,
+        throwsA(isA<host.BridgeError>().having((e) => e.code, 'code', code)),
+      );
+    }
+
+    final first = selection('saved-first');
+    await open(first);
+    final hit = (await api.searchSelectedKnowledge(
+      handle: session.handle,
+      selection: first,
+      query: 'Orchard',
+      limit: 1,
+    )).hits.single;
+    final oldToken = workspace.sessionToken!;
+    await host.closeHost(handle: session.handle);
+    activeHandle = null;
+    session = await reopenHost(state);
+    activeHandle = session.handle;
+    await denied(names(oldToken), 'KNOWLEDGE_ACCESS_DENIED');
+    await denied(open(first), 'KNOWLEDGE_ACCESS_DENIED');
+    workspace = await host.restoreWorkspaceAccess(
+      handle: session.handle,
+      workspaceId: workspace.workspaceId,
+    );
+    expect(workspace.sessionToken, isNot(oldToken));
+    expect(await names(workspace.sessionToken!), ['calendar']);
+    final second = selection('saved-second');
+    await open(second);
+    final passage = await api.readKnowledgeCitation(
+      handle: session.handle,
+      selection: second,
+      hitId: hit.hitId,
+      expectedSha256: hit.sourceSha256,
+    );
+    expect(passage.text, await document.readAsString());
+    await api.retireSavedKnowledgeCollection(
+      handle: session.handle,
+      workspaceId: workspace.workspaceId,
+      sessionToken: workspace.sessionToken!,
+      name: 'calendar',
+    );
+    await denied(
+      open(selection('saved-after-retirement')),
+      'KNOWLEDGE_NAME_RETIRED',
+    );
+    await host.closeHost(handle: session.handle);
+    activeHandle = null;
+    session = await reopenHost(state);
+    activeHandle = session.handle;
+    workspace = await host.restoreWorkspaceAccess(
+      handle: session.handle,
+      workspaceId: workspace.workspaceId,
+    );
+    expect(await names(workspace.sessionToken!), isEmpty);
+    await denied(
+      open(selection('saved-after-reopen')),
+      'KNOWLEDGE_NAME_RETIRED',
+    );
+  });
 }

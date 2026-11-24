@@ -212,8 +212,13 @@
       ],
       "functions": [
         "closeKnowledgeCollection",
+        "listSavedKnowledgeCollections",
         "openKnowledgeCollection",
+        "openSavedKnowledgeCollection",
         "readKnowledgeCitation",
+        "reconcileSavedKnowledgeCleanup",
+        "retireSavedKnowledgeCollection",
+        "savedKnowledgeCleanupPending",
         "searchSelectedKnowledge"
       ]
     }

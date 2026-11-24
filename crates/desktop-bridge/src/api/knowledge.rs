@@ -33,7 +33,7 @@ pub async fn open_knowledge_collection(
     selection: KnowledgeSelection,
     relative_files: Vec<String>,
 ) -> Result<(), BridgeError> {
-    crate::host::knowledge::open(handle, selection, relative_files).await
+    crate::host::knowledge::open(handle, selection, relative_files, None).await
 }
 pub async fn search_selected_knowledge(
     handle: String,
@@ -67,4 +67,38 @@ pub async fn close_knowledge_collection(
     selection: KnowledgeSelection,
 ) -> Result<(), BridgeError> {
     crate::host::knowledge::close(handle, selection).await
+}
+
+/// Save or reopen the exact file selection under a stable private name.
+pub async fn open_saved_knowledge_collection(
+    handle: String,
+    selection: KnowledgeSelection,
+    relative_files: Vec<String>,
+    name: String,
+) -> Result<(), BridgeError> {
+    crate::host::knowledge::open(handle, selection, relative_files, Some(name)).await
+}
+pub async fn list_saved_knowledge_collections(
+    handle: String,
+    workspace_id: String,
+    session_token: String,
+) -> Result<Vec<String>, BridgeError> {
+    crate::host::knowledge::saved_names(handle, workspace_id, session_token).await
+}
+pub async fn retire_saved_knowledge_collection(
+    handle: String,
+    workspace_id: String,
+    session_token: String,
+    name: String,
+) -> Result<(), BridgeError> {
+    crate::host::knowledge::retire(handle, workspace_id, session_token, name).await
+}
+
+/// Retry only collection retirements already recorded by durable user consent.
+pub async fn reconcile_saved_knowledge_cleanup(handle: String) -> Result<(), BridgeError> {
+    crate::host::knowledge::reconcile(handle).await
+}
+
+pub async fn saved_knowledge_cleanup_pending(handle: String) -> Result<bool, BridgeError> {
+    crate::host::knowledge::cleanup_pending(handle).await
 }

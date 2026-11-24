@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1568559030;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1002213714;
 
 // Section: executor
 
@@ -2779,6 +2779,49 @@ fn wire__crate__api__host__list_runs_impl(
         },
     )
 }
+fn wire__crate__api__knowledge__list_saved_knowledge_collections_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "list_saved_knowledge_collections",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <String>::sse_decode(&mut deserializer);
+            let api_workspace_id = <String>::sse_decode(&mut deserializer);
+            let api_session_token = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::host::BridgeError>(
+                    (move || async move {
+                        let output_ok = crate::api::knowledge::list_saved_knowledge_collections(
+                            api_handle,
+                            api_workspace_id,
+                            api_session_token,
+                        )
+                        .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__memory__list_scopes_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2934,6 +2977,52 @@ fn wire__crate__api__knowledge__open_knowledge_collection_impl(
                             api_handle,
                             api_selection,
                             api_relative_files,
+                        )
+                        .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__knowledge__open_saved_knowledge_collection_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "open_saved_knowledge_collection",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <String>::sse_decode(&mut deserializer);
+            let api_selection =
+                <crate::api::knowledge::KnowledgeSelection>::sse_decode(&mut deserializer);
+            let api_relative_files = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::host::BridgeError>(
+                    (move || async move {
+                        let output_ok = crate::api::knowledge::open_saved_knowledge_collection(
+                            api_handle,
+                            api_selection,
+                            api_relative_files,
+                            api_name,
                         )
                         .await?;
                         std::result::Result::Ok(output_ok)
@@ -3660,6 +3749,44 @@ fn wire__crate__api__account__read_personal_wallet_impl(
         },
     )
 }
+fn wire__crate__api__knowledge__reconcile_saved_knowledge_cleanup_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "reconcile_saved_knowledge_cleanup",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::host::BridgeError>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::knowledge::reconcile_saved_knowledge_cleanup(api_handle)
+                                .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__memory__reconcile_task_write_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -3784,6 +3911,51 @@ fn wire__crate__api__host__restore_workspace_access_impl(
                         let output_ok = crate::api::host::restore_workspace_access(
                             api_handle,
                             api_workspace_id,
+                        )
+                        .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__knowledge__retire_saved_knowledge_collection_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "retire_saved_knowledge_collection",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <String>::sse_decode(&mut deserializer);
+            let api_workspace_id = <String>::sse_decode(&mut deserializer);
+            let api_session_token = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::host::BridgeError>(
+                    (move || async move {
+                        let output_ok = crate::api::knowledge::retire_saved_knowledge_collection(
+                            api_handle,
+                            api_workspace_id,
+                            api_session_token,
+                            api_name,
                         )
                         .await?;
                         std::result::Result::Ok(output_ok)
@@ -4036,6 +4208,44 @@ fn wire__crate__api__memory__run_memory_requirements_impl(
                     (move || async move {
                         let output_ok =
                             crate::api::memory::run_memory_requirements(api_handle, api_run_id)
+                                .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__knowledge__saved_knowledge_cleanup_pending_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "saved_knowledge_cleanup_pending",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_handle = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::host::BridgeError>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::knowledge::saved_knowledge_cleanup_pending(api_handle)
                                 .await?;
                         std::result::Result::Ok(output_ok)
                     })()
@@ -7316,173 +7526,203 @@ fn pde_ffi_dispatcher_primary_impl(
         62 => wire__crate__api__memory__list_members_impl(port, ptr, rust_vec_len, data_len),
         63 => wire__crate__api__host__list_retained_edits_impl(port, ptr, rust_vec_len, data_len),
         64 => wire__crate__api__host__list_runs_impl(port, ptr, rust_vec_len, data_len),
-        65 => wire__crate__api__memory__list_scopes_impl(port, ptr, rust_vec_len, data_len),
-        66 => wire__crate__api__host__list_unresolved_edits_impl(port, ptr, rust_vec_len, data_len),
-        67 => wire__crate__api__host__list_workspaces_impl(port, ptr, rust_vec_len, data_len),
-        68 => wire__crate__api__knowledge__open_knowledge_collection_impl(
+        65 => wire__crate__api__knowledge__list_saved_knowledge_collections_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        69 => wire__crate__api__memory__owner_inventory_impl(port, ptr, rust_vec_len, data_len),
-        70 => wire__crate__api__memory__pending_user_drafts_impl(port, ptr, rust_vec_len, data_len),
-        71 => {
+        66 => wire__crate__api__memory__list_scopes_impl(port, ptr, rust_vec_len, data_len),
+        67 => wire__crate__api__host__list_unresolved_edits_impl(port, ptr, rust_vec_len, data_len),
+        68 => wire__crate__api__host__list_workspaces_impl(port, ptr, rust_vec_len, data_len),
+        69 => wire__crate__api__knowledge__open_knowledge_collection_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        70 => wire__crate__api__knowledge__open_saved_knowledge_collection_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        71 => wire__crate__api__memory__owner_inventory_impl(port, ptr, rust_vec_len, data_len),
+        72 => wire__crate__api__memory__pending_user_drafts_impl(port, ptr, rust_vec_len, data_len),
+        73 => {
             wire__crate__api__account__personal_api_endpoint_impl(port, ptr, rust_vec_len, data_len)
         }
-        72 => wire__crate__api__memory__prepare_edit_impl(port, ptr, rust_vec_len, data_len),
-        73 => wire__crate__api__host__prepare_export_impl(port, ptr, rust_vec_len, data_len),
-        74 => wire__crate__api__host__prepare_export_restoration_impl(
+        74 => wire__crate__api__memory__prepare_edit_impl(port, ptr, rust_vec_len, data_len),
+        75 => wire__crate__api__host__prepare_export_impl(port, ptr, rust_vec_len, data_len),
+        76 => wire__crate__api__host__prepare_export_restoration_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        75 => wire__crate__api__host__prepare_export_retirement_impl(
+        77 => wire__crate__api__host__prepare_export_retirement_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        76 => wire__crate__api__host__prepare_recovery_decision_impl(
+        78 => wire__crate__api__host__prepare_recovery_decision_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        77 => wire__crate__api__memory__prepare_removal_impl(port, ptr, rust_vec_len, data_len),
-        78 => wire__crate__api__host__prepare_retention_archive_impl(
+        79 => wire__crate__api__memory__prepare_removal_impl(port, ptr, rust_vec_len, data_len),
+        80 => wire__crate__api__host__prepare_retention_archive_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        79 => wire__crate__api__host__preview_editing_tool_impl(port, ptr, rust_vec_len, data_len),
-        80 => wire__crate__api__memory__preview_run_memory_impl(port, ptr, rust_vec_len, data_len),
-        81 => wire__crate__api__memory__read_entry_impl(port, ptr, rust_vec_len, data_len),
-        82 => wire__crate__api__knowledge__read_knowledge_citation_impl(
+        81 => wire__crate__api__host__preview_editing_tool_impl(port, ptr, rust_vec_len, data_len),
+        82 => wire__crate__api__memory__preview_run_memory_impl(port, ptr, rust_vec_len, data_len),
+        83 => wire__crate__api__memory__read_entry_impl(port, ptr, rust_vec_len, data_len),
+        84 => wire__crate__api__knowledge__read_knowledge_citation_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        83 => {
+        85 => {
             wire__crate__api__account__read_personal_budgets_impl(port, ptr, rust_vec_len, data_len)
         }
-        84 => {
+        86 => {
             wire__crate__api__account__read_personal_wallet_impl(port, ptr, rust_vec_len, data_len)
         }
-        85 => {
+        87 => wire__crate__api__knowledge__reconcile_saved_knowledge_cleanup_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        88 => {
             wire__crate__api__memory__reconcile_task_write_impl(port, ptr, rust_vec_len, data_len)
         }
-        86 => wire__crate__api__memory__restore_run_memory_impl(port, ptr, rust_vec_len, data_len),
-        87 => {
+        89 => wire__crate__api__memory__restore_run_memory_impl(port, ptr, rust_vec_len, data_len),
+        90 => {
             wire__crate__api__host__restore_workspace_access_impl(port, ptr, rust_vec_len, data_len)
         }
-        88 => wire__crate__api__memory__review_edit_impl(port, ptr, rust_vec_len, data_len),
-        89 => wire__crate__api__host__review_local_package_impl(port, ptr, rust_vec_len, data_len),
-        90 => {
+        91 => wire__crate__api__knowledge__retire_saved_knowledge_collection_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        92 => wire__crate__api__memory__review_edit_impl(port, ptr, rust_vec_len, data_len),
+        93 => wire__crate__api__host__review_local_package_impl(port, ptr, rust_vec_len, data_len),
+        94 => {
             wire__crate__api__host__revoke_creation_access_impl(port, ptr, rust_vec_len, data_len)
         }
-        91 => wire__crate__api__host__revoke_editing_access_impl(port, ptr, rust_vec_len, data_len),
-        92 => wire__crate__api__host__revoke_workspace_impl(port, ptr, rust_vec_len, data_len),
-        93 => wire__crate__api__memory__run_memory_requirements_impl(
+        95 => wire__crate__api__host__revoke_editing_access_impl(port, ptr, rust_vec_len, data_len),
+        96 => wire__crate__api__host__revoke_workspace_impl(port, ptr, rust_vec_len, data_len),
+        97 => wire__crate__api__memory__run_memory_requirements_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        94 => wire__crate__api__knowledge__search_selected_knowledge_impl(
+        98 => wire__crate__api__knowledge__saved_knowledge_cleanup_pending_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        95 => {
+        99 => wire__crate__api__knowledge__search_selected_knowledge_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        100 => {
             wire__crate__api__host__set_local_skill_enabled_impl(port, ptr, rust_vec_len, data_len)
         }
-        96 => wire__crate__api__memory__set_member_impl(port, ptr, rust_vec_len, data_len),
-        97 => wire__crate__api__memory__set_scope_enabled_impl(port, ptr, rust_vec_len, data_len),
-        98 => wire__crate__api__host__start_creation_run_impl(port, ptr, rust_vec_len, data_len),
-        99 => wire__crate__api__host__start_editing_run_impl(port, ptr, rust_vec_len, data_len),
-        100 => {
+        101 => wire__crate__api__memory__set_member_impl(port, ptr, rust_vec_len, data_len),
+        102 => wire__crate__api__memory__set_scope_enabled_impl(port, ptr, rust_vec_len, data_len),
+        103 => wire__crate__api__host__start_creation_run_impl(port, ptr, rust_vec_len, data_len),
+        104 => wire__crate__api__host__start_editing_run_impl(port, ptr, rust_vec_len, data_len),
+        105 => {
             wire__crate__api__host__start_interactive_run_impl(port, ptr, rust_vec_len, data_len)
         }
-        101 => {
+        106 => {
             wire__crate__api__host__start_local_skill_run_impl(port, ptr, rust_vec_len, data_len)
         }
-        102 => wire__crate__api__memory__start_memory_run_impl(port, ptr, rust_vec_len, data_len),
-        103 => wire__crate__api__host__start_model_service_impl(port, ptr, rust_vec_len, data_len),
-        104 => wire__crate__api__host__start_run_impl(port, ptr, rust_vec_len, data_len),
-        105 => wire__crate__api__host__stop_model_service_impl(port, ptr, rust_vec_len, data_len),
-        106 => wire__crate__api__memory__suspend_access_impl(port, ptr, rust_vec_len, data_len),
-        107 => wire__crate__api__host__suspend_creation_selection_impl(
+        107 => wire__crate__api__memory__start_memory_run_impl(port, ptr, rust_vec_len, data_len),
+        108 => wire__crate__api__host__start_model_service_impl(port, ptr, rust_vec_len, data_len),
+        109 => wire__crate__api__host__start_run_impl(port, ptr, rust_vec_len, data_len),
+        110 => wire__crate__api__host__stop_model_service_impl(port, ptr, rust_vec_len, data_len),
+        111 => wire__crate__api__memory__suspend_access_impl(port, ptr, rust_vec_len, data_len),
+        112 => wire__crate__api__host__suspend_creation_selection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        108 => wire__crate__api__host__suspend_editing_selection_impl(
+        113 => wire__crate__api__host__suspend_editing_selection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        109 => wire__crate__api__host__suspend_export_destination_impl(
+        114 => wire__crate__api__host__suspend_export_destination_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        110 => wire__crate__api__host__suspend_export_inspection_impl(
+        115 => wire__crate__api__host__suspend_export_inspection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        111 => wire__crate__api__host__suspend_export_restoration_impl(
+        116 => wire__crate__api__host__suspend_export_restoration_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        112 => wire__crate__api__host__suspend_export_retirement_impl(
+        117 => wire__crate__api__host__suspend_export_retirement_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        113 => wire__crate__api__host__suspend_recovery_inspection_impl(
+        118 => wire__crate__api__host__suspend_recovery_inspection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        114 => wire__crate__api__host__suspend_recovery_write_selection_impl(
+        119 => wire__crate__api__host__suspend_recovery_write_selection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        115 => {
+        120 => {
             wire__crate__api__host__suspend_retention_access_impl(port, ptr, rust_vec_len, data_len)
         }
-        116 => {
+        121 => {
             wire__crate__api__host__suspend_workspace_access_impl(port, ptr, rust_vec_len, data_len)
         }
-        117 => wire__crate__api__host__suspend_workspace_selection_impl(
+        122 => wire__crate__api__host__suspend_workspace_selection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        118 => {
+        123 => {
             wire__crate__api__memory__uncertain_task_writes_impl(port, ptr, rust_vec_len, data_len)
         }
-        119 => {
+        124 => {
             wire__crate__api__host__uninstall_local_package_impl(port, ptr, rust_vec_len, data_len)
         }
-        120 => wire__crate__api__host__validate_amount_impl(port, ptr, rust_vec_len, data_len),
+        125 => wire__crate__api__host__validate_amount_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
