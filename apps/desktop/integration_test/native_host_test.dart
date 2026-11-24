@@ -16,6 +16,8 @@ import 'local_model_fixture.dart';
 
 import 'reopen_host.dart';
 
+export 'reopen_host.dart' show reopenHost;
+
 Future<void> settle(WidgetTester tester, String checkpoint) async {
   debugPrint(jsonEncode({'nativeCheckpoint': checkpoint}));
   try {
